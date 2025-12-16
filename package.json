@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "NODE_OPTIONS=\"--localstorage-file=/tmp/node-localstorage\" next dev --turbopack",
-    "build": "next build",
+    "build": "prisma generate && hnext build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.35.5",
