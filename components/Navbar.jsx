@@ -1,10 +1,12 @@
 'use client'
 import { PackageIcon, Search, ShoppingCart, User } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSelector } from "react-redux";
 import { useUser, useClerk, UserButton} from "@clerk/nextjs";
+import { assets } from "@/assets/assets";
 
 const Navbar = () => {
 
@@ -26,9 +28,9 @@ const Navbar = () => {
             <div className="mx-6">
                 <div className="flex items-center justify-between max-w-7xl mx-auto py-4  transition-all">
 
-                    <Link href="/" className="relative text-4xl font-semibold text-slate-700">
-                        <span className="text-green-600">go</span>cart<span className="text-green-600 text-5xl leading-0">.</span>
-                        <p className="absolute text-xs font-semibold -top-1 -right-8 px-3 p-0.5 rounded-full flex items-center gap-2 text-white bg-green-500">
+                    <Link href="/" className="relative flex items-center gap-2">
+                        <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-12 w-auto object-contain" priority />
+                        <p className="absolute -top-1 -right-8 text-xs font-semibold px-3 p-0.5 rounded-full flex items-center gap-2 text-white bg-green-500">
                             plus
                         </p>
                     </Link>
