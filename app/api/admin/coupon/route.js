@@ -1,13 +1,8 @@
 import authAdmin from "@/middlewares/authAdmin";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-
-
-
-
-// Add new coupon
-
-import { getAuth } from "@clerk/nextjs/dist/types/server";
+import { getAuth } from "@clerk/nextjs/server";
+import { inngest } from "@/inngest/client";
 
 export async function POST(request) {
     try {
@@ -44,7 +39,7 @@ export async function POST(request) {
 // Delete a coupon /api/coupon?id=couponId
 export async function DELETE(request) {
     try {
-        const {userId} = getAuth();
+        const {userId} = getAuth(request);
         const isAdmin = await authAdmin(userId);
 
         if(!isAdmin) {
@@ -69,7 +64,7 @@ export async function DELETE(request) {
  // Get all coupons
  export async function GET(request) {
     try {
-        const {userId} = getAuth();
+        const {userId} = getAuth(request);
         const isAdmin = await authAdmin(userId);
 
         if(!isAdmin) {
