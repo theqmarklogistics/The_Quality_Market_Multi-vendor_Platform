@@ -16,6 +16,7 @@
     "@prisma/adapter-neon": "^7.1.0",
     "@prisma/client": "6.14.0",
     "@reduxjs/toolkit": "^2.8.2",
+    "@vercel/analytics": "^1.6.1",
     "axios": "^1.13.3",
     "date-fns": "^4.1.0",
     "inngest": "^3.47.0",

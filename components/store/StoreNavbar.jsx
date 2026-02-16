@@ -2,8 +2,11 @@
 import Link from "next/link"
 import Image from "next/image"
 import { assets } from "@/assets/assets"
+import { useUser, UserButton } from "@clerk/nextjs"
 
 const StoreNavbar = () => {
+
+    const {user} = useUser();
 
 
     return (
@@ -15,7 +18,8 @@ const StoreNavbar = () => {
                 </p>
             </Link>
             <div className="flex items-center gap-3">
-                <p>Hi, Seller</p>
+                <p>Hi, {user?.firstName}</p>
+                <UserButton />
             </div>
         </div>
     )

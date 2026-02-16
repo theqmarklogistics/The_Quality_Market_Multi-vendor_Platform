@@ -11,7 +11,8 @@ export async function POST(request) {
     try {
         
         const {userId} = getAuth(request);
-        const productId = await request.json();
+        const body = await request.json();
+        const productId = body?.productId;
 
         if(!productId){
             return NextResponse.json({error: "Product ID is required"}, {status: 400});

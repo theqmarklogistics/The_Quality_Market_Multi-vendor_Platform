@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 
 
 
@@ -14,13 +14,10 @@ const authSeller = async (userId) => {
             }
         });
 
-        if(user.store){
-            if(user.store.status === 'approved'){
-                return user.store.id;
-           }
-        } else {
-            return false;
+        if (user.store && user.store.status === 'approved') {
+            return user.store.id;
         }
+        return false;
         
     } catch (error) {
         console.error(error);

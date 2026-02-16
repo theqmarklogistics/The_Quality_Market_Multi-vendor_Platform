@@ -91,7 +91,7 @@ export async function GET(request) {
                 storeId: storeId
             }
         });
-        return NextResponse.json(products);
+        return NextResponse.json({ products });
 
 
     } catch (error) {

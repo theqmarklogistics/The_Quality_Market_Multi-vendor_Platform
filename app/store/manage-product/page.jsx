@@ -4,27 +4,57 @@ import { toast } from "react-hot-toast"
 import Image from "next/image"
 import Loading from "@/components/Loading"
 import { productDummyData } from "@/assets/assets"
+import { useAuth } from "@clerk/nextjs"
+import axios from "axios"
 
 export default function StoreManageProducts() {
 
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
+    const {getToken, user} = useAuth();
+
+    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'Rwf'
 
     const [loading, setLoading] = useState(true)
     const [products, setProducts] = useState([])
 
     const fetchProducts = async () => {
-        setProducts(productDummyData)
+        try {
+            const token = await getToken();
+            const {data} = await axios.get('/api/store/product', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            const list = Array.isArray(data) ? data : (data?.products || [])
+            setProducts(list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)))
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
         setLoading(false)
     }
 
     const toggleStock = async (productId) => {
         // Logic to toggle the stock of a product
+        try {
+            const token = await getToken();
+            const {data} = await axios.post('/api/store/stock-toggle', {
+                productId
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            setProducts(products.map(product => product.id === productId ? {...product, inStock: !product.inStock} : product))
+            toast.success(data.message)
+            
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
 
 
     }
 
     useEffect(() => {
-            fetchProducts()
+        fetchProducts()
     }, [])
 
     if (loading) return <Loading />
