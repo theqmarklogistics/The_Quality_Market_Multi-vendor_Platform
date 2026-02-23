@@ -17,7 +17,6 @@ export default function AdminCoupons() {
         description: '',
         discount: '',
         forNewUser: false,
-        forMember: false,
         isPublic: false,
         expiresAt: new Date()
     })
@@ -122,17 +121,6 @@ export default function AdminCoupons() {
                         </label>
                         <p>For New User</p>
                     </div>
-                    <div className="flex gap-2 mt-3">
-                        <label className="relative inline-flex items-center cursor-pointer text-gray-900 gap-3">
-                            <input type="checkbox" className="sr-only peer"
-                                name="forMember" checked={newCoupon.forMember}
-                                onChange={(e) => setNewCoupon({ ...newCoupon, forMember: e.target.checked })}
-                            />
-                            <div className="w-11 h-6 bg-slate-300 rounded-full peer peer-checked:bg-green-600 transition-colors duration-200"></div>
-                            <span className="dot absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-5"></span>
-                        </label>
-                        <p>For Member</p>
-                    </div>
                 </div>
                 <button className="mt-4 p-2 px-10 rounded bg-slate-700 text-white active:scale-95 transition">Add Coupon</button>
             </form>
@@ -149,7 +137,6 @@ export default function AdminCoupons() {
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">Discount</th>
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">Expires At</th>
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">New User</th>
-                                <th className="py-3 px-4 text-left font-semibold text-slate-600">For Member</th>
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">Action</th>
                             </tr>
                         </thead>
@@ -161,7 +148,6 @@ export default function AdminCoupons() {
                                     <td className="py-3 px-4 text-slate-800">{coupon.discount}%</td>
                                     <td className="py-3 px-4 text-slate-800">{format(coupon.expiresAt, 'yyyy-MM-dd')}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.forNewUser ? 'Yes' : 'No'}</td>
-                                    <td className="py-3 px-4 text-slate-800">{coupon.forMember ? 'Yes' : 'No'}</td>
                                     <td className="py-3 px-4 text-slate-800">
                                         <DeleteIcon onClick={() => toast.promise(deleteCoupon(coupon.code), { loading: "Deleting coupon..." })} className="w-5 h-5 text-red-500 hover:text-red-800 cursor-pointer" />
                                     </td>

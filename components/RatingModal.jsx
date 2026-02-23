@@ -18,6 +18,12 @@ const RatingModal = ({ ratingModal, setRatingModal }) => {
             return toast('write a short review');
         }
 
+        try {
+            
+        } catch (error) {
+            
+        }
+
         setRatingModal(null);
     }
 

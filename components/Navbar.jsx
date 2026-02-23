@@ -30,9 +30,6 @@ const Navbar = () => {
 
                     <Link href="/" className="relative flex items-center gap-2">
                         <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-12 w-auto object-contain" priority />
-                        <p className="absolute -top-1 -right-8 text-xs font-semibold px-3 p-0.5 rounded-full flex items-center gap-2 text-white bg-green-500">
-                            plus
-                        </p>
                     </Link>
 
                     {/* Desktop Menu */}

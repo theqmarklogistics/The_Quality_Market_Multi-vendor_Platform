@@ -135,7 +135,6 @@ model Coupon {
     description String
     discount    Float
     forNewUser  Boolean
-    forMember   Boolean  @default(false)
     isPublic    Boolean
     expiresAt   DateTime
     createdAt   DateTime @default(now())

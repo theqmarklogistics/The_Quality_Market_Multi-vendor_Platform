@@ -20,7 +20,7 @@ export async function GET(request) {
                 username, isActive: true
             },
             include: {
-                products: { include: { ratings: true }}
+                Product: { include: { rating: true } }
             }
         });
 

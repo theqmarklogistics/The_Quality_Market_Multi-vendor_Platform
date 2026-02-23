@@ -2,8 +2,16 @@
 import { XIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "react-hot-toast"
+import { useAuth } from "@clerk/nextjs"
+import { useDispatch } from "react-redux"
+import axios from "axios"
+import { addAddress } from "@/lib/features/address/addressSlice"
+
 
 const AddressModal = ({ setShowAddressModal }) => {
+
+    const {getToken} = useAuth();
+    const dispatch = useDispatch();
 
     const [address, setAddress] = useState({
         name: '',
@@ -26,7 +34,20 @@ const AddressModal = ({ setShowAddressModal }) => {
     const handleSubmit = async (e) => {
         e.preventDefault()
 
-        setShowAddressModal(false)
+        try {
+            const token = await getToken();
+            const {data} = await axios.post('/api/address', {address}, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            dispatch(addAddress(data.newAddress));
+            toast.success(data.message);
+            setShowAddressModal(false);
+        } catch (error) {
+            console.error(error);
+            toast.error(error?.response?.data?.error || error.message);
+        }
     }
 
     return (
@@ -37,8 +58,8 @@ const AddressModal = ({ setShowAddressModal }) => {
                 <input name="email" onChange={handleAddressChange} value={address.email} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="email" placeholder="Email address" required />
                 <input name="street" onChange={handleAddressChange} value={address.street} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Street" required />
                 <div className="flex gap-4">
-                    <input name="city" onChange={handleAddressChange} value={address.city} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="City" required />
-                    <input name="state" onChange={handleAddressChange} value={address.state} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="State" required />
+                    <input name="city" onChange={handleAddressChange} value={address.city} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="District" required />
+                    <input name="state" onChange={handleAddressChange} value={address.state} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Province" required />
                 </div>
                 <div className="flex gap-4">
                     <input name="zip" onChange={handleAddressChange} value={address.zip} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="number" placeholder="Zip code" required />

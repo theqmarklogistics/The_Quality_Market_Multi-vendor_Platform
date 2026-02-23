@@ -1,11 +1,20 @@
 import { PlusIcon, SquarePenIcon, XIcon } from 'lucide-react';
 import React, { useState } from 'react'
 import AddressModal from './AddressModal';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
+import { useAuth } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
+import { fetchCart } from '@/lib/features/cart/cartSlice';
+
 
 const OrderSummary = ({ totalPrice, items }) => {
+
+    const {getToken} = useAuth();
+    const {user} = useUser();
+    const dispatch = useDispatch();
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
 
@@ -22,12 +31,64 @@ const OrderSummary = ({ totalPrice, items }) => {
     const handleCouponCode = async (event) => {
         event.preventDefault();
         
+        try {
+            if(!user) {
+                toast.error('Please login to apply coupon');
+                return;
+            }
+
+            const token = await getToken();
+            const {data} = await axios.post('/api/coupon', { code: couponCodeInput }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            setCoupon(data.coupon);
+            toast.success('Coupon applied successfully');
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message);
+        }
     }
 
     const handlePlaceOrder = async (e) => {
         e.preventDefault();
 
-        router.push('/orders')
+        try {
+            if(!user) {
+                toast.error('Please login to place order');
+                return;
+            }
+
+            if(!selectedAddress) {
+                toast.error('Please select an address');
+                return;
+            }
+
+            const token = await getToken();
+
+            const orderData = {
+                items,
+                addressId: selectedAddress.id,
+                paymentMethod,
+                couponCode: couponCodeInput
+            }
+            
+            if(coupon){
+                orderData.couponCode = coupon.code;
+            }
+
+            const {data} = await axios.post('/api/orders', orderData, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            toast.success(data.message);
+            router.push('/orders');
+            dispatch(fetchCart({getToken}))
+        } catch (error) {
+            console.error(error);
+            toast.error(error?.response?.data?.error || error.message);
+        }
     }
 
     return (
@@ -78,7 +139,7 @@ const OrderSummary = ({ totalPrice, items }) => {
                     </div>
                     <div className='flex flex-col gap-1 font-medium text-right'>
                         <p>{currency}{totalPrice.toLocaleString()}</p>
-                        <p>Free</p>
+                        <p>Free in Kigali</p>
                         {coupon && <p>{`-${currency}${(coupon.discount / 100 * totalPrice).toFixed(2)}`}</p>}
                     </div>
                 </div>
