@@ -28,8 +28,19 @@ export async function POST(request) {
     const category = formData.get("category");
     const images = formData.getAll("images");
 
-    if(!name || !description || !mrp || !price || !category || images.length === 0){
-        return new Response(JSON.stringify({error: "Missing required fields"}), {status: 400});
+    const missing = [];
+    if (!name || String(name).trim() === "") missing.push("name");
+    if (!description || String(description).trim() === "") missing.push("description");
+    if (category == null || String(category).trim() === "") missing.push("category");
+    if (Number.isNaN(mrp) || mrp < 0) missing.push("valid mrp (actual price)");
+    if (Number.isNaN(price) || price < 0) missing.push("valid price (offer price)");
+    if (!images?.length) missing.push("at least one image");
+
+    if (missing.length) {
+        return new Response(
+            JSON.stringify({ error: "Missing or invalid: " + missing.join(", ") }),
+            { status: 400 }
+        );
     }
 
     // uploading images to imagekit

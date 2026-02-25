@@ -5,11 +5,9 @@ import Image from "next/image"
 import { useState } from "react"
 import { toast } from "react-hot-toast"
 import axios from "axios"
-import { productCategories } from "@/lib/constants"
+import { categoryTree } from "@/lib/constants"
 
 export default function StoreAddProduct() {
-
-    const categories = productCategories
 
     const [images, setImages] = useState({ 1: null, 2: null, 3: null, 4: null })
     const [productInfo, setProductInfo] = useState({
@@ -17,9 +15,11 @@ export default function StoreAddProduct() {
         description: "",
         mrp: 0,
         price: 0,
-        category: "",
+        mainCategory: "",
+        category: "", // stored value: main category or subcategory (used for filtering)
     })
     const [loading, setLoading] = useState(false)
+    const [aiUsed, setAiUsed] = useState(false)
 
     const {getToken} = useAuth();
 
@@ -27,6 +27,42 @@ export default function StoreAddProduct() {
         setProductInfo({ ...productInfo, [e.target.name]: e.target.value })
     }
 
+    const handleImageUpload = async (key, file) => {
+        if (!file) return;
+        // Store the file immediately so it shows in preview and is included on submit
+        setImages(prev => ({ ...prev, [key]: file }));
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = async () => {
+            const base64String = reader.result;
+            const token = await getToken();
+
+            try {
+                await toast.promise(axios.post('/api/store/ai', { base64Image: base64String, mimeType: file.type }, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }), {
+                    loading: "Analyzing image with AI...",
+                    success: (res) => {
+                        const data = res.data;
+                        if (data.name && data.description) {
+                            setProductInfo(prev => ({
+                                ...prev,
+                                name: data.name,
+                                description: data.description,
+                            }));
+                            setAiUsed(true);
+                            return "AI filled product info";
+                        }
+                        return "AI could not analyze the image";
+                    },
+                    error: (err) => err?.response?.data?.error || err.message,
+                });
+            } catch (error) {
+                console.error(error);
+            }
+        };
+    }
     const onSubmitHandler = async (e) => {
         e.preventDefault()
         // Logic to add a product
@@ -62,6 +98,7 @@ export default function StoreAddProduct() {
                 description: "",
                 mrp: 0,
                 price: 0,
+                mainCategory: "",
                 category: "",
             })
 
@@ -87,7 +124,7 @@ export default function StoreAddProduct() {
                 {Object.keys(images).map((key) => (
                     <label key={key} htmlFor={`images${key}`}>
                         <Image width={300} height={300} className='h-15 w-auto border border-slate-200 rounded cursor-pointer' src={images[key] ? URL.createObjectURL(images[key]) : assets.upload_area} alt="" />
-                        <input type="file" accept='image/*' id={`images${key}`} onChange={e => setImages({ ...images, [key]: e.target.files[0] })} hidden />
+                        <input type="file" accept='image/*' id={`images${key}`} onChange={e => handleImageUpload(key, e.target.files[0])} hidden />
                     </label>
                 ))}
             </div>
@@ -113,12 +150,44 @@ export default function StoreAddProduct() {
                 </label>
             </div>
 
-            <select onChange={e => setProductInfo({ ...productInfo, category: e.target.value })} value={productInfo.category} className="w-full max-w-sm p-2 px-4 my-6 outline-none border border-slate-200 rounded" required>
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                ))}
-            </select>
+            <label htmlFor="mainCategory" className="flex flex-col gap-2 my-6">
+                Category
+                <select
+                    id="mainCategory"
+                    value={productInfo.mainCategory}
+                    onChange={e => setProductInfo({ ...productInfo, mainCategory: e.target.value, category: "" })}
+                    className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded"
+                    required
+                >
+                    <option value="">Select a category</option>
+                    {categoryTree.map((item) => (
+                        <option key={item.name} value={item.name}>{item.name}</option>
+                    ))}
+                </select>
+            </label>
+
+            {productInfo.mainCategory && (
+                <label htmlFor="subcategory" className="flex flex-col gap-2 my-6">
+                    Subcategory
+                    <select
+                        id="subcategory"
+                        value={productInfo.category}
+                        onChange={e => setProductInfo({ ...productInfo, category: e.target.value })}
+                        className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded"
+                        required
+                    >
+                        <option value="">Select a subcategory</option>
+                        {(() => {
+                            const entry = categoryTree.find(c => c.name === productInfo.mainCategory)
+                            if (!entry) return null
+                            const options = [entry.name, ...entry.subcategories]
+                            return options.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))
+                        })()}
+                    </select>
+                </label>
+            )}
 
             <br />
 
