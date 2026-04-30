@@ -10,6 +10,11 @@ const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600"] });
 export const metadata = {
     title: "The Quality Market - Shop smarter",
     description: "The Quality Market - Shop smarter",
+    icons: {
+        icon: "/the-quality-market-logo.png",
+        shortcut: "/the-quality-market-logo.png",
+        apple: "/the-quality-market-logo.png"
+    }
 };
 
 export default function RootLayout({ children }) {
