@@ -27,7 +27,10 @@ export default function CreateStore() {
         email: "",
         contact: "",
         address: "",
-        image: ""
+        image: "",
+        tinNumber: "",
+        idPhoto: "",
+        rdbCertificate: ""
     })
 
     const onChangeHandler = (e) => {
@@ -81,6 +84,10 @@ export default function CreateStore() {
             return toast('Please login to continue')
         }
 
+        if (!storeInfo.image || !storeInfo.idPhoto) {
+            return toast.error('Store logo and ID photo are required')
+        }
+
         try {
             const token = await getToken()
             const formData = new FormData()
@@ -90,7 +97,12 @@ export default function CreateStore() {
             formData.append('email', storeInfo.email)
             formData.append('contact', storeInfo.contact)
             formData.append('address', storeInfo.address)
-            formData.append('image', storeInfo.image) 
+            formData.append('image', storeInfo.image)
+            formData.append('tinNumber', storeInfo.tinNumber)
+            formData.append('idPhoto', storeInfo.idPhoto)
+            if (storeInfo.rdbCertificate) {
+                formData.append('rdbCertificate', storeInfo.rdbCertificate)
+            }
 
             const { data } = await axios.post('/api/store/create', formData, {
                 headers: {
@@ -138,7 +150,7 @@ export default function CreateStore() {
                         <label className="mt-10 cursor-pointer">
                             Store Logo
                             <Image src={storeInfo.image ? URL.createObjectURL(storeInfo.image) : assets.upload_area} className="rounded-lg mt-2 h-16 w-auto" alt="" width={150} height={100} />
-                            <input type="file" accept="image/*" onChange={(e) => setStoreInfo({ ...storeInfo, image: e.target.files[0] })} hidden />
+                            <input type="file" accept="image/*" onChange={(e) => setStoreInfo({ ...storeInfo, image: e.target.files[0] })} hidden required />
                         </label>
 
                         <p>Username</p>
@@ -158,6 +170,19 @@ export default function CreateStore() {
 
                         <p>Address</p>
                         <textarea name="address" onChange={onChangeHandler} value={storeInfo.address} rows={5} placeholder="Enter your store address" className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded resize-none" />
+
+                        <p>TIN (Taxpayer Identification Number)</p>
+                        <input name="tinNumber" onChange={onChangeHandler} value={storeInfo.tinNumber} type="text" placeholder="Enter your TIN" className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded" required />
+
+                        <label className="cursor-pointer">
+                            ID Photo (required)
+                            <input type="file" accept="image/*,.pdf" onChange={(e) => setStoreInfo({ ...storeInfo, idPhoto: e.target.files[0] })} className="mt-2 border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded" required />
+                        </label>
+
+                        <label className="cursor-pointer">
+                            RDB Business Registration Certificate (optional)
+                            <input type="file" accept="image/*,.pdf" onChange={(e) => setStoreInfo({ ...storeInfo, rdbCertificate: e.target.files[0] })} className="mt-2 border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded" />
+                        </label>
 
                         <button className="bg-slate-800 text-white px-12 py-2 rounded mt-10 mb-40 active:scale-95 hover:bg-slate-900 transition ">Submit</button>
                     </form>

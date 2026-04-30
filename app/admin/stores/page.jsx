@@ -4,13 +4,16 @@ import StoreInfo from "@/components/admin/StoreInfo"
 import Loading from "@/components/Loading"
 import { useAuth, useUser } from "@clerk/nextjs"
 import axios from "axios"
+import { MessageCircleIcon } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
 
 export default function AdminStores() {
 
     const {user} = useUser();
     const {getToken} = useAuth();
+    const router = useRouter();
 
     const [stores, setStores] = useState([])
     const [loading, setLoading] = useState(true)
@@ -47,6 +50,23 @@ export default function AdminStores() {
 
     }
 
+    const startStoreChat = async (storeId) => {
+        try {
+            const token = await getToken();
+            const { data } = await axios.post('/api/chat/conversations', {
+                targetType: 'STORE',
+                storeId
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            router.push(`/admin/chat/${data.conversation.id}`);
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
+    }
+
     useEffect(() => {
         if (user) {
             fetchStores()
@@ -72,6 +92,13 @@ export default function AdminStores() {
                                     <div className="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-green-600 transition-colors duration-200"></div>
                                     <span className="dot absolute left-1 top-1 w-3 h-3 bg-white rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></span>
                                 </label>
+                                <button
+                                    type="button"
+                                    onClick={() => toast.promise(startStoreChat(store.id), { loading: "Opening store chat..." })}
+                                    className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    <MessageCircleIcon size={16} /> Chat Store
+                                </button>
                             </div>
                         </div>
                     ))}

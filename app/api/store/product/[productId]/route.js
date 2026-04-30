@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import imageKit, { toFile } from "@/configs/imageKit";
 import { Buffer } from "buffer";
+import { getSocketServer } from "@/lib/socketServer";
 
 // Get a single product (must belong to seller's store)
 export async function GET(request, { params }) {
@@ -51,12 +52,19 @@ export async function PATCH(request, { params }) {
     const description = formData.get("description");
     const mrp = formData.get("mrp");
     const price = formData.get("price");
+    const warehouseQuantity = formData.get("warehouseQuantity");
     const category = formData.get("category");
     const existingImagesRaw = formData.get("existingImages");
     const newImageFiles = formData.getAll("images");
 
-    if (!name || !description || mrp == null || price == null || !category) {
+    const parsedWarehouseQuantity = Number(warehouseQuantity);
+
+    if (!name || !description || mrp == null || price == null || !category || warehouseQuantity == null) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
+    }
+
+    if (!Number.isInteger(parsedWarehouseQuantity) || parsedWarehouseQuantity < 0) {
+      return new Response(JSON.stringify({ error: "Invalid warehouse quantity" }), { status: 400 });
     }
 
     let images = product.images;
@@ -102,12 +110,27 @@ export async function PATCH(request, { params }) {
         description: String(description),
         mrp: Number(mrp),
         price: Number(price),
+        warehouseQuantity: parsedWarehouseQuantity,
         category: String(category),
         images,
+        approvalStatus: "PENDING",
+        approvalNotes: null,
+        approvedBy: null,
+        approvedAt: null,
       },
     });
 
-    return new Response(JSON.stringify({ message: "Product updated successfully" }));
+    try {
+      const io = getSocketServer();
+      io.to('admin-room').emit('admin-notification', {
+        key: 'pendingProducts',
+        message: 'Product updated and resubmitted for approval'
+      });
+    } catch (socketError) {
+      console.error('Socket.IO admin notify error:', socketError.message);
+    }
+
+    return new Response(JSON.stringify({ message: "Product updated and resubmitted for approval" }));
   } catch (error) {
     console.error("Error updating product:", error);
     return new Response(JSON.stringify({ error: error.message || error.code }), { status: 400 });

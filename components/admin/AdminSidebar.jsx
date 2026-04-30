@@ -1,24 +1,53 @@
 'use client'
 
 import { usePathname } from "next/navigation"
-import { HomeIcon, ShieldCheckIcon, StoreIcon, TicketPercentIcon } from "lucide-react"
+import { HomeIcon, MessageCircleIcon, PackageCheckIcon, ShieldCheckIcon, StoreIcon, TagsIcon, TicketPercentIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { assets } from "@/assets/assets"
 import { useUser } from "@clerk/nextjs"
+import { useEffect, useState } from "react"
 
 const AdminSidebar = () => {
 
     const {user} = useUser()
 
     const pathname = usePathname()
+    const [counts, setCounts] = useState({
+        pendingStores: 0,
+        pendingProducts: 0,
+        pendingPaymentProofs: 0,
+        newOrders: 0,
+        unreadChatMessages: 0,
+    })
 
     const sidebarLinks = [
         { name: 'Dashboard', href: '/admin', icon: HomeIcon },
         { name: 'Stores', href: '/admin/stores', icon: StoreIcon },
-        { name: 'Approve Store', href: '/admin/approve', icon: ShieldCheckIcon },
+        { name: 'Approve Store', href: '/admin/approve', icon: ShieldCheckIcon, badge: counts.pendingStores },
+        { name: 'Approve Products', href: '/admin/products', icon: PackageCheckIcon, badge: counts.pendingProducts },
+        { name: 'Orders', href: '/admin/orders', icon: TagsIcon, badge: counts.newOrders },
+        { name: 'Payments', href: '/admin/payments', icon: TicketPercentIcon, badge: counts.pendingPaymentProofs },
+        { name: 'Chats', href: '/admin/chat', icon: MessageCircleIcon, badge: counts.unreadChatMessages },
         { name: 'Coupons', href: '/admin/coupons', icon: TicketPercentIcon  },
     ]
+
+    useEffect(() => {
+        const onCountsUpdated = (event) => {
+            const detail = event?.detail || {}
+            setCounts({
+                pendingStores: detail.pendingStores || 0,
+                pendingProducts: detail.pendingProducts || 0,
+                pendingPaymentProofs: detail.pendingPaymentProofs || 0,
+                newOrders: detail.newOrders || 0,
+                unreadChatMessages: detail.unreadChatMessages || 0,
+            })
+        }
+
+        window.addEventListener('admin:counts-updated', onCountsUpdated)
+        return () => {
+            window.removeEventListener('admin:counts-updated', onCountsUpdated)
+        }
+    }, [])
 
     return user && (
         <div className="inline-flex h-full flex-col gap-5 border-r border-slate-200 sm:min-w-60">
@@ -35,6 +64,11 @@ const AdminSidebar = () => {
                             <link.icon size={18} className="sm:ml-5" />
                             <p className="max-sm:hidden">{link.name}</p>
                             {pathname === link.href && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
+                            {link.badge > 0 && (
+                                <span className="ml-auto mr-2 inline-flex min-w-6 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-semibold text-white max-sm:hidden">
+                                    {link.badge}
+                                </span>
+                            )}
                         </Link>
                     ))
                 }

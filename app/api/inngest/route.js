@@ -1,6 +1,16 @@
 import { serve } from "inngest/next";
 import { inngest } from "../../../inngest/client";
-import { deleteCouponOnExpiry, syncUserCreation, syncUserDeletion, syncUserUpdate } from "@/inngest/functions";
+import {
+  deleteCouponOnExpiry,
+  expirePendingOrders,
+  onChatMessageCreated,
+  onPaymentProofReviewed,
+  onPaymentProofSubmitted,
+  onProductModerationUpdated,
+  syncUserCreation,
+  syncUserDeletion,
+  syncUserUpdate
+} from "@/inngest/functions";
 
 // Create an API that serves zero functions
 export const { GET, POST, PUT } = serve({
@@ -9,6 +19,11 @@ export const { GET, POST, PUT } = serve({
     syncUserCreation,
     syncUserUpdate,
     syncUserDeletion,
-    deleteCouponOnExpiry
+    deleteCouponOnExpiry,
+    expirePendingOrders,
+    onChatMessageCreated,
+    onPaymentProofSubmitted,
+    onProductModerationUpdated,
+    onPaymentProofReviewed
   ],
 });

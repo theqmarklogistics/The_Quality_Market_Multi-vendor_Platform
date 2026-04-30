@@ -7,6 +7,7 @@ import { ArrowRightIcon } from "lucide-react"
 import AdminNavbar from "./AdminNavbar"
 import AdminSidebar from "./AdminSidebar"
 import { useUser, useAuth  } from "@clerk/nextjs"
+import AdminNotificationWatcher from "./AdminNotificationWatcher"
 
 
 
@@ -45,6 +46,7 @@ const AdminLayout = ({ children }) => {
         <Loading />
     ) : isAdmin ? (
         <div className="flex flex-col h-screen">
+            <AdminNotificationWatcher />
             <AdminNavbar />
             <div className="flex flex-1 items-start h-full overflow-y-scroll no-scrollbar">
                 <AdminSidebar />

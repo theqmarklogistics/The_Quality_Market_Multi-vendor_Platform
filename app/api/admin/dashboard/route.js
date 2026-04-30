@@ -15,33 +15,81 @@ export async function GET(request) {
         return NextResponse.json({error: "Not Unauthorized"}, {status: 401});
     }
 
-    // Get all orders
-    const orders = await prisma.order.count();
-    // Get all stores on app
-    const stores = await prisma.store.count();
+    const [
+        orders,
+        newOrders,
+        stores,
+        pendingStores,
+        allOrders,
+        revenueAgg,
+        products,
+        pendingProducts,
+        pendingPaymentProofs,
+        unreadChatMessages
+    ] = await Promise.all([
+        prisma.order.count(),
+        prisma.order.count({
+            where: {
+                status: 'ORDER_PLACED'
+            }
+        }),
+        prisma.store.count(),
+        prisma.store.count({
+            where: {
+                status: 'pending'
+            }
+        }),
+        prisma.order.findMany({
+            select: {
+                createdAt: true,
+                total: true
+            }
+        }),
+        prisma.order.aggregate({
+            _sum: {
+                total: true
+            }
+        }),
+        prisma.product.count(),
+        prisma.product.count({
+            where: {
+                approvalStatus: 'PENDING'
+            }
+        }),
+        prisma.order.count({
+            where: {
+                paymentProofStatus: 'SUBMITTED'
+            }
+        }),
+        prisma.message.count({
+            where: {
+                isRead: false,
+                senderId: {
+                    not: userId
+                },
+                conversation: {
+                    participants: {
+                        some: {
+                            userId
+                        }
+                    }
+                }
+            }
+        })
+    ]);
 
-    // Get all orders including only createdAt and total & calculate total revenue
-    const allOrders = await prisma.order.findMany({
-        select: {
-            createdAt: true,
-            total: true
-        }
-    });
+    const revenue = Number(revenueAgg?._sum?.total || 0).toFixed(2);
 
-    let totalRevenue = 0;
-    allOrders.forEach(order => {
-        totalRevenue += order.total;
-    });
-
-    const revenue = totalRevenue.toFixed(2);
-
-    // Total products on app
-    const products = await prisma.product.count();
     const dashboardData = {
         orders,
+        newOrders,
         stores,
+        pendingStores,
         revenue,
         products,
+        pendingProducts,
+        pendingPaymentProofs,
+        unreadChatMessages,
         allOrders
     }
 

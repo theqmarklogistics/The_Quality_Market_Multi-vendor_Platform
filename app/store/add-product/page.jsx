@@ -15,6 +15,7 @@ export default function StoreAddProduct() {
         description: "",
         mrp: 0,
         price: 0,
+        warehouseQuantity: 0,
         mainCategory: "",
         category: "", // stored value: main category or subcategory (used for filtering)
     })
@@ -78,6 +79,7 @@ export default function StoreAddProduct() {
             formData.append('description', productInfo.description);
             formData.append('mrp', productInfo.mrp);
             formData.append('price', productInfo.price);
+            formData.append('warehouseQuantity', productInfo.warehouseQuantity);
             formData.append('category', productInfo.category);
             // Append all the images to the form data
             Object.keys(images).forEach(key => {
@@ -98,6 +100,7 @@ export default function StoreAddProduct() {
                 description: "",
                 mrp: 0,
                 price: 0,
+                warehouseQuantity: 0,
                 mainCategory: "",
                 category: "",
             })
@@ -147,6 +150,10 @@ export default function StoreAddProduct() {
                 <label htmlFor="" className="flex flex-col gap-2 ">
                     Offer Price (Rwf)
                     <input type="number" name="price" onChange={onChangeHandler} value={productInfo.price} placeholder="0" rows={5} className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
+                </label>
+                <label htmlFor="" className="flex flex-col gap-2 ">
+                    Available Quantity (Warehouse)
+                    <input type="number" name="warehouseQuantity" min="0" step="1" onChange={onChangeHandler} value={productInfo.warehouseQuantity} placeholder="0" className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
                 </label>
             </div>
 

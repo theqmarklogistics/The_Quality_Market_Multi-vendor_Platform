@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import imageKit, { toFile } from "@/configs/imageKit";
 import { Buffer } from "buffer";
+import { getSocketServer } from "@/lib/socketServer";
 
 
 
@@ -25,6 +26,7 @@ export async function POST(request) {
     const description = formData.get("description");
     const mrp = Number(formData.get("mrp"));
     const price = Number(formData.get("price"));
+    const warehouseQuantity = Number(formData.get("warehouseQuantity"));
     const category = formData.get("category");
     const images = formData.getAll("images");
 
@@ -34,6 +36,7 @@ export async function POST(request) {
     if (category == null || String(category).trim() === "") missing.push("category");
     if (Number.isNaN(mrp) || mrp < 0) missing.push("valid mrp (actual price)");
     if (Number.isNaN(price) || price < 0) missing.push("valid price (offer price)");
+    if (!Number.isInteger(warehouseQuantity) || warehouseQuantity < 0) missing.push("valid warehouse quantity (0 or more)");
     if (!images?.length) missing.push("at least one image");
 
     if (missing.length) {
@@ -71,13 +74,28 @@ export async function POST(request) {
             description,
             mrp,
             price,
+            warehouseQuantity,
             category,
             images: imagesUrls,
-            storeId
+            storeId,
+            approvalStatus: "PENDING",
+            approvalNotes: null,
+            approvedAt: null,
+            approvedBy: null
         }
     });
 
-    return new Response(JSON.stringify({message: "Product added successfully"}));
+    try {
+        const io = getSocketServer();
+        io.to('admin-room').emit('admin-notification', {
+            key: 'pendingProducts',
+            message: 'New product submitted for approval'
+        });
+    } catch (socketError) {
+        console.error('Socket.IO admin notify error:', socketError.message);
+    }
+
+    return new Response(JSON.stringify({message: "Product submitted for admin approval"}));
     
 
   } catch (error) {

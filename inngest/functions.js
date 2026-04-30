@@ -77,3 +77,75 @@ export const deleteCouponOnExpiry = inngest.createFunction(
     
     }
 )
+
+// Inngest cron to expire unpaid pending orders after timeout
+export const expirePendingOrders = inngest.createFunction(
+    { id: "expire-pending-orders" },
+    { cron: "*/10 * * * *" },
+    async ({ step }) => {
+        await step.run("mark-expired-orders", async () => {
+            const now = new Date();
+            const result = await prisma.order.updateMany({
+                where: {
+                    paymentStatus: "PENDING",
+                    isPaid: false,
+                    paymentExpiresAt: {
+                        lte: now
+                    }
+                },
+                data: {
+                    paymentStatus: "EXPIRED"
+                }
+            });
+            return result.count;
+        });
+    }
+);
+
+// Chat notification event hook (for analytics/notification fanout)
+export const onChatMessageCreated = inngest.createFunction(
+    { id: "on-chat-message-created" },
+    { event: "chat/message.created" },
+    async ({ event, step }) => {
+        await step.run("record-chat-message-event", async () => {
+            const { conversationId, senderId, messageId } = event.data;
+            console.log("Chat message event:", { conversationId, senderId, messageId });
+        });
+    }
+);
+
+// Payment proof notification event hook
+export const onPaymentProofSubmitted = inngest.createFunction(
+    { id: "on-payment-proof-submitted" },
+    { event: "payment/proof.submitted" },
+    async ({ event, step }) => {
+        await step.run("record-payment-proof-event", async () => {
+            const { orderId, userId } = event.data;
+            console.log("Payment proof submitted:", { orderId, userId });
+        });
+    }
+);
+
+// Product moderation notification event hook
+export const onProductModerationUpdated = inngest.createFunction(
+    { id: "on-product-moderation-updated" },
+    { event: "product/moderation.updated" },
+    async ({ event, step }) => {
+        await step.run("record-product-moderation-event", async () => {
+            const { productId, status, moderatedBy } = event.data;
+            console.log("Product moderation update:", { productId, status, moderatedBy });
+        });
+    }
+);
+
+// Payment proof review notification event hook
+export const onPaymentProofReviewed = inngest.createFunction(
+    { id: "on-payment-proof-reviewed" },
+    { event: "payment/proof.reviewed" },
+    async ({ event, step }) => {
+        await step.run("record-payment-proof-review-event", async () => {
+            const { orderId, status, reviewedBy } = event.data;
+            console.log("Payment proof reviewed:", { orderId, status, reviewedBy });
+        });
+    }
+);

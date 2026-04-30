@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts } from "@/lib/features/product/productSlice";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { fetchCart, uploadCart } from "@/lib/features/cart/cartSlice";
 import { fetchAddresses } from "@/lib/features/address/addressSlice";
@@ -39,7 +39,9 @@ export default function PublicLayout({ children }) {
     return (
         <>
             <Banner />
-            <Navbar />
+            <Suspense fallback={<div className="h-20" />}>
+                <Navbar />
+            </Suspense>
             {children}
             <Footer />
         </>

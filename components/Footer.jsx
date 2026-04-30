@@ -16,10 +16,10 @@ const Footer = () => {
         {
             title: "PRODUCTS",
             links: [
-                { text: "Earphones", path: '/', icon: null },
-                { text: "Headphones", path: '/', icon: null },
-                { text: "Smartphones", path: '/', icon: null },
-                { text: "Laptops", path: '/', icon: null },
+                { text: "Earphones", path: '/shop?category=Consumer%20Electronics', icon: null },
+                { text: "Headphones", path: '/shop?category=Consumer%20Electronics', icon: null },
+                { text: "Smartphones", path: '/shop?category=Consumer%20Electronics', icon: null },
+                { text: "Laptops", path: '/shop?category=Computer%20Products', icon: null },
             ]
         },
         {
@@ -33,8 +33,8 @@ const Footer = () => {
         {
             title: "CONTACT",
             links: [
-                { text: "+1-212-456-7890", path: '/', icon: MailIcon },
-                { text: "contact@example.com", path: '/', icon: PhoneIcon },
+                { text: "+1-212-456-7890", path: '/', icon: PhoneIcon },
+                { text: "contact@example.com", path: '/', icon: MailIcon },
                 { text: "794 Francisco, 94102", path: '/', icon: MapPinIcon }
             ]
         }
@@ -55,12 +55,12 @@ const Footer = () => {
                         <Link href="/" className="inline-block">
                             <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-14 w-auto object-contain" />
                         </Link>
-                        <p className="max-w-[410px] mt-6 text-sm">Welcome to The Quality Market, your ultimate destination for the latest and smartest gadgets. From smartphones and smartwatches to essential accessories, we bring you the best in innovation — all in one place.</p>
+                        <p className="max-w-[420px] mt-6 text-sm leading-7">Welcome to The Quality Market, your destination for trusted gadgets, useful accessories, and store-approved products that make everyday shopping feel simple and reliable.</p>
                         <div className="flex items-center gap-3 mt-5">
                             {socialIcons.map((item, i) => (
-                                <Link href={item.link} key={i} className="flex items-center justify-center w-10 h-10 bg-slate-100 hover:scale-105 hover:border border-slate-300 transition rounded-full">
+                                <a href={item.link} key={i} target="_blank" rel="noreferrer" className="flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-800 hover:text-white hover:scale-105 transition rounded-full">
                                     <item.icon />
-                                </Link>
+                                </a>
                             ))}
                         </div>
                     </div>
@@ -81,7 +81,7 @@ const Footer = () => {
                     </div>
                 </div>
                 <p className="py-4 text-sm text-slate-500">
-                    Copyright 2025 © The Quality Market All Right Reserved.
+                    Copyright 2026 © The Quality Market. All rights reserved.
                 </p>
             </div>
         </footer>

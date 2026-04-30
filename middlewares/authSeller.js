@@ -14,7 +14,7 @@ const authSeller = async (userId) => {
             }
         });
 
-        if (user.store && user.store.status === 'approved') {
+        if (user.store && String(user.store.status).toLowerCase() === 'approved' && user.store.isActive) {
             return user.store.id;
         }
         return false;

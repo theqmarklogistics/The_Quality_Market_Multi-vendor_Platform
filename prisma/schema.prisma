@@ -22,6 +22,8 @@ model User {
     Address     Address[]
     store       Store?
     buyerOrders Order[]   @relation("BuyerRelation")
+    conversations      ConversationParticipant[]
+    sentMessages       Message[]                 @relation("MessageSender")
 }
 
 // Required for creating a Product: name, description, mrp, price, images, category, storeId
@@ -31,10 +33,15 @@ model Product {
     description String
     mrp         Float
     price       Float
+    warehouseQuantity Int @default(0)
     images      String[]
     category    String
     inStock     Boolean  @default(true)
     storeId     String
+    approvalStatus ProductApprovalStatus @default(PENDING)
+    approvalNotes  String?
+    approvedBy     String?
+    approvedAt     DateTime?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -42,6 +49,14 @@ model Product {
     store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
     orderItems OrderItem[]
     rating     Rating[]
+
+    @@index([approvalStatus, createdAt])
+}
+
+enum ProductApprovalStatus {
+    PENDING
+    APPROVED
+    REJECTED
 }
 
 enum OrderStatus {
@@ -52,11 +67,32 @@ enum OrderStatus {
 }
 
 enum PaymentMethod {
-    COD
     STRIPE
+    MTN_MOMO
+    AIRTEL_MONEY
+    BANK_TRANSFER
 }
 
-// Required for creating an Order: total, userId, storeId, addressId, isPaid, paymentMethod, isCouponUsed, coupon (JSON), orderItems (nested)
+enum PaymentStatus {
+    PENDING
+    PAID
+    FAILED
+    EXPIRED
+}
+
+enum PaymentProofStatus {
+    NOT_SUBMITTED
+    SUBMITTED
+    APPROVED
+    REJECTED
+}
+
+enum ConversationTargetType {
+    ADMIN
+    STORE
+}
+
+// Required for creating an Order: total, userId, storeId, addressId, isPaid, paymentMethod, paymentStatus, isCouponUsed, coupon (JSON), orderItems (nested)
 model Order {
     id            String        @id @default(cuid())
     total         Float
@@ -66,6 +102,15 @@ model Order {
     addressId     String
     isPaid        Boolean       @default(false)
     paymentMethod PaymentMethod
+    paymentStatus PaymentStatus @default(PENDING)
+    paymentExpiresAt DateTime?
+    paymentProofUrl String?
+    paymentProofStatus PaymentProofStatus @default(NOT_SUBMITTED)
+    paymentProofNotes String?
+    paymentProofDate DateTime?
+    paymentReviewedBy String?
+    paymentReviewedAt DateTime?
+    paymentReceivedAt DateTime?
     createdAt     DateTime      @default(now())
     updatedAt     DateTime      @updatedAt
     isCouponUsed  Boolean       @default(false)
@@ -76,6 +121,9 @@ model Order {
     user    User    @relation("BuyerRelation", fields: [userId], references: [id])
     store   Store   @relation(fields: [storeId], references: [id])
     address Address @relation(fields: [addressId], references: [id])
+    conversations Conversation[]
+
+    @@index([paymentProofStatus, createdAt])
 }
 
 // Required for creating an OrderItem: orderId, productId, quantity, price
@@ -153,10 +201,58 @@ model Store {
     logo        String
     email       String
     contact     String
+    tinNumber   String?
+    idPhotoUrl  String?
+    rdbCertificateUrl String?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
     Product Product[]
     Order   Order[]
+    conversations Conversation[]
     user    User      @relation(fields: [userId], references: [id])
+}
+
+model Conversation {
+    id           String                 @id @default(cuid())
+    targetType   ConversationTargetType
+    storeId      String?
+    orderId      String?
+    createdById  String
+    createdAt    DateTime               @default(now())
+    updatedAt    DateTime               @updatedAt
+
+    store        Store?                 @relation(fields: [storeId], references: [id])
+    order        Order?                 @relation(fields: [orderId], references: [id])
+    participants ConversationParticipant[]
+    messages     Message[]
+
+    @@index([targetType, createdAt])
+}
+
+model ConversationParticipant {
+    conversationId String
+    userId         String
+    createdAt      DateTime @default(now())
+
+    conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([conversationId, userId])
+    @@index([userId, createdAt])
+}
+
+model Message {
+    id             String   @id @default(cuid())
+    conversationId String
+    senderId       String
+    content        String
+    createdAt      DateTime @default(now())
+    isRead         Boolean  @default(false)
+
+    conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+    @@index([conversationId, createdAt])
+    @@index([senderId, createdAt])
 }

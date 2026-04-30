@@ -20,21 +20,23 @@ export default function Orders() {
 
     const router = useRouter();
 
+    const fetchOrders = async () => {
+        try {
+            const token = await getToken();
+            const {data} = await axios.get('/api/orders', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            setOrders(data.orders)
+            setLoading(false)
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+            setLoading(false)
+        }
+    }
+
     useEffect(() => {
-        const fetchOrders = async () => {
-            try {
-                const token = await getToken();
-                const {data} = await axios.get('/api/orders', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                })
-                setOrders(data.orders)
-                setLoading(false)
-            } catch (error) {
-                toast.error(error?.response?.data?.error || error.message)
-            }
-        } 
         if(isLoaded){
             if(user){
                 fetchOrders()
@@ -68,7 +70,7 @@ export default function Orders() {
                             </thead>
                             <tbody>
                                 {orders.map((order) => (
-                                    <OrderItem order={order} key={order.id} />
+                                    <OrderItem order={order} onProofUploaded={fetchOrders} key={order.id} />
                                 ))}
                             </tbody>
                         </table>

@@ -8,19 +8,45 @@ export async function GET(request) {
     try {
         
         const { searchParams } = new URL(request.url);
-        const username = searchParams.get("username").toLowerCase();
+        const usernameParam = searchParams.get("username");
 
-        if(!username){
+        if(!usernameParam){
             return NextResponse.json({error: "Invalid username"}, {status: 400});
         }
+
+        const username = usernameParam.toLowerCase();
 
         // Get store info and inStock products with ratings
         const store = await prisma.store.findFirst({
             where: {
                 username, isActive: true
             },
-            include: {
-                Product: { include: { rating: true } }
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                username: true,
+                address: true,
+                logo: true,
+                email: true,
+                Product: {
+                    where: {
+                        inStock: true,
+                        approvalStatus: "APPROVED"
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        description: true,
+                        mrp: true,
+                        price: true,
+                        images: true,
+                        category: true,
+                        inStock: true,
+                        createdAt: true,
+                        rating: true
+                    }
+                }
             }
         });
 

@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState } from "react"
 import Loading from "@/components/Loading"
-import { orderDummyData } from "@/assets/assets"
 import { useAuth } from "@clerk/nextjs"
 import axios from "axios"
 import toast from "react-hot-toast"
@@ -33,23 +32,6 @@ export default function StoreOrders() {
        }
     }
 
-    const updateOrderStatus = async (orderId, status) => {
-        // Logic to update the status of an order
-        try {
-            const token = await getToken();
-            await axios.post('/api/store/orders', {orderId, status}, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            setOrders(prev => prev.map(order => order.id === orderId ? {...order, status} : order))
-            toast.success("Order status updated successfully")
-        } catch (error) {
-            toast.error(error?.response?.data?.error || error.message)
-        }
-       
-    }
-
     const openModal = (order) => {
         setSelectedOrder(order)
         setIsModalOpen(true)
@@ -76,7 +58,7 @@ export default function StoreOrders() {
                     <table className="w-full text-sm text-left text-gray-600">
                         <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
                             <tr>
-                                {["Sr. No.", "Customer", "Total", "Payment", "Coupon", "Status", "Date"].map((heading, i) => (
+                                {["Sr. No.", "Customer", "Total", "Payment Method", "Payment Status", "Coupon", "Status", "Date"].map((heading, i) => (
                                     <th key={i} className="px-4 py-3">{heading}</th>
                                 ))}
                             </tr>
@@ -95,6 +77,11 @@ export default function StoreOrders() {
                                     <td className="px-4 py-3 font-medium text-slate-800">${order.total}</td>
                                     <td className="px-4 py-3">{order.paymentMethod}</td>
                                     <td className="px-4 py-3">
+                                        <span className={`text-xs px-2 py-1 rounded-full ${order.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                            {order.paymentStatus || (order.isPaid ? 'PAID' : 'PENDING')}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3">
                                         {order.isCouponUsed ? (
                                             <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
                                                 {order.coupon?.code}
@@ -103,17 +90,10 @@ export default function StoreOrders() {
                                             "—"
                                         )}
                                     </td>
-                                    <td className="px-4 py-3" onClick={(e) => { e.stopPropagation() }}>
-                                        <select
-                                            value={order.status}
-                                            onChange={e => updateOrderStatus(order.id, e.target.value)}
-                                            className="border-gray-300 rounded-md text-sm focus:ring focus:ring-blue-200"
-                                        >
-                                            <option value="ORDER_PLACED">ORDER_PLACED</option>
-                                            <option value="PROCESSING">PROCESSING</option>
-                                            <option value="SHIPPED">SHIPPED</option>
-                                            <option value="DELIVERED">DELIVERED</option>
-                                        </select>
+                                    <td className="px-4 py-3">
+                                        <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">
+                                            {order.status}
+                                        </span>
                                     </td>
                                     <td className="px-4 py-3 text-gray-500">
                                         {new Date(order.createdAt).toLocaleString()}
@@ -166,6 +146,7 @@ export default function StoreOrders() {
                         {/* Payment & Status */}
                         <div className="mb-4">
                             <p><span className="text-green-700">Payment Method:</span> {selectedOrder.paymentMethod}</p>
+                            <p><span className="text-green-700">Payment Status:</span> {selectedOrder.paymentStatus || (selectedOrder.isPaid ? "PAID" : "PENDING")}</p>
                             <p><span className="text-green-700">Paid:</span> {selectedOrder.isPaid ? "Yes" : "No"}</p>
                             {selectedOrder.isCouponUsed && (
                                 <p><span className="text-green-700">Coupon:</span> {selectedOrder.coupon.code} ({selectedOrder.coupon.discount}% off)</p>

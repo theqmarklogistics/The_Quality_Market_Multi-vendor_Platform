@@ -8,6 +8,7 @@ import SellerSidebar from "./StoreSidebar"
 import { dummyStoreData } from "@/assets/assets"
 import { useAuth } from "@clerk/nextjs"
 import axios from "axios"  
+import StoreNotificationWatcher from "./StoreNotificationWatcher"
 
 const StoreLayout = ({ children }) => {
 
@@ -44,6 +45,7 @@ const StoreLayout = ({ children }) => {
         <Loading />
     ) : isSeller ? (
         <div className="flex flex-col h-screen">
+            <StoreNotificationWatcher />
             <SellerNavbar />
             <div className="flex flex-1 items-start h-full overflow-y-scroll no-scrollbar">
                 <SellerSidebar storeInfo={storeInfo} />

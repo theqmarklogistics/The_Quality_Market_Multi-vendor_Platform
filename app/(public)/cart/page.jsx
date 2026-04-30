@@ -3,8 +3,9 @@ import Counter from "@/components/Counter";
 import OrderSummary from "@/components/OrderSummary";
 import PageTitle from "@/components/PageTitle";
 import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
-import { Trash2Icon } from "lucide-react";
+import { ArrowRightIcon, Trash2Icon } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -98,7 +99,13 @@ export default function Cart() {
         </div>
     ) : (
         <div className="min-h-[80vh] mx-6 flex items-center justify-center text-slate-400">
-            <h1 className="text-2xl sm:text-4xl font-semibold">Your cart is empty</h1>
+            <div className="text-center max-w-md border border-dashed border-slate-200 rounded-2xl px-6 py-12 bg-slate-50/70">
+                <h1 className="text-2xl sm:text-4xl font-semibold text-slate-700">Your cart is empty</h1>
+                <p className="mt-3 text-sm text-slate-500">Browse products and add items to start checkout.</p>
+                <Link href="/shop" className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-900 transition">
+                    Continue shopping <ArrowRightIcon size={16} />
+                </Link>
+            </div>
         </div>
     )
 }

@@ -14,16 +14,7 @@ export async function POST(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { orderId, status } = await request.json();
-        await prisma.order.update({
-            where: {
-                id: orderId
-            },
-            data: {
-                status
-            }
-        });
-        return NextResponse.json({ message: "Order status updated successfully" }, { status: 200 });
+        return NextResponse.json({ error: "Only admin can update order delivery status" }, { status: 403 });
         
     } catch (error) {
         console.error(error);
@@ -46,7 +37,7 @@ export async function GET(request) {
                 storeId
             },
             include: {
-                orderItems: true,
+                orderItems: { include: { product: true } },
                 user: true,
                 address: true
             }

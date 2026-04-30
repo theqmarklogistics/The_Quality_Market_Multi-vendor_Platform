@@ -31,6 +31,7 @@ export default function StoreEditProduct() {
         description: "",
         mrp: 0,
         price: 0,
+        warehouseQuantity: 0,
         mainCategory: "",
         category: "",
     })
@@ -51,6 +52,7 @@ export default function StoreEditProduct() {
                     description: data.description,
                     mrp: data.mrp,
                     price: data.price,
+                    warehouseQuantity: data.warehouseQuantity ?? 0,
                     mainCategory: main,
                     category: data.category,
                 })
@@ -105,6 +107,7 @@ export default function StoreEditProduct() {
             formData.append("description", productInfo.description)
             formData.append("mrp", productInfo.mrp)
             formData.append("price", productInfo.price)
+            formData.append("warehouseQuantity", productInfo.warehouseQuantity)
             formData.append("category", productInfo.category)
             formData.append("existingImages", JSON.stringify(existingUrls))
             newFiles.forEach((f) => formData.append("images", f))
@@ -240,6 +243,20 @@ export default function StoreEditProduct() {
                         name="price"
                         value={productInfo.price || ""}
                         onChange={onChangeHandler}
+                        placeholder="0"
+                        className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded"
+                        required
+                    />
+                </label>
+                <label className="flex flex-col gap-2">
+                    Available Quantity (Warehouse)
+                    <input
+                        type="number"
+                        name="warehouseQuantity"
+                        value={productInfo.warehouseQuantity || ""}
+                        onChange={onChangeHandler}
+                        min="0"
+                        step="1"
                         placeholder="0"
                         className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded"
                         required
