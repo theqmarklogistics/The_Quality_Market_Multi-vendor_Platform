@@ -85,9 +85,9 @@ const OrderSummary = ({ totalPrice, items }) => {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            toast.success(data.message);
-            router.push('/orders');
             dispatch(fetchCart({getToken}))
+            const ids = (data.orderIds || []).join(',')
+            router.push(`/orders/confirmation${ids ? `?ids=${ids}` : ''}`)
         } catch (error) {
             console.error(error);
             toast.error(error?.response?.data?.error || error.message);

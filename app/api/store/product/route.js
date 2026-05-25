@@ -29,6 +29,11 @@ export async function POST(request) {
     const warehouseQuantity = Number(formData.get("warehouseQuantity"));
     const category = formData.get("category");
     const images = formData.getAll("images");
+    const weightKg = formData.get("weightKg") ? Number(formData.get("weightKg")) : null;
+    const lengthCm = formData.get("lengthCm") ? Number(formData.get("lengthCm")) : null;
+    const widthCm = formData.get("widthCm") ? Number(formData.get("widthCm")) : null;
+    const heightCm = formData.get("heightCm") ? Number(formData.get("heightCm")) : null;
+    const importOrigin = formData.get("importOrigin") || null;
 
     const missing = [];
     if (!name || String(name).trim() === "") missing.push("name");
@@ -81,7 +86,12 @@ export async function POST(request) {
             approvalStatus: "PENDING",
             approvalNotes: null,
             approvedAt: null,
-            approvedBy: null
+            approvedBy: null,
+            weightKg,
+            lengthCm,
+            widthCm,
+            heightCm,
+            importOrigin
         }
     });
 
@@ -105,23 +115,37 @@ export async function POST(request) {
 }
 
 
-// Get all products for a seller
+// Get all products for a seller (paginated)
 export async function GET(request) {
     try {
         const {userId} = getAuth(request);
         const storeId = await authSeller(userId);
-  
+
         if(!storeId){
             return new Response(JSON.stringify({error: "Unauthorized"}), {status: 401});
         }
 
-        const products = await prisma.product.findMany({
-            where: {
-                storeId: storeId
-            }
-        });
-        return NextResponse.json({ products });
+        const { searchParams } = new URL(request.url);
+        const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')));
+        const search = searchParams.get('search')?.trim() || '';
+        const status = searchParams.get('status') || '';
 
+        const where = { storeId }
+        if (search) where.name = { contains: search, mode: 'insensitive' }
+        if (status) where.approvalStatus = status
+
+        const [products, total] = await Promise.all([
+            prisma.product.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * limit,
+                take: limit
+            }),
+            prisma.product.count({ where })
+        ]);
+
+        return NextResponse.json({ products, total, page, pages: Math.ceil(total / limit) });
 
     } catch (error) {
         console.error(error);

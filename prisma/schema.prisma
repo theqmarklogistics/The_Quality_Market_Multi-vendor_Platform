@@ -42,6 +42,12 @@ model Product {
     approvalNotes  String?
     approvedBy     String?
     approvedAt     DateTime?
+    // Shipping dimensions for weight-based cost calculation
+    weightKg    Float?
+    lengthCm    Float?
+    widthCm     Float?
+    heightCm    Float?
+    importOrigin String?  // "CHINA" | null (local/Rwanda)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -111,6 +117,12 @@ model Order {
     paymentReviewedBy String?
     paymentReviewedAt DateTime?
     paymentReceivedAt DateTime?
+    // Persisted shipping cost applied to this order
+    shippingCost  Float?        @default(0)
+    // Reference to the shipping rule applied (if any)
+    shippingRuleId String?
+    // Commission breakdown stored as JSON per-item
+    commission     Json          @default("{}")
     createdAt     DateTime      @default(now())
     updatedAt     DateTime      @updatedAt
     isCouponUsed  Boolean       @default(false)
@@ -170,6 +182,13 @@ model Address {
     zip       String
     country   String
     phone     String
+    // Optional geolocation for distance-based shipping
+    latitude  Float?
+    longitude Float?
+    // Optional district/region identifier for region-based shipping
+    district  String?
+    // Kigali sector for zone-based shipping (Zone A/B/C)
+    sector    String?
     createdAt DateTime @default(now())
 
     // Relations
@@ -196,14 +215,19 @@ model Store {
     description String
     username    String   @unique
     address     String
-    status      String   @default("pending")
-    isActive    Boolean  @default(false)
+    status          String   @default("pending")
+    isActive        Boolean  @default(false)
+    rejectionNotes  String?
     logo        String
     email       String
     contact     String
+    sellerModel SellerModel @default(LOCAL_SELLER)
     tinNumber   String?
     idPhotoUrl  String?
     rdbCertificateUrl String?
+    // Optional geolocation for distance calculations
+    latitude    Float?
+    longitude   Float?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -255,4 +279,70 @@ model Message {
 
     @@index([conversationId, createdAt])
     @@index([senderId, createdAt])
+}
+
+enum SellerModel {
+    FULL_MANAGED
+    LOCAL_SELLER
+}
+
+enum ShippingRuleType {
+    REGION
+    KM
+    DEFAULT
+}
+
+model ShippingRule {
+    id        String           @id @default(cuid())
+    name      String
+    type      ShippingRuleType
+    // For REGION rules this stores a district or region key
+    regionKey String?
+    // For KM rules define bounds
+    minKm     Float?
+    maxKm     Float?
+    // Pricing
+    flatRate  Float?
+    perKmRate Float?
+    priority  Int     @default(0)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+// Weight-based shipping tariff table (zone × weight bracket)
+// zone: "A" | "B" | "C" (Kigali last-mile) | "CHINA_RWANDA" (international freight)
+model WeightShippingRate {
+    id            String   @id @default(cuid())
+    zone          String
+    minWeightKg   Float
+    maxWeightKg   Float?   // null = unlimited (100+ kg tier)
+    cost          Float
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    @@index([zone, minWeightKg])
+}
+
+model CategoryCommission {
+    id           String   @id @default(cuid())
+    category     String
+    sellerModel  String?  // "FULL_MANAGED" | "LOCAL_SELLER" | null (null = applies to all)
+    percent      Float?   // percentage e.g., 5.5 for 5.5%
+    fixedAmount  Float?   // fixed amount per item
+    effectiveFrom DateTime?
+    effectiveTo   DateTime?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([category, sellerModel])
+}
+
+// Raw event store for analytics / audit
+model Event {
+    id        String   @id @default(cuid())
+    name      String
+    payload   Json
+    userId    String?
+    storeId   String?
+    createdAt DateTime @default(now())
 }

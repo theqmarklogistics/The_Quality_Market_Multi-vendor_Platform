@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from "react"
 import axios from "axios"
 import toast from "react-hot-toast"
+import Link from "next/link"
 
 export default function AdminDashboard() {
     const { getToken } = useAuth()
@@ -95,11 +96,11 @@ export default function AdminDashboard() {
     ]
 
     const notificationCards = [
-        { title: 'New Orders', value: dashboardData.newOrders, icon: TagsIcon, tone: 'text-blue-600 bg-blue-50 border-blue-100' },
-        { title: 'Pending Stores', value: dashboardData.pendingStores, icon: StoreIcon, tone: 'text-amber-600 bg-amber-50 border-amber-100' },
-        { title: 'Pending Products', value: dashboardData.pendingProducts, icon: PackageCheckIcon, tone: 'text-violet-600 bg-violet-50 border-violet-100' },
-        { title: 'Pending Payments', value: dashboardData.pendingPaymentProofs, icon: PackageCheckIcon, tone: 'text-rose-600 bg-rose-50 border-rose-100' },
-        { title: 'Unread Chats', value: dashboardData.unreadChatMessages, icon: BellIcon, tone: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+        { title: 'New Orders', value: dashboardData.newOrders, icon: TagsIcon, tone: 'text-blue-600 bg-blue-50 border-blue-100', href: '/admin/orders' },
+        { title: 'Pending Stores', value: dashboardData.pendingStores, icon: StoreIcon, tone: 'text-amber-600 bg-amber-50 border-amber-100', href: '/admin/approve' },
+        { title: 'Pending Products', value: dashboardData.pendingProducts, icon: PackageCheckIcon, tone: 'text-violet-600 bg-violet-50 border-violet-100', href: '/admin/products' },
+        { title: 'Pending Payments', value: dashboardData.pendingPaymentProofs, icon: PackageCheckIcon, tone: 'text-rose-600 bg-rose-50 border-rose-100', href: '/admin/payments' },
+        { title: 'Unread Chats', value: dashboardData.unreadChatMessages, icon: BellIcon, tone: 'text-emerald-600 bg-emerald-50 border-emerald-100', href: '/admin/chat' },
     ]
 
     return (
@@ -122,13 +123,13 @@ export default function AdminDashboard() {
                 <h2 className="text-lg font-medium text-slate-700 mb-4">Notifications</h2>
                 <div className="flex flex-wrap gap-4">
                     {notificationCards.map((card, index) => (
-                        <div key={index} className={`flex items-center gap-4 border p-3 px-5 rounded-lg ${card.tone}`}>
+                        <Link key={index} href={card.href} className={`flex items-center gap-4 border p-3 px-5 rounded-lg transition hover:opacity-80 hover:-translate-y-0.5 ${card.tone}`}>
                             <div className="flex flex-col gap-1 text-xs min-w-28">
                                 <p>{card.title}</p>
                                 <b className="text-2xl font-medium">{card.value}</b>
                             </div>
                             <card.icon size={42} className="w-10 h-10 p-2 rounded-full bg-white/80" />
-                        </div>
+                        </Link>
                     ))}
                 </div>
             </div>

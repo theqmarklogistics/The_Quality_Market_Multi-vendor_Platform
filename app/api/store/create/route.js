@@ -23,8 +23,13 @@ export async function POST(request) {
         const address = String(formData.get("address") || "").trim();
         const image = formData.get("image");
         const tinNumber = String(formData.get("tinNumber") || "").trim();
+        const sellerModel = String(formData.get("sellerModel") || "LOCAL_SELLER").trim();
         const idPhoto = formData.get("idPhoto");
         const rdbCertificate = formData.get("rdbCertificate");
+
+        if (!['FULL_MANAGED', 'LOCAL_SELLER'].includes(sellerModel)) {
+            return NextResponse.json({ error: "Invalid seller model" }, { status: 400 });
+        }
 
         const missingFields = [];
         if (!name) missingFields.push("name");
@@ -119,6 +124,7 @@ export async function POST(request) {
                 address,
                 logo: optimizedImage,
                 tinNumber: String(tinNumber),
+                sellerModel,
                 idPhotoUrl: idUpload.url,
                 rdbCertificateUrl
             }

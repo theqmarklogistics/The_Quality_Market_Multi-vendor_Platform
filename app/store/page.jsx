@@ -74,6 +74,13 @@ export default function Dashboard() {
             <h2>Total Reviews</h2>
 
             <div className="mt-5">
+                {dashboardData.ratings.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/70">
+                        <StarIcon size={36} className="text-slate-300 mb-3" />
+                        <p className="font-medium text-slate-500">No reviews yet</p>
+                        <p className="text-sm text-slate-400 mt-1">Customer reviews for your products will appear here.</p>
+                    </div>
+                )}
                 {
                     dashboardData.ratings.map((review, index) => (
                         <div key={index} className="flex max-sm:flex-col gap-5 sm:items-center justify-between py-6 border-b border-slate-200 text-sm text-slate-600 max-w-4xl">

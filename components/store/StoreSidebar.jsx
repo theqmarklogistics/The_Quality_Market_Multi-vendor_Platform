@@ -3,16 +3,36 @@ import { usePathname } from "next/navigation"
 import { HomeIcon, LayoutListIcon, MessageCircleIcon, SquarePenIcon, SquarePlusIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { useAuth } from "@clerk/nextjs"
+import { useEffect, useState } from "react"
+import axios from "axios"
 
 const StoreSidebar = ({storeInfo}) => {
 
     const pathname = usePathname()
+    const { getToken } = useAuth()
+    const [pendingOrders, setPendingOrders] = useState(0)
+
+    useEffect(() => {
+        const fetchCounts = async () => {
+            try {
+                const token = await getToken()
+                const { data } = await axios.get('/api/store/counts', {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                setPendingOrders(data.pendingOrders || 0)
+            } catch {
+                // silently ignore — badge is non-critical
+            }
+        }
+        fetchCounts()
+    }, [getToken])
 
     const sidebarLinks = [
         { name: 'Dashboard', href: '/store', icon: HomeIcon },
         { name: 'Add Product', href: '/store/add-product', icon: SquarePlusIcon },
         { name: 'Manage Product', href: '/store/manage-product', icon: SquarePenIcon },
-        { name: 'Orders', href: '/store/orders', icon: LayoutListIcon },
+        { name: 'Orders', href: '/store/orders', icon: LayoutListIcon, badge: pendingOrders },
         { name: 'Chats', href: '/store/chat', icon: MessageCircleIcon },
     ]
 
@@ -30,6 +50,11 @@ const StoreSidebar = ({storeInfo}) => {
                             <link.icon size={18} className="sm:ml-5" />
                             <p className="max-sm:hidden">{link.name}</p>
                             {pathname === link.href && <span className="absolute bg-green-500 right-0 top-1.5 bottom-1.5 w-1 sm:w-1.5 rounded-l"></span>}
+                            {link.badge > 0 && (
+                                <span className="ml-auto mr-2 inline-flex min-w-6 items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-semibold text-white max-sm:hidden">
+                                    {link.badge}
+                                </span>
+                            )}
                         </Link>
                     ))
                 }

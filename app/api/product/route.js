@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 export async function GET(request) {
     try {
         let products = await prisma.product.findMany({
-            where: { inStock: true, approvalStatus: 'APPROVED' },
+            where: { inStock: true, approvalStatus: 'APPROVED', store: { isActive: true } },
             select: {
                 id: true,
                 name: true,
@@ -36,9 +36,7 @@ export async function GET(request) {
             },
             orderBy: { createdAt: "desc" }
         });
-        // remove products with store isActive is false
-        products = products.filter(product => product.store.isActive);
-        return NextResponse.json({products} );
+        return NextResponse.json({ products });
 
     } catch (error) {
         console.error(error);

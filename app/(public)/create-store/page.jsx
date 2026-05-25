@@ -20,6 +20,8 @@ export default function CreateStore() {
     const [loading, setLoading] = useState(true)
     const [message, setMessage] = useState("")
 
+    const [sellerModel, setSellerModel] = useState('LOCAL_SELLER')
+
     const [storeInfo, setStoreInfo] = useState({
         name: "",
         username: "",
@@ -99,6 +101,7 @@ export default function CreateStore() {
             formData.append('address', storeInfo.address)
             formData.append('image', storeInfo.image)
             formData.append('tinNumber', storeInfo.tinNumber)
+            formData.append('sellerModel', sellerModel)
             formData.append('idPhoto', storeInfo.idPhoto)
             if (storeInfo.rdbCertificate) {
                 formData.append('rdbCertificate', storeInfo.rdbCertificate)
@@ -147,7 +150,36 @@ export default function CreateStore() {
                             <p className="max-w-lg">To become a seller on The Quality Market, submit your store details for review. Your store will be activated after admin verification.</p>
                         </div>
 
-                        <label className="mt-10 cursor-pointer">
+                        {/* Seller Model Selection */}
+                        <div className="w-full max-w-lg mt-8">
+                            <p className="font-medium text-slate-700 mb-3">How will you sell on The Quality Market?</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setSellerModel('LOCAL_SELLER')}
+                                    className={`text-left p-4 rounded-xl border-2 transition ${sellerModel === 'LOCAL_SELLER' ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}
+                                >
+                                    <p className={`font-semibold text-sm mb-1 ${sellerModel === 'LOCAL_SELLER' ? 'text-slate-900' : 'text-slate-700'}`}>
+                                        {sellerModel === 'LOCAL_SELLER' && <span className="inline-block w-2 h-2 rounded-full bg-slate-800 mr-2 align-middle" />}
+                                        Local Seller
+                                    </p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">Semi-managed. You list products, set your own prices, and ship from your own warehouse directly to customers.</p>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSellerModel('FULL_MANAGED')}
+                                    className={`text-left p-4 rounded-xl border-2 transition ${sellerModel === 'FULL_MANAGED' ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-300'}`}
+                                >
+                                    <p className={`font-semibold text-sm mb-1 ${sellerModel === 'FULL_MANAGED' ? 'text-slate-900' : 'text-slate-700'}`}>
+                                        {sellerModel === 'FULL_MANAGED' && <span className="inline-block w-2 h-2 rounded-full bg-slate-800 mr-2 align-middle" />}
+                                        Full Managed
+                                    </p>
+                                    <p className="text-xs text-slate-500 leading-relaxed">For manufacturers &amp; wholesalers. Ship inventory to our warehouse — we handle storage, picking, packing, and delivery.</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        <label className="mt-6 cursor-pointer">
                             Store Logo
                             <Image src={storeInfo.image ? URL.createObjectURL(storeInfo.image) : assets.upload_area} className="rounded-lg mt-2 h-16 w-auto" alt="" width={150} height={100} />
                             <input type="file" accept="image/*" onChange={(e) => setStoreInfo({ ...storeInfo, image: e.target.files[0] })} hidden required />

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
-import { shippingFee } from "@/lib/constants";
+import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
 import { getSocketServer } from "@/lib/socketServer";
 
 const PAYMENT_TIMEOUT_MINUTES = 30;
@@ -75,14 +75,19 @@ export async function POST(request) {
             groupedItems.set(item.id, (groupedItems.get(item.id) || 0) + quantity);
         }
 
+        // Batch-fetch all products in one query to avoid N+1
+        const productIds = [...groupedItems.keys()];
+        const fetchedProducts = await prisma.product.findMany({
+            where: { id: { in: productIds } },
+            include: { store: true }
+        });
+        const productMap = new Map(fetchedProducts.map(p => [p.id, p]));
+
         // Group orders by storeId using Map
         const orderByStore = new Map();
 
         for(const [productId, quantity] of groupedItems.entries()){
-            const product = await prisma.product.findUnique({
-                where: { id: productId },
-                include: { store: true }
-            });
+            const product = productMap.get(productId);
             if(!product){
                 return NextResponse.json({ error: `Product not found: ${productId}` }, { status: 400 });
             }
@@ -107,6 +112,13 @@ export async function POST(request) {
                 warehouseQuantity: product.warehouseQuantity,
                 storeId: product.storeId,
                 name: product.name,
+                category: product.category,
+                sellerModel: product.store?.sellerModel || 'LOCAL_SELLER',
+                weightKg: product.weightKg,
+                lengthCm: product.lengthCm,
+                widthCm: product.widthCm,
+                heightCm: product.heightCm,
+                importOrigin: product.importOrigin
             })
         }
 
@@ -158,9 +170,32 @@ export async function POST(request) {
                     total -= (total * coupon.discount / 100);
                 }
 
-                if(!isShippingFeeAdded && !couponCode){
-                    total += shippingFee;
-                    isShippingFeeAdded = true;
+                // Calculate shipping cost for this store (per-store shipping)
+                const shippingRes = await calculateOrderShippingForStore(tx, storeId, address, storeItems);
+                const shippingCost = shippingRes?.cost || 0;
+                const shippingRuleId = shippingRes?.ruleId || null;
+
+                // Add shipping cost once per store order
+                total += shippingCost;
+
+                // Calculate commission breakdown per item and persist with order
+                const commissionBreakdown = [];
+                for (const item of storeItems) {
+                    try {
+                        const comm = await calculateItemCommission(tx, { category: item.category }, item.price, item.sellerModel);
+                        const commissionAmountTotal = parseFloat((comm.commissionAmount * item.quantity).toFixed(2));
+                        commissionBreakdown.push({
+                            productId: item.id,
+                            quantity: item.quantity,
+                            unitCommission: comm.commissionAmount,
+                            commissionAmount: commissionAmountTotal,
+                            commissionRate: comm.commissionRate,
+                            fixedAmount: comm.fixedAmount,
+                            appliedRuleId: comm.appliedRuleId
+                        });
+                    } catch (err) {
+                        console.error('Commission calc error', err);
+                    }
                 }
 
                 const order = await tx.order.create({
@@ -169,6 +204,9 @@ export async function POST(request) {
                         storeId,
                         addressId,
                         total: parseFloat(total.toFixed(2)),
+                        shippingCost: parseFloat((shippingCost || 0).toFixed(2)),
+                        shippingRuleId: shippingRuleId,
+                        commission: commissionBreakdown.length ? commissionBreakdown : {},
                         paymentMethod: selectedPaymentMethod,
                         paymentStatus: "PENDING",
                         paymentExpiresAt,

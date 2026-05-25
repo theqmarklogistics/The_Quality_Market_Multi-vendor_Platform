@@ -22,6 +22,7 @@ const Navbar = () => {
     const searchParams = useSearchParams();
 
     const [search, setSearch] = useState('')
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const [isSeller, setIsSeller] = useState(false)
     const [loadingAccess, setLoadingAccess] = useState(false)
@@ -194,37 +195,66 @@ const Navbar = () => {
 
                     </div>
 
-                    {/* Mobile User Button  */}
-                    <div  className="sm:hidden">
+                    {/* Mobile: search icon + cart + user */}
+                    <div className="sm:hidden flex items-center gap-3">
+                        <button
+                            aria-label="Search products"
+                            onClick={() => setMobileSearchOpen(v => !v)}
+                            className="text-slate-600 hover:text-slate-800 transition"
+                        >
+                            {mobileSearchOpen ? <XIcon size={20} /> : <Search size={20} />}
+                        </button>
 
-                        {
-                            user ? (
-                                <UserButton>
-                                    <UserButton.MenuItems>
-                                        {canShowAccessActions && isAdmin && (
-                                            <UserButton.Action labelIcon={<User size={16} />} label="Admin Dashboard" onClick={() => router.push('/admin')} />
-                                        )}
-                                        {canShowAccessActions && isSeller && (
-                                            <>
-                                                <UserButton.Action labelIcon={<User size={16} />} label="Store Dashboard" onClick={() => router.push('/store')} />
-                                                <UserButton.Action labelIcon={<MessageCircleIcon size={16} />} label="Contact Admin" onClick={openAdminConversation} />
-                                            </>
-                                        )}
-                                        <UserButton.Action labelIcon = {<ShoppingCart size={16}/>} label="Cart" onClick={()=> router.push('/cart')}/>
-                                        <UserButton.Action labelIcon = {<PackageIcon size={16}/>} label="My Orders" onClick={()=> router.push('/orders')}/>
-                                        <UserButton.Action labelIcon = {<MessageCircleIcon size={16}/>} label="My Chats" onClick={()=> router.push('/chat')}/>
-                                    </UserButton.MenuItems>
-                                </UserButton>
-                            ) : (
-                                <button onClick={openSignIn} className="px-7 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-sm transition text-white rounded-full">
-                                    Login
-                                </button>
-                            )
-                        }
-                        
+                        <Link href="/cart" className="relative text-slate-600" aria-label="View cart">
+                            <ShoppingCart size={20} />
+                            <span className="absolute -top-1 -right-1 flex items-center justify-center text-[8px] text-white bg-slate-600 size-3.5 rounded-full">{cartCount}</span>
+                        </Link>
+
+                        {user ? (
+                            <UserButton>
+                                <UserButton.MenuItems>
+                                    {canShowAccessActions && isAdmin && (
+                                        <UserButton.Action labelIcon={<User size={16} />} label="Admin Dashboard" onClick={() => router.push('/admin')} />
+                                    )}
+                                    {canShowAccessActions && isSeller && (
+                                        <>
+                                            <UserButton.Action labelIcon={<User size={16} />} label="Store Dashboard" onClick={() => router.push('/store')} />
+                                            <UserButton.Action labelIcon={<MessageCircleIcon size={16} />} label="Contact Admin" onClick={openAdminConversation} />
+                                        </>
+                                    )}
+                                    <UserButton.Action labelIcon={<PackageIcon size={16} />} label="My Orders" onClick={() => router.push('/orders')} />
+                                    <UserButton.Action labelIcon={<MessageCircleIcon size={16} />} label="My Chats" onClick={() => router.push('/chat')} />
+                                </UserButton.MenuItems>
+                            </UserButton>
+                        ) : (
+                            <button onClick={openSignIn} className="px-5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-sm transition text-white rounded-full">
+                                Login
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
+            {/* Mobile search bar — slides in below the nav row */}
+            {mobileSearchOpen && (
+                <div className="sm:hidden px-4 pb-3">
+                    <form onSubmit={(e) => { handleSearch(e); setMobileSearchOpen(false) }} className="flex items-center gap-2 bg-slate-100 px-4 py-2.5 rounded-full text-sm">
+                        <Search size={16} className="text-slate-500 shrink-0" />
+                        <input
+                            autoFocus
+                            className="flex-1 bg-transparent outline-none placeholder-slate-500 text-slate-700"
+                            type="text"
+                            placeholder="Search products…"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                        {search && (
+                            <button type="button" onClick={clearSearch} className="text-slate-400 hover:text-slate-600 transition">
+                                <XIcon size={15} />
+                            </button>
+                        )}
+                    </form>
+                </div>
+            )}
             <hr className="border-gray-300" />
         </nav>
     )

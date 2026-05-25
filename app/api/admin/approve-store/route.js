@@ -15,30 +15,21 @@ export async function POST(request) {
             return NextResponse.json({error: "Not Unauthorized"}, {status: 401});
         }
 
-        const { storeId, status } = await request.json();
+        const { storeId, status, notes } = await request.json();
 
         if(status === 'approved') {
             await prisma.store.update({
-                where: {
-                    id: storeId
-                },
-                data: {
-                    status: 'approved',
-                    isActive: true
-                }
+                where: { id: storeId },
+                data: { status: 'approved', isActive: true, rejectionNotes: null }
             })
         } else if(status === 'rejected') {
             await prisma.store.update({
-                where: {
-                    id: storeId
-                },
-                data: {
-                    status: 'rejected',
-                }
+                where: { id: storeId },
+                data: { status: 'rejected', rejectionNotes: notes || null }
             });
         }
 
-        return NextResponse.json({message: status + "successfully"});
+        return NextResponse.json({message: `Store ${status} successfully`});
     } catch (error) {
         console.error(error);
         return NextResponse.json({error: error.message || error.code}, {status: 400});

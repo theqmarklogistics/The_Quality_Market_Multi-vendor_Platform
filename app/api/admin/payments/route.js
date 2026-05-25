@@ -16,23 +16,28 @@ export async function GET(request) {
         }
 
         const { searchParams } = new URL(request.url);
-        const proofStatus = searchParams.get("proofStatus") || "SUBMITTED";
+        const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')));
+        const proofStatus = searchParams.get('proofStatus') || 'SUBMITTED';
 
-        const orders = await prisma.order.findMany({
-            where: {
-                paymentProofStatus: proofStatus
-            },
-            include: {
-                user: true,
-                store: true,
-                orderItems: { include: { product: true } }
-            },
-            orderBy: {
-                createdAt: "desc"
-            }
-        });
+        const where = { paymentProofStatus: proofStatus };
 
-        return NextResponse.json({ orders });
+        const [orders, total] = await Promise.all([
+            prisma.order.findMany({
+                where,
+                include: {
+                    user: true,
+                    store: true,
+                    orderItems: { include: { product: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * limit,
+                take: limit
+            }),
+            prisma.order.count({ where })
+        ]);
+
+        return NextResponse.json({ orders, total, page, pages: Math.ceil(total / limit) });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

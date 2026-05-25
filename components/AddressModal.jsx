@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/nextjs"
 import { useDispatch } from "react-redux"
 import axios from "axios"
 import { addAddress } from "@/lib/features/address/addressSlice"
+import { KIGALI_SECTORS } from "@/lib/constants"
 
 
 const AddressModal = ({ setShowAddressModal }) => {
@@ -17,6 +18,7 @@ const AddressModal = ({ setShowAddressModal }) => {
         name: '',
         email: '',
         street: '',
+        sector: '',
         city: '',
         state: '',
         zip: '',
@@ -36,6 +38,11 @@ const AddressModal = ({ setShowAddressModal }) => {
 
         try {
             const token = await getToken();
+            if (!token) {
+                toast.error('Please sign in before saving an address');
+                return;
+            }
+
             const {data} = await axios.post('/api/address', {address}, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -57,6 +64,10 @@ const AddressModal = ({ setShowAddressModal }) => {
                 <input name="name" onChange={handleAddressChange} value={address.name} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Enter your name" required />
                 <input name="email" onChange={handleAddressChange} value={address.email} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="email" placeholder="Email address" required />
                 <input name="street" onChange={handleAddressChange} value={address.street} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Street" required />
+                <select name="sector" onChange={handleAddressChange} value={address.sector} className="p-2 px-4 outline-none border border-slate-200 rounded w-full text-slate-700">
+                    <option value="">Sector (Kigali) — optional</option>
+                    {KIGALI_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
                 <div className="flex gap-4">
                     <input name="city" onChange={handleAddressChange} value={address.city} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="District" required />
                     <input name="state" onChange={handleAddressChange} value={address.state} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Province" required />

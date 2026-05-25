@@ -6,9 +6,12 @@ import prisma from "@/lib/prisma";
 export async function POST(request) {
     try {
         const { userId } = getAuth(request);
+        if (!userId) {
+            return NextResponse.json({ error: "You must be signed in to save an address" }, { status: 401 });
+        }
+
         const body = await request.json();
-        const data = body.address ?? body;
-        data.userId = userId;
+        const data = { ...(body.address ?? body), userId };
         const newAddress = await prisma.address.create({
             data
         });
