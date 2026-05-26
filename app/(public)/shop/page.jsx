@@ -1,41 +1,81 @@
 'use client'
-import { Suspense } from "react"
+import { Suspense, useEffect, useState, useCallback } from "react"
 import ProductCard from "@/components/ProductCard"
 import { ProductGridSkeleton } from "@/components/ProductCardSkeleton"
 import CategoryFilter from "@/components/CategoryFilter"
 import { FilterXIcon, MoveLeftIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useSelector } from "react-redux"
-import { useState } from "react"
+import axios from "axios"
 
 const SORT_OPTIONS = [
-    { value: 'newest', label: 'Newest' },
-    { value: 'price-low', label: 'Price: Low → High' },
+    { value: 'newest',     label: 'Newest' },
+    { value: 'price-low',  label: 'Price: Low → High' },
     { value: 'price-high', label: 'Price: High → Low' },
-    { value: 'rating', label: 'Top Rated' },
+    { value: 'rating',     label: 'Top Rated' },
 ]
 
-function avgRating(product) {
-    const ratings = product.rating || []
-    if (!ratings.length) return 0
-    return ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
-}
+const PAGE_SIZE = 20
 
 function ShopContent() {
     const searchParams = useSearchParams()
-    const search = searchParams.get('search')
-    const category = searchParams.get('category')
-    const sort = searchParams.get('sort') || 'newest'
+    const search   = searchParams.get('search')   || ''
+    const category = searchParams.get('category') || ''
+    const sort     = searchParams.get('sort')     || 'newest'
     const priceMin = searchParams.get('priceMin') || ''
     const priceMax = searchParams.get('priceMax') || ''
-    const router = useRouter()
+    const router   = useRouter()
 
     const [priceMinInput, setPriceMinInput] = useState(priceMin)
     const [priceMaxInput, setPriceMaxInput] = useState(priceMax)
-    const [showFilters, setShowFilters] = useState(false)
+    const [showFilters,   setShowFilters]   = useState(false)
 
-    const products = useSelector(state => state.product.list)
-    const productsLoading = useSelector(state => state.product.loading)
+    const [products,    setProducts]    = useState([])
+    const [total,       setTotal]       = useState(0)
+    const [page,        setPage]        = useState(1)
+    const [loading,     setLoading]     = useState(true)
+    const [loadingMore, setLoadingMore] = useState(false)
+
+    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF'
+
+    const buildQuery = useCallback((p = 1) => {
+        const q = new URLSearchParams()
+        q.set('page',  String(p))
+        q.set('limit', String(PAGE_SIZE))
+        if (search)   q.set('search',   search)
+        if (category) q.set('category', category)
+        if (sort && sort !== 'newest') q.set('sort', sort)
+        if (priceMin) q.set('priceMin', priceMin)
+        if (priceMax) q.set('priceMax', priceMax)
+        return q.toString()
+    }, [search, category, sort, priceMin, priceMax])
+
+    // Reset and fetch page 1 whenever filters change
+    useEffect(() => {
+        let cancelled = false
+        setLoading(true)
+        setPage(1)
+        axios.get(`/api/product?${buildQuery(1)}`)
+            .then(({ data }) => {
+                if (cancelled) return
+                setProducts(data.products ?? [])
+                setTotal(data.total ?? 0)
+            })
+            .catch(() => setProducts([]))
+            .finally(() => { if (!cancelled) setLoading(false) })
+        return () => { cancelled = true }
+    }, [buildQuery])
+
+    const loadMore = async () => {
+        const next = page + 1
+        setLoadingMore(true)
+        try {
+            const { data } = await axios.get(`/api/product?${buildQuery(next)}`)
+            setProducts(prev => [...prev, ...(data.products ?? [])])
+            setPage(next)
+        } finally {
+            setLoadingMore(false)
+        }
+    }
 
     const pushParams = (overrides) => {
         const params = new URLSearchParams(searchParams.toString())
@@ -53,7 +93,7 @@ function ShopContent() {
     }
 
     const setCategory = (cat) => pushParams({ category: cat })
-    const setSort = (s) => pushParams({ sort: s === 'newest' ? '' : s })
+    const setSort     = (s)   => pushParams({ sort: s === 'newest' ? '' : s })
 
     const applyPriceFilter = (e) => {
         e.preventDefault()
@@ -61,19 +101,7 @@ function ShopContent() {
     }
 
     const hasActiveFilters = search || category || sort !== 'newest' || priceMin || priceMax
-
-    let filteredProducts = [...products]
-
-    if (search) filteredProducts = filteredProducts.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-    if (category) filteredProducts = filteredProducts.filter(p => p.category === category)
-    if (priceMin) filteredProducts = filteredProducts.filter(p => p.price >= Number(priceMin))
-    if (priceMax) filteredProducts = filteredProducts.filter(p => p.price <= Number(priceMax))
-
-    if (sort === 'price-low') filteredProducts.sort((a, b) => a.price - b.price)
-    else if (sort === 'price-high') filteredProducts.sort((a, b) => b.price - a.price)
-    else if (sort === 'rating') filteredProducts.sort((a, b) => avgRating(b) - avgRating(a))
-
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF'
+    const hasMore = products.length < total
 
     return (
         <div className="min-h-[70vh] mx-6">
@@ -83,7 +111,6 @@ function ShopContent() {
                         {search && <MoveLeftIcon size={20} />} All <span className="text-slate-700 font-medium">Products</span>
                     </h1>
                     <div className="flex items-center gap-3">
-                        {/* Sort */}
                         <select
                             value={sort}
                             onChange={e => setSort(e.target.value)}
@@ -91,7 +118,6 @@ function ShopContent() {
                         >
                             {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
-                        {/* Filter toggle (mobile) */}
                         <button
                             onClick={() => setShowFilters(v => !v)}
                             className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 transition sm:hidden"
@@ -101,7 +127,6 @@ function ShopContent() {
                     </div>
                 </div>
 
-                {/* Category + active filters */}
                 <div className="flex flex-wrap items-center gap-3 mb-4">
                     <CategoryFilter currentCategory={category} onSelectCategory={setCategory} />
                     {hasActiveFilters && (
@@ -128,23 +153,18 @@ function ShopContent() {
                     )}
                 </div>
 
-                {/* Price range filter panel */}
                 <div className={`mb-5 ${showFilters ? 'block' : 'hidden sm:block'}`}>
                     <form onSubmit={applyPriceFilter} className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm">
                         <span className="text-slate-500 font-medium">Price range:</span>
                         <input
-                            type="number"
-                            min="0"
-                            placeholder="Min"
+                            type="number" min="0" placeholder="Min"
                             value={priceMinInput}
                             onChange={e => setPriceMinInput(e.target.value)}
                             className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 outline-none focus:border-slate-400"
                         />
                         <span className="text-slate-400">–</span>
                         <input
-                            type="number"
-                            min="0"
-                            placeholder="Max"
+                            type="number" min="0" placeholder="Max"
                             value={priceMaxInput}
                             onChange={e => setPriceMaxInput(e.target.value)}
                             className="w-24 rounded-lg border border-slate-200 bg-white px-2 py-1 outline-none focus:border-slate-400"
@@ -158,14 +178,25 @@ function ShopContent() {
                     </form>
                 </div>
 
-                {productsLoading ? (
+                {loading ? (
                     <ProductGridSkeleton count={8} />
-                ) : filteredProducts.length > 0 ? (
+                ) : products.length > 0 ? (
                     <>
-                        <p className="text-xs text-slate-400 mb-4">{filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-32">
-                            {filteredProducts.map(product => <ProductCard key={product.id} product={product} />)}
+                        <p className="text-xs text-slate-400 mb-4">{total} product{total !== 1 ? 's' : ''} found</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-10">
+                            {products.map(product => <ProductCard key={product.id} product={product} />)}
                         </div>
+                        {hasMore && (
+                            <div className="flex justify-center mb-32">
+                                <button
+                                    onClick={loadMore}
+                                    disabled={loadingMore}
+                                    className="rounded-full border border-slate-200 bg-white px-8 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                                >
+                                    {loadingMore ? 'Loading…' : `Load more (${total - products.length} remaining)`}
+                                </button>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div className="max-w-xl mx-auto text-center py-20 px-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50/70 mb-32">

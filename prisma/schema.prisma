@@ -24,6 +24,7 @@ model User {
     buyerOrders Order[]   @relation("BuyerRelation")
     conversations      ConversationParticipant[]
     sentMessages       Message[]                 @relation("MessageSender")
+    returns     Return[]
 }
 
 // Required for creating a Product: name, description, mrp, price, images, category, storeId
@@ -84,6 +85,7 @@ enum PaymentStatus {
     PAID
     FAILED
     EXPIRED
+    CANCELLED
 }
 
 enum PaymentProofStatus {
@@ -96,6 +98,18 @@ enum PaymentProofStatus {
 enum ConversationTargetType {
     ADMIN
     STORE
+}
+
+enum PayoutStatus {
+    PENDING
+    PAID
+}
+
+enum ReturnStatus {
+    REQUESTED
+    APPROVED
+    REJECTED
+    COMPLETED
 }
 
 // Required for creating an Order: total, userId, storeId, addressId, isPaid, paymentMethod, paymentStatus, isCouponUsed, coupon (JSON), orderItems (nested)
@@ -134,6 +148,7 @@ model Order {
     store   Store   @relation(fields: [storeId], references: [id])
     address Address @relation(fields: [addressId], references: [id])
     conversations Conversation[]
+    returnRequest Return?
 
     @@index([paymentProofStatus, createdAt])
 }
@@ -204,6 +219,8 @@ model Coupon {
     forNewUser  Boolean
     isPublic    Boolean
     expiresAt   DateTime
+    maxUses     Int?
+    usedCount   Int      @default(0)
     createdAt   DateTime @default(now())
 }
 
@@ -235,6 +252,7 @@ model Store {
     Order   Order[]
     conversations Conversation[]
     user    User      @relation(fields: [userId], references: [id])
+    payouts Payout[]
 }
 
 model Conversation {
@@ -337,6 +355,57 @@ model CategoryCommission {
     @@index([category, sellerModel])
 }
 
+model Return {
+    id          String       @id @default(cuid())
+    orderId     String       @unique
+    userId      String
+    reason      String
+    status      ReturnStatus @default(REQUESTED)
+    adminNotes  String?
+    reviewedBy  String?
+    reviewedAt  DateTime?
+    createdAt   DateTime     @default(now())
+    updatedAt   DateTime     @updatedAt
+
+    order       Order        @relation(fields: [orderId], references: [id])
+    user        User         @relation(fields: [userId], references: [id])
+
+    @@index([status, createdAt])
+}
+
+model Payout {
+    id          String       @id @default(cuid())
+    storeId     String
+    amount      Float
+    periodStart DateTime
+    periodEnd   DateTime
+    status      PayoutStatus @default(PENDING)
+    paidAt      DateTime?
+    paidBy      String?
+    notes       String?
+    createdAt   DateTime     @default(now())
+    updatedAt   DateTime     @updatedAt
+
+    store       Store        @relation(fields: [storeId], references: [id])
+
+    @@index([storeId, status])
+}
+
+model AuditLog {
+    id         String   @id @default(cuid())
+    adminId    String
+    adminName  String   @default("")
+    action     String
+    targetType String
+    targetId   String
+    notes      String?
+    metadata   Json     @default("{}")
+    createdAt  DateTime @default(now())
+
+    @@index([adminId, createdAt])
+    @@index([targetType, createdAt])
+}
+
 // Raw event store for analytics / audit
 model Event {
     id        String   @id @default(cuid())
@@ -345,4 +414,26 @@ model Event {
     userId    String?
     storeId   String?
     createdAt DateTime @default(now())
+}
+
+// Admin-configurable hero/banner slots ("main" | "card1" | "card2")
+model HeroConfig {
+    slot          String   @id  // "main" | "card1" | "card2"
+    // Main panel
+    badgeText     String?
+    headline      String?
+    description   String?
+    startingPrice String?
+    cta1Label     String?
+    cta1Href      String?
+    cta2Label     String?
+    cta2Href      String?
+    // Side cards
+    cardTitle     String?
+    accentColor   String?  // hex e.g. "#FFAD51"
+    linkLabel     String?
+    linkHref      String?
+    // Shared
+    imageUrl      String?
+    updatedAt     DateTime @updatedAt
 }

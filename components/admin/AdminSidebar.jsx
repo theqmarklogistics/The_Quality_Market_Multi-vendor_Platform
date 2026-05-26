@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from "next/navigation"
-import { HomeIcon, MessageCircleIcon, PackageCheckIcon, ShieldCheckIcon, StoreIcon, TagsIcon, TicketPercentIcon } from "lucide-react"
+import { ClipboardListIcon, CircleDollarSignIcon, HomeIcon, LayoutPanelTopIcon, MessageCircleIcon, PackageCheckIcon, RotateCcwIcon, ShieldCheckIcon, StoreIcon, TagsIcon, TicketPercentIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useUser } from "@clerk/nextjs"
@@ -28,7 +28,11 @@ const AdminSidebar = () => {
         { name: 'Orders', href: '/admin/orders', icon: TagsIcon, badge: counts.newOrders },
         { name: 'Payments', href: '/admin/payments', icon: TicketPercentIcon, badge: counts.pendingPaymentProofs },
         { name: 'Chats', href: '/admin/chat', icon: MessageCircleIcon, badge: counts.unreadChatMessages },
-        { name: 'Coupons', href: '/admin/coupons', icon: TicketPercentIcon  },
+        { name: 'Coupons', href: '/admin/coupons', icon: TicketPercentIcon },
+        { name: 'Returns', href: '/admin/returns', icon: RotateCcwIcon },
+        { name: 'Payouts', href: '/admin/payouts', icon: CircleDollarSignIcon },
+        { name: 'Audit Log', href: '/admin/audit', icon: ClipboardListIcon },
+        { name: 'Hero Banners', href: '/admin/hero', icon: LayoutPanelTopIcon },
     ]
 
     useEffect(() => {

@@ -7,6 +7,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { CheckCircle2Icon, PackageIcon, MessageCircleIcon, ArrowRightIcon } from 'lucide-react'
 import Loading from '@/components/Loading'
+import toast from 'react-hot-toast'
 
 function ConfirmationContent() {
     const searchParams = useSearchParams()
@@ -36,6 +37,7 @@ function ConfirmationContent() {
                 const matched = (data.orders || []).filter(o => ids.includes(o.id))
                 setOrders(matched)
             } catch {
+                toast.error('Could not load order details. Redirecting…')
                 router.replace('/orders')
             } finally {
                 setLoading(false)
@@ -48,6 +50,7 @@ function ConfirmationContent() {
     if (loading) return <Loading />
 
     if (orders.length === 0) {
+        toast.error('Order not found. Redirecting…')
         router.replace('/orders')
         return null
     }

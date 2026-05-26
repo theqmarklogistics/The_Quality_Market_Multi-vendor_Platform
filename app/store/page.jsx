@@ -2,7 +2,7 @@
 import { dummyStoreDashboardData } from "@/assets/assets"
 import Loading from "@/components/Loading"
 import { useAuth } from "@clerk/nextjs"
-import { CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
+import { AlertTriangleIcon, CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -23,6 +23,7 @@ export default function Dashboard() {
         totalEarnings: 0,
         totalOrders: 0,
         ratings: [],
+        lowStockProducts: [],
     })
 
     const dashboardCardsData = [
@@ -70,6 +71,25 @@ export default function Dashboard() {
                     ))
                 }
             </div>
+
+            {dashboardData.lowStockProducts?.length > 0 && (
+                <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangleIcon size={18} className="text-amber-500" />
+                        <h2 className="text-lg font-medium text-slate-700">Low Stock Alert</h2>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        {dashboardData.lowStockProducts.map(p => (
+                            <div key={p.id} className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm ${p.warehouseQuantity === 0 ? 'border-red-200 bg-red-50' : 'border-amber-100 bg-amber-50'}`}>
+                                <span className="font-medium text-slate-700">{p.name}</span>
+                                <span className={`font-bold ${p.warehouseQuantity === 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                                    {p.warehouseQuantity === 0 ? 'Out of stock' : `${p.warehouseQuantity} left`}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <h2>Total Reviews</h2>
 

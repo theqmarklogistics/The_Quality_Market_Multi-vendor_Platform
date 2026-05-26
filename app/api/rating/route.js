@@ -1,14 +1,32 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
+import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+
+const ratingLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
 
 
 // Add new rating
 
 export async function POST(request) {
+    const ip = getClientIp(request);
+    const rl = ratingLimiter(`rating:${ip}`);
+    if (!rl.success) {
+        return NextResponse.json(
+            { error: 'Too many requests. Please slow down.' },
+            { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+        );
+    }
+
     try {
         const { userId } = getAuth(request);
+        if (!userId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
         const { orderId, productId, rating, review } = await request.json();
+        if (!rating || !Number.isInteger(Number(rating)) || rating < 1 || rating > 5) {
+            return NextResponse.json({ error: "Rating must be a whole number between 1 and 5" }, { status: 400 });
+        }
         const order = await prisma.order.findFirst({
             where: {
                 id: orderId, userId, status: "DELIVERED"

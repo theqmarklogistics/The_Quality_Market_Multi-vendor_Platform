@@ -14,34 +14,42 @@ export async function GET(request) {
             return NextResponse.json({error: "Unauthorized"}, {status: 401});
         }
 
-        // Get all orders for seller
-        const totalOrders = await prisma.order.findMany({
-            where: {
-                storeId
-            }
-        });
+        const [orders, productCount, ratings, lowStockProducts] = await Promise.all([
+            prisma.order.findMany({
+                where: { storeId },
+                select: { total: true, paymentStatus: true, commission: true }
+            }),
+            prisma.product.count({ where: { storeId } }),
+            prisma.rating.findMany({
+                where: { product: { storeId } },
+                include: {
+                    user: { select: { name: true, image: true } },
+                    product: { select: { name: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 20
+            }),
+            prisma.product.findMany({
+                where: { storeId, warehouseQuantity: { lte: 5 }, approvalStatus: 'APPROVED' },
+                select: { id: true, name: true, warehouseQuantity: true, inStock: true },
+                orderBy: { warehouseQuantity: 'asc' },
+                take: 10,
+            })
+        ]);
 
-        // Get total products with ratings for seller
-        const totalProducts = await prisma.product.findMany({
-            where: {
-                storeId
-            }
-        });
-
-        const ratings = await prisma.rating.findMany({
-            where: {
-                productId: {
-                    in: totalProducts.map(product => product.id)
-                }
-            }, 
-            include: {user: true, product: true}
-        });
+        const paidOrders = orders.filter(o => o.paymentStatus === 'PAID');
+        const grossEarnings = paidOrders.reduce((acc, o) => acc + o.total, 0);
+        const totalCommissions = paidOrders.reduce((acc, o) => {
+            const items = Array.isArray(o.commission) ? o.commission : [];
+            return acc + items.reduce((sum, item) => sum + (item.commissionAmount || 0), 0);
+        }, 0);
 
         const dashboardData = {
-            totalOrders: totalOrders.length,
-            totalProducts: totalProducts.length,
-            totalEarnings: Math.round(totalOrders.reduce((acc, order) => acc + order.total, 0)),
-            ratings
+            totalOrders: orders.length,
+            totalProducts: productCount,
+            totalEarnings: Math.round(grossEarnings - totalCommissions),
+            ratings,
+            lowStockProducts,
         };
 
         return NextResponse.json(dashboardData); 

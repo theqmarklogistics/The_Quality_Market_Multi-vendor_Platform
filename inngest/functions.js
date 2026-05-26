@@ -78,26 +78,45 @@ export const deleteCouponOnExpiry = inngest.createFunction(
     }
 )
 
-// Inngest cron to expire unpaid pending orders after timeout
+// Inngest cron to expire unpaid pending orders after timeout and restore stock
 export const expirePendingOrders = inngest.createFunction(
     { id: "expire-pending-orders" },
     { cron: "*/10 * * * *" },
     async ({ step }) => {
         await step.run("mark-expired-orders", async () => {
             const now = new Date();
-            const result = await prisma.order.updateMany({
+
+            const expiredOrders = await prisma.order.findMany({
                 where: {
                     paymentStatus: "PENDING",
                     isPaid: false,
-                    paymentExpiresAt: {
-                        lte: now
-                    }
+                    paymentExpiresAt: { lte: now }
                 },
-                data: {
-                    paymentStatus: "EXPIRED"
-                }
+                include: { orderItems: true }
             });
-            return result.count;
+
+            if (expiredOrders.length === 0) return 0;
+
+            await prisma.$transaction(async (tx) => {
+                for (const order of expiredOrders) {
+                    for (const item of order.orderItems) {
+                        await tx.product.update({
+                            where: { id: item.productId },
+                            data: {
+                                warehouseQuantity: { increment: item.quantity },
+                                inStock: true
+                            }
+                        });
+                    }
+                }
+
+                await tx.order.updateMany({
+                    where: { id: { in: expiredOrders.map(o => o.id) } },
+                    data: { paymentStatus: "EXPIRED" }
+                });
+            });
+
+            return expiredOrders.length;
         });
     }
 );

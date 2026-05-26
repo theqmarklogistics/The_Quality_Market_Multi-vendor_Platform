@@ -4,11 +4,23 @@ import prisma from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
 import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
 import { getSocketServer } from "@/lib/socketServer";
+import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+
+const orderLimiter = createRateLimiter({ max: 5, windowMs: 60_000 });
 
 const PAYMENT_TIMEOUT_MINUTES = 30;
 
 
 export async function POST(request) {
+    const ip = getClientIp(request);
+    const rl = orderLimiter(`orders:${ip}`);
+    if (!rl.success) {
+        return NextResponse.json(
+            { error: 'Too many requests. Please wait before placing another order.' },
+            { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+        );
+    }
+
     try {
         const { userId } = getAuth(request);
         if(!userId){
@@ -48,9 +60,15 @@ export async function POST(request) {
 
             if(!coupon){
                 return NextResponse.json({ error: "Coupon not found" }, { status: 400 });
-            }    
+            }
 
-            
+            if(coupon.expiresAt && coupon.expiresAt < new Date()){
+                return NextResponse.json({ error: "Coupon has expired" }, { status: 400 });
+            }
+
+            if(coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses){
+                return NextResponse.json({ error: "Coupon usage limit reached" }, { status: 400 });
+            }
         }
 
         // check if the coupon is valid for the new user
@@ -157,11 +175,23 @@ export async function POST(request) {
                         select: { warehouseQuantity: true }
                     });
 
-                    if ((remainingProduct?.warehouseQuantity || 0) <= 0) {
-                        await tx.product.update({
-                            where: { id: item.id },
-                            data: { inStock: false }
-                        });
+                    const remaining = remainingProduct?.warehouseQuantity ?? 0;
+                    if (remaining <= 0) {
+                        await tx.product.update({ where: { id: item.id }, data: { inStock: false } });
+                    }
+
+                    // Low-stock alert: notify seller via socket when quantity hits threshold
+                    if (remaining > 0 && remaining <= 5) {
+                        try {
+                            const io = getSocketServer();
+                            io.to(`store-room-${storeId}`).emit('store-notification', {
+                                key: 'lowStock',
+                                productId: item.id,
+                                productName: item.name,
+                                warehouseQuantity: remaining,
+                                message: `Low stock: "${item.name}" has only ${remaining} unit${remaining !== 1 ? 's' : ''} left.`
+                            });
+                        } catch {}
                     }
                 }
 
@@ -229,6 +259,13 @@ export async function POST(request) {
                 where: { id: userId },
                 data: { cart: {} }
             });
+
+            if(couponCode && coupon){
+                await tx.coupon.update({
+                    where: { code: coupon.code },
+                    data: { usedCount: { increment: 1 } }
+                });
+            }
         });
 
         try {
@@ -263,7 +300,8 @@ export async function GET(request) {
             include: {
                 orderItems: {include: {product: true}},
                 user: true,
-                address: true
+                address: true,
+                returnRequest: { select: { id: true, status: true, reason: true, createdAt: true } }
             },
             orderBy: {
                 createdAt: 'desc'

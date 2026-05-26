@@ -2,6 +2,7 @@ import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
+import { logAdminAction } from "@/lib/auditLog";
 
 
 // Approve Seller (store)
@@ -28,6 +29,9 @@ export async function POST(request) {
                 data: { status: 'rejected', rejectionNotes: notes || null }
             });
         }
+
+        const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: `STORE_${status.toUpperCase()}`, targetType: 'Store', targetId: storeId, notes });
 
         return NextResponse.json({message: `Store ${status} successfully`});
     } catch (error) {

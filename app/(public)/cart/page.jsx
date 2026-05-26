@@ -3,59 +3,69 @@ import Counter from "@/components/Counter";
 import OrderSummary from "@/components/OrderSummary";
 import PageTitle from "@/components/PageTitle";
 import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
-import { ArrowRightIcon, Trash2Icon } from "lucide-react";
+import { ArrowRightIcon, Trash2Icon, AlertTriangleIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import axios from "axios";
 
 export default function Cart() {
-
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
-    
-    const { cartItems } = useSelector(state => state.cart);
-    const products = useSelector(state => state.product.list);
 
+    const { cartItems } = useSelector(state => state.cart);
+    const storeProducts = useSelector(state => state.product.list);
     const dispatch = useDispatch();
 
+    const [extraProducts, setExtraProducts] = useState([]);
     const [cartArray, setCartArray] = useState([]);
     const [totalPrice, setTotalPrice] = useState(0);
 
-    const createCartArray = () => {
-        setTotalPrice(0);
-        const cartArray = [];
-        for (const [key, value] of Object.entries(cartItems)) {
-            const product = products.find(product => product.id === key);
-            if (product) {
-                cartArray.push({
-                    ...product,
-                    quantity: value,
-                });
-                setTotalPrice(prev => prev + product.price * value);
-            }
-        }
-        setCartArray(cartArray);
-    }
+    // Fetch products that aren't in the Redux store (outside the initial 20)
+    useEffect(() => {
+        const cartIds = Object.keys(cartItems);
+        const missing = cartIds.filter(id => !storeProducts.find(p => p.id === id));
+        if (missing.length === 0) { setExtraProducts([]); return; }
 
-    const handleDeleteItemFromCart = (productId) => {
-        dispatch(deleteItemFromCart({ productId }))
-    }
+        Promise.all(missing.map(id => axios.get(`/api/product/${id}`).then(r => r.data.product).catch(() => null)))
+            .then(results => setExtraProducts(results.filter(Boolean)));
+    }, [cartItems, storeProducts]);
 
     useEffect(() => {
-        if (products.length > 0) {
-            createCartArray();
+        const allProducts = [...storeProducts, ...extraProducts];
+        let total = 0;
+        const arr = [];
+        for (const [id, quantity] of Object.entries(cartItems)) {
+            const product = allProducts.find(p => p.id === id);
+            if (product) {
+                arr.push({ ...product, quantity });
+                total += product.price * quantity;
+            }
         }
-    }, [cartItems, products]);
+        setCartArray(arr);
+        setTotalPrice(total);
+    }, [cartItems, storeProducts, extraProducts]);
+
+    const handleDeleteItemFromCart = (productId) => {
+        dispatch(deleteItemFromCart({ productId }));
+    };
+
+    const outOfStockItems = cartArray.filter(item => !item.inStock || item.warehouseQuantity < item.quantity);
+    const hasStockIssues = outOfStockItems.length > 0;
 
     return cartArray.length > 0 ? (
         <div className="min-h-screen mx-6 text-slate-800">
-
-            <div className="max-w-7xl mx-auto ">
-                {/* Title */}
+            <div className="max-w-7xl mx-auto">
                 <PageTitle heading="My Cart" text="items in your cart" linkText="Add more" />
 
-                <div className="flex items-start justify-between gap-5 max-lg:flex-col">
+                {hasStockIssues && (
+                    <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 max-w-4xl">
+                        <AlertTriangleIcon size={16} className="mt-0.5 shrink-0" />
+                        <p>Some items in your cart are out of stock or have insufficient quantity. Remove them before placing your order.</p>
+                    </div>
+                )}
 
+                <div className="flex items-start justify-between gap-5 max-lg:flex-col">
                     <table className="w-full max-w-4xl text-slate-600 table-auto">
                         <thead>
                             <tr className="max-sm:text-sm">
@@ -66,9 +76,10 @@ export default function Cart() {
                             </tr>
                         </thead>
                         <tbody>
-                            {
-                                cartArray.map((item, index) => (
-                                    <tr key={index} className="space-x-2">
+                            {cartArray.map((item, index) => {
+                                const stockIssue = !item.inStock || item.warehouseQuantity < item.quantity;
+                                return (
+                                    <tr key={index} className={`space-x-2 ${stockIssue ? 'opacity-60' : ''}`}>
                                         <td className="flex gap-3 my-4">
                                             <div className="flex gap-3 items-center justify-center bg-slate-100 size-18 rounded-md">
                                                 <Image src={item.images[0]} className="h-14 w-auto" alt="" width={45} height={45} />
@@ -77,6 +88,11 @@ export default function Cart() {
                                                 <p className="max-sm:text-sm">{item.name}</p>
                                                 <p className="text-xs text-slate-500">{item.category}</p>
                                                 <p>{currency}{item.price}</p>
+                                                {stockIssue && (
+                                                    <p className="text-xs text-red-500 font-medium mt-0.5">
+                                                        {!item.inStock ? 'Out of stock' : `Only ${item.warehouseQuantity} available`}
+                                                    </p>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="text-center">
@@ -84,16 +100,16 @@ export default function Cart() {
                                         </td>
                                         <td className="text-center">{currency}{(item.price * item.quantity).toLocaleString()}</td>
                                         <td className="text-center max-md:hidden">
-                                            <button onClick={() => handleDeleteItemFromCart(item.id)} className=" text-red-500 hover:bg-red-50 p-2.5 rounded-full active:scale-95 transition-all">
+                                            <button onClick={() => handleDeleteItemFromCart(item.id)} className="text-red-500 hover:bg-red-50 p-2.5 rounded-full active:scale-95 transition-all">
                                                 <Trash2Icon size={18} />
                                             </button>
                                         </td>
                                     </tr>
-                                ))
-                            }
+                                );
+                            })}
                         </tbody>
                     </table>
-                    <OrderSummary totalPrice={totalPrice} items={cartArray} />
+                    <OrderSummary totalPrice={totalPrice} items={cartArray} hasStockIssues={hasStockIssues} />
                 </div>
             </div>
         </div>
@@ -107,5 +123,5 @@ export default function Cart() {
                 </Link>
             </div>
         </div>
-    )
+    );
 }

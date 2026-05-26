@@ -2,8 +2,16 @@ import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
+import { logAdminAction } from "@/lib/auditLog";
 
 const ALLOWED_ORDER_STATUSES = ["ORDER_PLACED", "PROCESSING", "SHIPPED", "DELIVERED"];
+
+const VALID_TRANSITIONS = {
+    ORDER_PLACED: ['PROCESSING'],
+    PROCESSING:   ['SHIPPED'],
+    SHIPPED:      ['DELIVERED'],
+    DELIVERED:    [],
+};
 
 export async function GET(request) {
     try {
@@ -66,10 +74,22 @@ export async function POST(request) {
             return NextResponse.json({ error: "Invalid order status" }, { status: 400 });
         }
 
-        await prisma.order.update({
-            where: { id: orderId },
-            data: { status }
-        });
+        const order = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
+        if (!order) {
+            return NextResponse.json({ error: "Order not found" }, { status: 404 });
+        }
+
+        const allowed = VALID_TRANSITIONS[order.status] || [];
+        if (!allowed.includes(status)) {
+            return NextResponse.json({
+                error: `Cannot transition from ${order.status} to ${status}. Expected: ${allowed.join(', ') || 'none'}`
+            }, { status: 400 });
+        }
+
+        await prisma.order.update({ where: { id: orderId }, data: { status } });
+
+        const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'ORDER_STATUS_UPDATED', targetType: 'Order', targetId: orderId, notes: `${order.status} → ${status}` });
 
         return NextResponse.json({ message: "Order status updated successfully" });
     } catch (error) {

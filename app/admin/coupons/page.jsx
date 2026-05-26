@@ -18,7 +18,8 @@ export default function AdminCoupons() {
         discount: '',
         forNewUser: false,
         isPublic: false,
-        expiresAt: new Date()
+        expiresAt: new Date(),
+        maxUses: ''
     })
 
     const fetchCoupons = async () => {
@@ -108,6 +109,12 @@ export default function AdminCoupons() {
                         name="expiresAt" value={format(newCoupon.expiresAt, 'yyyy-MM-dd')} onChange={handleChange}
                     />
                 </label>
+                <label>
+                    <p className="mt-3">Max Uses <span className="text-slate-400 font-normal">(leave blank for unlimited)</span></p>
+                    <input type="number" placeholder="e.g. 100" min={1} className="w-full mt-1 p-2 border border-slate-200 outline-slate-400 rounded-md"
+                        name="maxUses" value={newCoupon.maxUses} onChange={handleChange}
+                    />
+                </label>
 
                 <div className="mt-5">
                     <div className="flex gap-2 mt-3">
@@ -137,6 +144,7 @@ export default function AdminCoupons() {
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">Discount</th>
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">Expires At</th>
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">New User</th>
+                                <th className="py-3 px-4 text-left font-semibold text-slate-600">Usage</th>
                                 <th className="py-3 px-4 text-left font-semibold text-slate-600">Action</th>
                             </tr>
                         </thead>
@@ -148,6 +156,9 @@ export default function AdminCoupons() {
                                     <td className="py-3 px-4 text-slate-800">{coupon.discount}%</td>
                                     <td className="py-3 px-4 text-slate-800">{format(coupon.expiresAt, 'yyyy-MM-dd')}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.forNewUser ? 'Yes' : 'No'}</td>
+                                    <td className="py-3 px-4 text-slate-800">
+                                        {coupon.usedCount}{coupon.maxUses != null ? ` / ${coupon.maxUses}` : ''}
+                                    </td>
                                     <td className="py-3 px-4 text-slate-800">
                                         <DeleteIcon onClick={() => toast.promise(deleteCoupon(coupon.code), { loading: "Deleting coupon..." })} className="w-5 h-5 text-red-500 hover:text-red-800 cursor-pointer" />
                                     </td>

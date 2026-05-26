@@ -23,10 +23,15 @@ app.prepare().then(() => {
     handle(req, res, parsedUrl);
   });
 
+  const corsOrigin = process.env.NEXT_PUBLIC_APP_URL;
+  if (!corsOrigin && process.env.NODE_ENV === 'production') {
+    throw new Error('NEXT_PUBLIC_APP_URL must be set in production to restrict Socket.IO CORS origins');
+  }
+
   // Initialize Socket.IO
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL || '*',
+      origin: corsOrigin || 'http://localhost:3000',
       methods: ['GET', 'POST'],
       credentials: true,
     },

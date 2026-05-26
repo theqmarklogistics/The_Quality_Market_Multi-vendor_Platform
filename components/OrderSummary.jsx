@@ -11,7 +11,7 @@ import { fetchCart } from '@/lib/features/cart/cartSlice';
 import { paymentMethod } from '@/lib/constants';
 
 
-const OrderSummary = ({ totalPrice, items }) => {
+const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
 
     const {getToken} = useAuth();
     const {user} = useUser();
@@ -189,7 +189,11 @@ const OrderSummary = ({ totalPrice, items }) => {
                         <p className='text-lg font-semibold'>{coupon ? formatAmount(totalPrice - ((coupon.discount / 100) * totalPrice)) : formatAmount(totalPrice)}</p>
                     </div>
 
-                    <button onClick={e => toast.promise(handlePlaceOrder(e), { loading: 'Placing order...' })} className='w-full rounded-full bg-[linear-gradient(135deg,_#16a34a_0%,_#0f172a_100%)] py-3 font-semibold text-white shadow-[0_12px_30px_rgba(22,163,74,0.24)] transition hover:-translate-y-0.5 active:scale-95'>
+                    <button
+                        onClick={e => !hasStockIssues && toast.promise(handlePlaceOrder(e), { loading: 'Placing order...' })}
+                        disabled={hasStockIssues}
+                        title={hasStockIssues ? 'Remove out-of-stock items before placing order' : undefined}
+                        className='w-full rounded-full bg-[linear-gradient(135deg,_#16a34a_0%,_#0f172a_100%)] py-3 font-semibold text-white shadow-[0_12px_30px_rgba(22,163,74,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0'>
                         Place Order
                     </button>
                 </section>

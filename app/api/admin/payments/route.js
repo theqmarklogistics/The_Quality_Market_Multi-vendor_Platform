@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { inngest } from "@/inngest/client";
+import { logAdminAction } from "@/lib/auditLog";
 
 const ALLOWED_REVIEW_STATUSES = ["APPROVED", "REJECTED"];
 
@@ -88,6 +89,9 @@ export async function POST(request) {
         } catch (inngestError) {
             console.error("Inngest payment review event error:", inngestError.message);
         }
+
+        const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: `PAYMENT_${status}`, targetType: 'Order', targetId: orderId, notes });
 
         return NextResponse.json({ message: `Payment proof ${status.toLowerCase()} successfully` });
     } catch (error) {

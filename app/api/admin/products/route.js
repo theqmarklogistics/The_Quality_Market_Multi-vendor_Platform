@@ -4,6 +4,7 @@ import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { inngest } from "@/inngest/client";
 import { getSocketServer } from "@/lib/socketServer";
+import { logAdminAction } from "@/lib/auditLog";
 
 const ALLOWED_STATUSES = ["APPROVED", "REJECTED"];
 
@@ -96,6 +97,9 @@ export async function POST(request) {
         } catch (inngestError) {
             console.error("Inngest product moderation event error:", inngestError.message);
         }
+
+        const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: `PRODUCT_${status}`, targetType: 'Product', targetId: productId, notes });
 
         return NextResponse.json({ message: `Product ${status.toLowerCase()} successfully` });
     } catch (error) {

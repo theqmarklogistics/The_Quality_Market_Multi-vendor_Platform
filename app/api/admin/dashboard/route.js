@@ -40,6 +40,9 @@ export async function GET(request) {
             }
         }),
         prisma.order.findMany({
+            where: {
+                createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) }
+            },
             select: {
                 createdAt: true,
                 total: true

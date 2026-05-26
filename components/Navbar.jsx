@@ -42,6 +42,19 @@ const Navbar = () => {
                 return
             }
 
+            const cacheKey = `access_${user.id}`
+            const cached = sessionStorage.getItem(cacheKey)
+            if (cached) {
+                try {
+                    const { isAdmin: a, isSeller: s, ts } = JSON.parse(cached)
+                    if (Date.now() - ts < 5 * 60 * 1000) {
+                        setIsAdmin(a)
+                        setIsSeller(s)
+                        return
+                    }
+                } catch (_) {}
+            }
+
             setLoadingAccess(true)
 
             try {
@@ -60,8 +73,11 @@ const Navbar = () => {
 
                 if (!mounted) return
 
-                setIsAdmin(adminResponse.status === 200 && Boolean(adminResponse.data?.isAdmin))
-                setIsSeller(sellerResponse.status === 200 && Boolean(sellerResponse.data?.isSeller))
+                const a = adminResponse.status === 200 && Boolean(adminResponse.data?.isAdmin)
+                const s = sellerResponse.status === 200 && Boolean(sellerResponse.data?.isSeller)
+                setIsAdmin(a)
+                setIsSeller(s)
+                sessionStorage.setItem(cacheKey, JSON.stringify({ isAdmin: a, isSeller: s, ts: Date.now() }))
             } catch (error) {
                 if (!mounted) return
                 toast.error(error?.response?.data?.error || error.message)

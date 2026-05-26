@@ -1,6 +1,6 @@
 'use client'
 import Image from "next/image";
-import { DotIcon, MessageCircleIcon } from "lucide-react";
+import { DotIcon, MessageCircleIcon, RotateCcwIcon } from "lucide-react";
 import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
@@ -14,6 +14,8 @@ const OrderItem = ({ order, onProofUploaded }) => {
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$';
     const [ratingModal, setRatingModal] = useState(null);
+    const [returnModal, setReturnModal] = useState(false);
+    const [returnReason, setReturnReason] = useState('');
     const { getToken } = useAuth();
     const router = useRouter();
 
@@ -45,6 +47,35 @@ const OrderItem = ({ order, onProofUploaded }) => {
         SUBMITTED: 'Proof submitted, awaiting admin review',
         APPROVED: 'Payment approved by admin',
         REJECTED: 'Proof rejected, please upload again'
+    };
+
+    const cancelOrder = async () => {
+        try {
+            const token = await getToken();
+            await axios.post(`/api/orders/${order.id}/cancel`, {}, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            toast.success('Order cancelled');
+            if (typeof onProofUploaded === 'function') await onProofUploaded();
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message);
+        }
+    };
+
+    const submitReturn = async () => {
+        if (!returnReason.trim()) return toast.error('Please provide a reason');
+        try {
+            const token = await getToken();
+            const { data } = await axios.post(`/api/orders/${order.id}/return`, { reason: returnReason }, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            toast.success(data.message);
+            setReturnModal(false);
+            setReturnReason('');
+            if (typeof onProofUploaded === 'function') await onProofUploaded();
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message);
+        }
     };
 
     const startConversation = async (targetType) => {
@@ -140,6 +171,19 @@ const OrderItem = ({ order, onProofUploaded }) => {
                     <button onClick={() => toast.promise(startConversation('STORE'), { loading: 'Opening store chat...' })} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 ml-2">
                         <MessageCircleIcon size={14} /> Chat Store
                     </button>
+                    {order.paymentStatus === 'PENDING' && (
+                        <button onClick={() => toast.promise(cancelOrder(), { loading: 'Cancelling order...' })} className="text-xs text-red-500 hover:underline inline-flex items-center gap-1 mt-1">
+                            Cancel Order
+                        </button>
+                    )}
+                    {order.status === 'DELIVERED' && !order.returnRequest && (
+                        <button onClick={() => setReturnModal(true)} className="text-xs text-orange-600 hover:underline inline-flex items-center gap-1 mt-1">
+                            <RotateCcwIcon size={12} /> Request Return
+                        </button>
+                    )}
+                    {order.returnRequest && (
+                        <span className="text-xs text-slate-400 mt-1 inline-block">Return: {order.returnRequest.status}</span>
+                    )}
                 </td>
             </tr>
             {/* Mobile */}
@@ -154,13 +198,23 @@ const OrderItem = ({ order, onProofUploaded }) => {
                             {order.status.replace(/_/g, ' ').toLowerCase()}
                         </span>
                     </div>
-                    <div className="flex gap-4 justify-center mt-3">
+                    <div className="flex gap-4 justify-center mt-3 flex-wrap">
                         <button onClick={() => toast.promise(startConversation('ADMIN'), { loading: 'Opening admin chat...' })} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
                             <MessageCircleIcon size={14} /> Admin
                         </button>
                         <button onClick={() => toast.promise(startConversation('STORE'), { loading: 'Opening store chat...' })} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
                             <MessageCircleIcon size={14} /> Store
                         </button>
+                        {order.paymentStatus === 'PENDING' && (
+                            <button onClick={() => toast.promise(cancelOrder(), { loading: 'Cancelling order...' })} className="text-xs text-red-500 hover:underline inline-flex items-center gap-1">
+                                Cancel
+                            </button>
+                        )}
+                        {order.status === 'DELIVERED' && !order.returnRequest && (
+                            <button onClick={() => setReturnModal(true)} className="text-xs text-orange-600 hover:underline inline-flex items-center gap-1">
+                                <RotateCcwIcon size={12} /> Return
+                            </button>
+                        )}
                     </div>
                 </td>
             </tr>
@@ -169,6 +223,33 @@ const OrderItem = ({ order, onProofUploaded }) => {
                     <div className="border-b border-slate-300 w-6/7 mx-auto" />
                 </td>
             </tr>
+
+            {returnModal && (
+                <tr>
+                    <td colSpan={4}>
+                        <div className="p-4 my-2 rounded-xl border border-orange-100 bg-orange-50/60">
+                            <p className="text-sm font-medium text-slate-700 mb-2">Request a return for this order</p>
+                            <textarea
+                                rows={3}
+                                placeholder="Describe the reason for your return…"
+                                value={returnReason}
+                                onChange={e => setReturnReason(e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 resize-none bg-white"
+                            />
+                            <div className="flex gap-2 mt-2">
+                                <button onClick={() => toast.promise(submitReturn(), { loading: 'Submitting…' })}
+                                    className="px-4 py-1.5 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition">
+                                    Submit Return
+                                </button>
+                                <button onClick={() => { setReturnModal(false); setReturnReason('') }}
+                                    className="px-3 py-1.5 border border-slate-200 text-sm rounded-lg hover:bg-slate-50 transition">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            )}
         </>
     )
 }

@@ -33,6 +33,11 @@ export async function POST(request) {
 
         const { coupon } = await request.json();
         coupon.code = coupon.code.toUpperCase();
+        if (coupon.maxUses !== undefined && coupon.maxUses !== '' && coupon.maxUses !== null) {
+            coupon.maxUses = parseInt(coupon.maxUses, 10);
+        } else {
+            delete coupon.maxUses;
+        }
 
         await prisma.coupon.create({
             data: coupon
