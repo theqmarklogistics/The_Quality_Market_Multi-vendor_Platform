@@ -8,13 +8,21 @@ import { Analytics } from "@vercel/analytics/next"
 const outfit = Outfit({ subsets: ["latin"], weight: ["400", "500", "600"] });
 
 export const metadata = {
-    title: "The Quality Market - Shop smarter",
-    description: "The Quality Market - Shop smarter",
+    title: "The Quality Market — Rwanda's Online Marketplace",
+    description: "Shop from verified sellers across Rwanda. Electronics, fashion, groceries, home goods and more — delivered to your door.",
+    keywords: ["Rwanda", "online shopping", "marketplace", "Kigali", "e-commerce"],
+    openGraph: {
+        title: "The Quality Market — Rwanda's Online Marketplace",
+        description: "Shop from verified sellers across Rwanda. Electronics, fashion, groceries, home goods and more.",
+        siteName: "The Quality Market",
+        locale: "en_RW",
+        type: "website",
+    },
     icons: {
         icon: "/the-quality-market-logo.png",
         shortcut: "/the-quality-market-logo.png",
-        apple: "/the-quality-market-logo.png"
-    }
+        apple: "/the-quality-market-logo.png",
+    },
 };
 
 export default function RootLayout({ children }) {

@@ -22,6 +22,16 @@ export async function POST(request) {
             return NextResponse.json({ error: "Missing proof details" }, { status: 400 });
         }
 
+        const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+        const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+
+        if (proofFile.size > MAX_SIZE) {
+            return NextResponse.json({ error: "File too large. Maximum size is 10 MB." }, { status: 400 });
+        }
+        if (!ALLOWED_TYPES.includes(proofFile.type)) {
+            return NextResponse.json({ error: "Invalid file type. Please upload an image (JPEG, PNG, WebP) or PDF." }, { status: 400 });
+        }
+
         const order = await prisma.order.findFirst({
             where: {
                 id: String(orderId),

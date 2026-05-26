@@ -1,10 +1,16 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+
+const couponLimiter = createRateLimiter({ max: 15, windowMs: 60_000 });
 
 // verify coupon
 
 export async function POST(request) {
+    const rl = couponLimiter(`coupon:${getClientIp(request)}`);
+    if (!rl.success) return NextResponse.json({ error: 'Too many requests.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } });
+
     try {
         const { userId } = getAuth(request);
         const { code } = await request.json();

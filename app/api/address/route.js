@@ -1,9 +1,15 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+
+const addressLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
 
 //add new address
 export async function POST(request) {
+    const rl = addressLimiter(`address:${getClientIp(request)}`);
+    if (!rl.success) return NextResponse.json({ error: 'Too many requests.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } });
+
     try {
         const { userId } = getAuth(request);
         if (!userId) {
