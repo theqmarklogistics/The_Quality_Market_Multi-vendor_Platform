@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from "next/navigation"
-import { ClipboardListIcon, CircleDollarSignIcon, HomeIcon, LayoutPanelTopIcon, MessageCircleIcon, PackageCheckIcon, RotateCcwIcon, ShieldCheckIcon, StoreIcon, TagsIcon, TicketPercentIcon } from "lucide-react"
+import { ClipboardListIcon, CircleDollarSignIcon, CreditCardIcon, FileTextIcon, HomeIcon, LayoutPanelTopIcon, MessageCircleIcon, PackageCheckIcon, RotateCcwIcon, ShieldCheckIcon, StoreIcon, TagsIcon, TicketPercentIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useUser } from "@clerk/nextjs"
@@ -18,6 +18,7 @@ const AdminSidebar = () => {
         pendingPaymentProofs: 0,
         newOrders: 0,
         unreadChatMessages: 0,
+        pendingInvoiceRequests: 0,
     })
 
     const sidebarLinks = [
@@ -31,6 +32,8 @@ const AdminSidebar = () => {
         { name: 'Coupons', href: '/admin/coupons', icon: TicketPercentIcon },
         { name: 'Returns', href: '/admin/returns', icon: RotateCcwIcon },
         { name: 'Payouts', href: '/admin/payouts', icon: CircleDollarSignIcon },
+        { name: 'Invoices', href: '/admin/invoices', icon: FileTextIcon, badge: counts.pendingInvoiceRequests },
+        { name: 'Payment Config', href: '/admin/payment-config', icon: CreditCardIcon },
         { name: 'Audit Log', href: '/admin/audit', icon: ClipboardListIcon },
         { name: 'Hero Banners', href: '/admin/hero', icon: LayoutPanelTopIcon },
     ]
@@ -44,6 +47,7 @@ const AdminSidebar = () => {
                 pendingPaymentProofs: detail.pendingPaymentProofs || 0,
                 newOrders: detail.newOrders || 0,
                 unreadChatMessages: detail.unreadChatMessages || 0,
+                pendingInvoiceRequests: detail.pendingInvoiceRequests || 0,
             })
         }
 

@@ -25,7 +25,8 @@ export async function GET(request) {
         products,
         pendingProducts,
         pendingPaymentProofs,
-        unreadChatMessages
+        unreadChatMessages,
+        pendingInvoiceRequests,
     ] = await Promise.all([
         prisma.order.count(),
         prisma.order.count({
@@ -67,17 +68,12 @@ export async function GET(request) {
         prisma.message.count({
             where: {
                 isRead: false,
-                senderId: {
-                    not: userId
-                },
-                conversation: {
-                    participants: {
-                        some: {
-                            userId
-                        }
-                    }
-                }
+                senderId: { not: userId },
+                conversation: { participants: { some: { userId } } }
             }
+        }),
+        prisma.order.count({
+            where: { invoiceRequested: true, invoiceStatus: null }
         })
     ]);
 
@@ -93,6 +89,7 @@ export async function GET(request) {
         pendingProducts,
         pendingPaymentProofs,
         unreadChatMessages,
+        pendingInvoiceRequests,
         allOrders
     }
 

@@ -33,7 +33,7 @@ export async function POST(request) {
             return NextResponse.json({ error: "Missing order details" }, { status: 400 });
         }
 
-        const allowedPaymentMethods = [paymentMethod.BANK_TRANSFER];
+        const allowedPaymentMethods = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
         if(!allowedPaymentMethods.includes(selectedPaymentMethod)){
             return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
         }

@@ -12,6 +12,7 @@ const NOTIFICATION_MESSAGES = {
     pendingPaymentProofs: 'New payment proof submitted',
     newOrders: 'New order placed',
     unreadChatMessages: 'New chat message received',
+    invoiceRequest: 'A customer has requested a payment invoice',
 }
 
 const emitBrowserNotification = (title, body) => {
@@ -43,6 +44,7 @@ const AdminNotificationWatcher = () => {
             pendingPaymentProofs: data.pendingPaymentProofs || 0,
             newOrders: data.newOrders || 0,
             unreadChatMessages: data.unreadChatMessages || 0,
+            pendingInvoiceRequests: data.pendingInvoiceRequests || 0,
         }
         window.dispatchEvent(new CustomEvent('admin:counts-updated', { detail: nextCounts }))
     }

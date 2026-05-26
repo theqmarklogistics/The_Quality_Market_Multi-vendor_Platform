@@ -1,5 +1,5 @@
 import { PlusIcon, SquarePenIcon, XIcon } from 'lucide-react';
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import AddressModal from './AddressModal';
 import { useDispatch, useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
@@ -28,6 +28,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     const [showAddressModal, setShowAddressModal] = useState(false);
     const [couponCodeInput, setCouponCodeInput] = useState('');
     const [coupon, setCoupon] = useState('');
+    const [paymentConfig, setPaymentConfig] = useState(null);
+
+    useEffect(() => {
+        axios.get('/api/payment-config').then(res => setPaymentConfig(res.data)).catch(() => null)
+    }, []);
 
     const formatAmount = (amount) => `${currency}${Number(amount || 0).toLocaleString()}`
 
@@ -104,28 +109,40 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
             <div className='space-y-6 p-6 text-sm text-slate-600'>
                 <section>
                     <p className='text-xs font-semibold uppercase tracking-[0.22em] text-slate-400'>Payment Method</p>
-                    <div className='mt-3 flex gap-3 items-start rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3'>
-                        <input
-                            type="radio"
-                            id={paymentMethod.BANK_TRANSFER}
-                            name='payment'
-                            onChange={() => setSelectedPaymentMethod(paymentMethod.BANK_TRANSFER)}
-                            checked={selectedPaymentMethod === paymentMethod.BANK_TRANSFER}
-                            className='mt-1 accent-green-600'
-                        />
-                        <label htmlFor={paymentMethod.BANK_TRANSFER} className='cursor-pointer'>
-                            <span className='block font-medium text-slate-800'>Bank Transfer / MoMo</span>
-                            <span className='block text-xs text-slate-500'>Manual payment verified by the admin.</span>
+                    <div className='mt-3 space-y-2'>
+                        {/* MTN MoMo */}
+                        <label htmlFor={paymentMethod.MTN_MOMO} className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${selectedPaymentMethod === paymentMethod.MTN_MOMO ? 'border-yellow-300 bg-yellow-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <input
+                                type="radio"
+                                id={paymentMethod.MTN_MOMO}
+                                name='payment'
+                                onChange={() => setSelectedPaymentMethod(paymentMethod.MTN_MOMO)}
+                                checked={selectedPaymentMethod === paymentMethod.MTN_MOMO}
+                                className='mt-1 accent-yellow-500'
+                            />
+                            <div>
+                                <span className='block font-medium text-slate-800'>MTN MoMo Pay</span>
+                                <span className='block text-xs text-slate-500 mt-0.5'>
+                                    {paymentConfig?.momoConfigured ? 'Pay code will be shown after placing order.' : 'Pay using mobile money.'}
+                                </span>
+                            </div>
                         </label>
-                    </div>
 
-                    <div className='mt-3 rounded-2xl border border-green-100 bg-green-50/70 p-4 text-xs text-slate-600 space-y-1.5'>
-                        <p className='font-semibold text-green-800'>Payment instructions</p>
-                        <p>Send to the admin account and keep the receipt for verification.</p>
-                        <p>Bank Name: {process.env.NEXT_PUBLIC_ADMIN_BANK_NAME || 'Not configured'}</p>
-                        <p>Account Number: {process.env.NEXT_PUBLIC_ADMIN_BANK_ACCOUNT || 'Not configured'}</p>
-                        <p>MoMo Number: {process.env.NEXT_PUBLIC_ADMIN_MOMO_NUMBER || 'Not configured'}</p>
-                        <p className='pt-1 text-slate-500'>After payment, upload proof from My Orders so the admin can approve your order faster.</p>
+                        {/* Bank Transfer */}
+                        <label htmlFor={paymentMethod.BANK_TRANSFER} className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${selectedPaymentMethod === paymentMethod.BANK_TRANSFER ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <input
+                                type="radio"
+                                id={paymentMethod.BANK_TRANSFER}
+                                name='payment'
+                                onChange={() => setSelectedPaymentMethod(paymentMethod.BANK_TRANSFER)}
+                                checked={selectedPaymentMethod === paymentMethod.BANK_TRANSFER}
+                                className='mt-1 accent-blue-600'
+                            />
+                            <div>
+                                <span className='block font-medium text-slate-800'>Bank Transfer</span>
+                                <span className='block text-xs text-slate-500 mt-0.5'>Bank details are sent via invoice email after you place the order.</span>
+                            </div>
+                        </label>
                     </div>
                 </section>
 

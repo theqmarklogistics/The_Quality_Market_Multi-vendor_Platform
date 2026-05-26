@@ -5,7 +5,7 @@ import { useAuth } from '@clerk/nextjs'
 import axios from 'axios'
 import Image from 'next/image'
 import Link from 'next/link'
-import { CheckCircle2Icon, PackageIcon, MessageCircleIcon, ArrowRightIcon } from 'lucide-react'
+import { CheckCircle2Icon, PackageIcon, MessageCircleIcon, ArrowRightIcon, FileTextIcon, CheckIcon } from 'lucide-react'
 import Loading from '@/components/Loading'
 import toast from 'react-hot-toast'
 
@@ -16,6 +16,9 @@ function ConfirmationContent() {
 
     const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
+    const [paymentConfig, setPaymentConfig] = useState(null)
+    const [requestedIds, setRequestedIds] = useState(new Set())
+    const [requesting, setRequesting] = useState(new Set())
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || '$'
 
@@ -28,34 +31,58 @@ function ConfirmationContent() {
 
         const ids = rawIds.split(',').filter(Boolean)
 
-        const fetchConfirmedOrders = async () => {
+        const init = async () => {
             try {
                 const token = await getToken()
-                const { data } = await axios.get('/api/orders', {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-                const matched = (data.orders || []).filter(o => ids.includes(o.id))
-                setOrders(matched)
-            } catch {
-                toast.error('Could not load order details. Redirecting…')
-                router.replace('/orders')
+                const [ordersRes, configRes] = await Promise.allSettled([
+                    axios.get('/api/orders', { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get('/api/payment-config'),
+                ])
+                if (ordersRes.status === 'fulfilled') {
+                    const matched = (ordersRes.value.data.orders || []).filter(o => ids.includes(o.id))
+                    setOrders(matched)
+                } else {
+                    toast.error('Could not load order details. Redirecting…')
+                    router.replace('/orders')
+                }
+                if (configRes.status === 'fulfilled') {
+                    setPaymentConfig(configRes.value.data)
+                }
             } finally {
                 setLoading(false)
             }
         }
 
-        fetchConfirmedOrders()
+        init()
     }, [searchParams, getToken, router])
+
+    const requestInvoice = async (orderId) => {
+        setRequesting(prev => new Set(prev).add(orderId))
+        try {
+            const token = await getToken()
+            await axios.post(`/api/orders/${orderId}/request-invoice`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setRequestedIds(prev => new Set(prev).add(orderId))
+            toast.success('Invoice requested — admin will send it to your email shortly.')
+        } catch (err) {
+            toast.error(err?.response?.data?.error || 'Failed to request invoice')
+        } finally {
+            setRequesting(prev => { const s = new Set(prev); s.delete(orderId); return s })
+        }
+    }
 
     if (loading) return <Loading />
 
     if (orders.length === 0) {
-        toast.error('Order not found. Redirecting…')
         router.replace('/orders')
         return null
     }
 
     const totalPaid = orders.reduce((sum, o) => sum + Number(o.total), 0)
+    const paymentMethodUsed = orders[0]?.paymentMethod
+    const isMomo = paymentMethodUsed === 'MTN_MOMO'
+    const isBankTransfer = paymentMethodUsed === 'BANK_TRANSFER'
 
     return (
         <div className="min-h-[80vh] mx-6 py-16">
@@ -113,11 +140,93 @@ function ConfirmationContent() {
                     </div>
                 )}
 
-                {/* Payment reminder */}
-                <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5 text-sm text-amber-800 mb-8">
-                    <p className="font-semibold mb-1">Next step: upload payment proof</p>
-                    <p>Transfer the total amount and upload your payment screenshot from <strong>My Orders</strong> so the admin can approve your order faster.</p>
-                    <p className="mt-2 text-xs text-amber-600">Bank Name: {process.env.NEXT_PUBLIC_ADMIN_BANK_NAME || 'Contact admin'} &nbsp;|&nbsp; MoMo: {process.env.NEXT_PUBLIC_ADMIN_MOMO_NUMBER || 'Contact admin'}</p>
+                {/* Payment instructions — MoMo */}
+                {isMomo && (
+                    <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-5 mb-6">
+                        <p className="font-semibold text-yellow-800 mb-3">Pay with MTN MoMo</p>
+                        {paymentConfig?.momoConfigured ? (
+                            <div className="space-y-1.5 text-sm text-yellow-900">
+                                <p>Dial the code below or use MoMo app to complete payment:</p>
+                                <div className="mt-2 rounded-xl bg-yellow-100 border border-yellow-200 px-4 py-3 font-mono text-base font-semibold tracking-wide text-yellow-800">
+                                    {paymentConfig.momoPayCode}
+                                </div>
+                                {paymentConfig.momoAccountName && (
+                                    <p className="text-xs text-yellow-700 mt-1">Account Name: <span className="font-medium">{paymentConfig.momoAccountName}</span></p>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-yellow-700">Payment details will be provided by admin. Please check your email or contact support.</p>
+                        )}
+                        <div className="mt-4 pt-4 border-t border-yellow-200">
+                            <p className="text-xs text-yellow-700 mb-3">Invoice is optional for MoMo. Request one for your records:</p>
+                            <div className="space-y-2">
+                                {orders.map(order => {
+                                    const requested = requestedIds.has(order.id) || order.invoiceRequested
+                                    return (
+                                        <div key={order.id} className="flex items-center justify-between gap-3">
+                                            <span className="text-xs text-yellow-800 font-mono">#{order.id.slice(0, 8)}</span>
+                                            {requested ? (
+                                                <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
+                                                    <CheckIcon size={13} /> Invoice Requested
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => requestInvoice(order.id)}
+                                                    disabled={requesting.has(order.id)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-yellow-800 border border-yellow-300 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded-lg transition disabled:opacity-60"
+                                                >
+                                                    <FileTextIcon size={12} />
+                                                    {requesting.has(order.id) ? 'Requesting...' : 'Request Invoice'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Payment instructions — Bank Transfer */}
+                {isBankTransfer && (
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 mb-6">
+                        <p className="font-semibold text-blue-800 mb-1">Bank Transfer Payment</p>
+                        <p className="text-sm text-blue-700 mb-4">Request your payment invoice to receive full bank account details by email. An invoice is required to complete a bank transfer.</p>
+                        <div className="space-y-2">
+                            {orders.map(order => {
+                                const requested = requestedIds.has(order.id) || order.invoiceRequested
+                                return (
+                                    <div key={order.id} className="rounded-xl bg-white border border-blue-100 px-4 py-3 flex items-center justify-between gap-3">
+                                        <div>
+                                            <span className="text-xs text-slate-500 font-mono">#{order.id.slice(0, 8)}</span>
+                                            <span className="ml-3 text-sm font-semibold text-slate-700">{currency}{Number(order.total).toLocaleString()}</span>
+                                        </div>
+                                        {requested ? (
+                                            <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
+                                                <CheckIcon size={13} /> Invoice Requested — Admin will send it shortly
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => requestInvoice(order.id)}
+                                                disabled={requesting.has(order.id)}
+                                                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-lg transition"
+                                            >
+                                                <FileTextIcon size={13} />
+                                                {requesting.has(order.id) ? 'Requesting...' : 'Request Invoice'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <p className="text-xs text-blue-500 mt-3">Bank account details are included in the invoice for security. Keep it safe.</p>
+                    </div>
+                )}
+
+                {/* Upload proof reminder */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 mb-8">
+                    <p className="font-medium text-slate-700 mb-1">After payment</p>
+                    <p>Upload your payment screenshot from <strong>My Orders</strong> so the admin can verify and approve your order faster.</p>
                 </div>
 
                 {/* CTAs */}

@@ -1,6 +1,6 @@
 'use client'
 import Image from "next/image";
-import { DotIcon, MessageCircleIcon, RotateCcwIcon } from "lucide-react";
+import { DotIcon, MessageCircleIcon, RotateCcwIcon, FileTextIcon, CheckIcon } from "lucide-react";
 import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
@@ -16,6 +16,8 @@ const OrderItem = ({ order, onProofUploaded }) => {
     const [ratingModal, setRatingModal] = useState(null);
     const [returnModal, setReturnModal] = useState(false);
     const [returnReason, setReturnReason] = useState('');
+    const [invoiceRequested, setInvoiceRequested] = useState(order.invoiceRequested || false);
+    const [invoiceRequesting, setInvoiceRequesting] = useState(false);
     const { getToken } = useAuth();
     const router = useRouter();
 
@@ -93,6 +95,25 @@ const OrderItem = ({ order, onProofUploaded }) => {
         }
     };
 
+    const requestInvoice = async () => {
+        setInvoiceRequesting(true)
+        try {
+            const token = await getToken()
+            await axios.post(`/api/orders/${order.id}/request-invoice`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setInvoiceRequested(true)
+            toast.success('Invoice requested — admin will send it to your email shortly.')
+        } catch (err) {
+            toast.error(err?.response?.data?.error || 'Failed to request invoice')
+        } finally {
+            setInvoiceRequesting(false)
+        }
+    }
+
+    const showInvoiceAction = order.paymentStatus === 'PENDING'
+    const invoiceSent = order.invoiceStatus === 'SENT'
+
     return (
         <>
             <tr className="text-sm">
@@ -132,6 +153,28 @@ const OrderItem = ({ order, onProofUploaded }) => {
                                                 }}
                                             />
                                         </label>
+                                    )}
+                                    {showInvoiceAction && (
+                                        <div className="mt-1">
+                                            {invoiceSent ? (
+                                                <span className="inline-flex items-center gap-1 text-xs text-green-600">
+                                                    <CheckIcon size={11} /> Invoice sent to your email
+                                                </span>
+                                            ) : invoiceRequested ? (
+                                                <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                                                    <FileTextIcon size={11} /> Invoice requested, awaiting admin
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => toast.promise(requestInvoice(), { loading: 'Requesting invoice...' })}
+                                                    disabled={invoiceRequesting}
+                                                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline disabled:opacity-60"
+                                                >
+                                                    <FileTextIcon size={11} />
+                                                    {order.paymentMethod === 'BANK_TRANSFER' ? 'Request Invoice (required)' : 'Request Invoice'}
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                     <div>
                                         {ratings.find(rating => order.id === rating.orderId && item.product.id === rating.productId)

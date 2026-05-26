@@ -144,6 +144,11 @@ model Order {
     updatedAt     DateTime      @updatedAt
     isCouponUsed  Boolean       @default(false)
     coupon        Json          @default("{}")
+    // Invoice request fields
+    invoiceRequested   Boolean   @default(false)
+    invoiceRequestedAt DateTime?
+    invoiceStatus      String?   // null | "SENT"
+    invoiceSentAt      DateTime?
     orderItems    OrderItem[]
 
     // Relations
@@ -417,6 +422,18 @@ model Event {
     userId    String?
     storeId   String?
     createdAt DateTime @default(now())
+}
+
+// Admin-configurable payment method settings (single row, id = "default")
+model PaymentConfig {
+    id                String   @id @default("default")
+    momoPayCode       String?
+    momoAccountName   String?
+    bankName          String?
+    bankAccountNumber String?
+    bankAccountName   String?
+    bankBranch        String?
+    updatedAt         DateTime @updatedAt
 }
 
 // Admin-configurable hero/banner slots ("main" | "card1" | "card2")
