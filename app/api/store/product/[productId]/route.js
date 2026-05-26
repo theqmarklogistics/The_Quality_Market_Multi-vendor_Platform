@@ -56,6 +56,10 @@ export async function PATCH(request, { params }) {
     const category = formData.get("category");
     const existingImagesRaw = formData.get("existingImages");
     const newImageFiles = formData.getAll("images");
+    const wholesalePriceRaw = formData.get("wholesalePrice");
+    const wholesaleMinQtyRaw = formData.get("wholesaleMinQty");
+    const wholesalePrice = wholesalePriceRaw ? Number(wholesalePriceRaw) : null;
+    const wholesaleMinQty = wholesaleMinQtyRaw ? Number(wholesaleMinQtyRaw) : null;
 
     const parsedWarehouseQuantity = Number(warehouseQuantity);
 
@@ -117,6 +121,8 @@ export async function PATCH(request, { params }) {
         approvalNotes: null,
         approvedBy: null,
         approvedAt: null,
+        wholesalePrice,
+        wholesaleMinQty,
       },
     });
 

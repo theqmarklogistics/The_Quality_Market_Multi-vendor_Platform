@@ -43,6 +43,9 @@ model Product {
     approvalNotes  String?
     approvedBy     String?
     approvedAt     DateTime?
+    // Wholesale pricing (optional — unlocked when quantity >= wholesaleMinQty)
+    wholesalePrice  Float?
+    wholesaleMinQty Int?
     // Shipping dimensions for weight-based cost calculation
     weightKg    Float?
     lengthCm    Float?

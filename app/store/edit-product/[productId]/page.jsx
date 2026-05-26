@@ -32,6 +32,8 @@ export default function StoreEditProduct() {
         mrp: 0,
         price: 0,
         warehouseQuantity: 0,
+        wholesalePrice: "",
+        wholesaleMinQty: "",
         mainCategory: "",
         category: "",
     })
@@ -53,6 +55,8 @@ export default function StoreEditProduct() {
                     mrp: data.mrp,
                     price: data.price,
                     warehouseQuantity: data.warehouseQuantity ?? 0,
+                    wholesalePrice: data.wholesalePrice ?? "",
+                    wholesaleMinQty: data.wholesaleMinQty ?? "",
                     mainCategory: main,
                     category: data.category,
                 })
@@ -111,6 +115,8 @@ export default function StoreEditProduct() {
             formData.append("category", productInfo.category)
             formData.append("existingImages", JSON.stringify(existingUrls))
             newFiles.forEach((f) => formData.append("images", f))
+            if (productInfo.wholesalePrice) formData.append("wholesalePrice", productInfo.wholesalePrice)
+            if (productInfo.wholesaleMinQty) formData.append("wholesaleMinQty", productInfo.wholesaleMinQty)
 
             const token = await getToken()
             await axios.patch(`/api/store/product/${productId}`, formData, {
@@ -262,6 +268,34 @@ export default function StoreEditProduct() {
                         required
                     />
                 </label>
+            </div>
+
+            {/* Wholesale Pricing */}
+            <div className="mt-8 border-t border-slate-100 pt-6">
+                <p className="text-slate-700 font-medium mb-1">Wholesale Pricing</p>
+                <p className="text-xs text-slate-400 mb-4">Optional — set a lower price for bulk buyers. Leave blank to disable.</p>
+                <div className="flex flex-wrap gap-5">
+                    <label className="flex flex-col gap-2">
+                        Wholesale Price (Rwf)
+                        <input
+                            type="number" name="wholesalePrice" min="0"
+                            value={productInfo.wholesalePrice}
+                            onChange={onChangeHandler}
+                            placeholder="0"
+                            className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                        Min. Qty for Wholesale
+                        <input
+                            type="number" name="wholesaleMinQty" min="1" step="1"
+                            value={productInfo.wholesaleMinQty}
+                            onChange={onChangeHandler}
+                            placeholder="e.g. 10"
+                            className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </label>
+                </div>
             </div>
 
             <label htmlFor="mainCategory" className="flex flex-col gap-2 my-6">

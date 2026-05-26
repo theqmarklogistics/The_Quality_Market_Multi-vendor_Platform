@@ -16,26 +16,28 @@ const Footer = () => {
         {
             title: "PRODUCTS",
             links: [
-                { text: "Earphones", path: '/shop?category=Consumer%20Electronics', icon: null },
-                { text: "Headphones", path: '/shop?category=Consumer%20Electronics', icon: null },
-                { text: "Smartphones", path: '/shop?category=Consumer%20Electronics', icon: null },
-                { text: "Laptops", path: '/shop?category=Computer%20Products', icon: null },
+                { text: "Electronics", path: '/shop?category=Consumer%20Electronics', icon: null },
+                { text: "Computers", path: '/shop?category=Computer%20Products', icon: null },
+                { text: "Accessories", path: '/shop?category=Accessories', icon: null },
+                { text: "All Products", path: '/shop', icon: null },
             ]
         },
         {
-            title: "WEBSITE?",
+            title: "COMPANY",
             links: [
                 { text: "Home", path: '/', icon: null },
-                { text: "Privacy Policy", path: '/', icon: null },
+                { text: "Shop", path: '/shop', icon: null },
                 { text: "Create Your Store", path: '/create-store', icon: null },
+                { text: "Privacy Policy", path: '/policy', icon: null },
+                { text: "Terms & Conditions", path: '/terms', icon: null },
             ]
         },
         {
             title: "CONTACT",
             links: [
-                { text: "+1-212-456-7890", path: '/', icon: PhoneIcon },
-                { text: "contact@example.com", path: '/', icon: MailIcon },
-                { text: "794 Francisco, 94102", path: '/', icon: MapPinIcon }
+                { text: "+250 783 610 209", path: 'tel:+250783610209', icon: PhoneIcon },
+                { text: "support@thequalitymarket.com", path: 'mailto:support@thequalitymarket.com', icon: MailIcon },
+                { text: "Kigali, KN 82 St, Tropical plaza, C26", path: '/', icon: MapPinIcon }
             ]
         }
     ];

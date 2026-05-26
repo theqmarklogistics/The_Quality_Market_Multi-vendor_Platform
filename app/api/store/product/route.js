@@ -34,6 +34,10 @@ export async function POST(request) {
     const widthCm = formData.get("widthCm") ? Number(formData.get("widthCm")) : null;
     const heightCm = formData.get("heightCm") ? Number(formData.get("heightCm")) : null;
     const importOrigin = formData.get("importOrigin") || null;
+    const wholesalePriceRaw = formData.get("wholesalePrice");
+    const wholesaleMinQtyRaw = formData.get("wholesaleMinQty");
+    const wholesalePrice = wholesalePriceRaw ? Number(wholesalePriceRaw) : null;
+    const wholesaleMinQty = wholesaleMinQtyRaw ? Number(wholesaleMinQtyRaw) : null;
 
     const missing = [];
     if (!name || String(name).trim() === "") missing.push("name");
@@ -91,7 +95,9 @@ export async function POST(request) {
             lengthCm,
             widthCm,
             heightCm,
-            importOrigin
+            importOrigin,
+            wholesalePrice,
+            wholesaleMinQty,
         }
     });
 

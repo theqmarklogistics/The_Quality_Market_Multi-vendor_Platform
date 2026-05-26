@@ -18,6 +18,8 @@ export default function StoreAddProduct() {
         warehouseQuantity: 0,
         mainCategory: "",
         category: "", // stored value: main category or subcategory (used for filtering)
+        wholesalePrice: "",
+        wholesaleMinQty: "",
         weightKg: "",
         lengthCm: "",
         widthCm: "",
@@ -118,6 +120,8 @@ export default function StoreAddProduct() {
             if (productInfo.widthCm) formData.append('widthCm', productInfo.widthCm);
             if (productInfo.heightCm) formData.append('heightCm', productInfo.heightCm);
             if (productInfo.importOrigin) formData.append('importOrigin', productInfo.importOrigin);
+            if (productInfo.wholesalePrice) formData.append('wholesalePrice', productInfo.wholesalePrice);
+            if (productInfo.wholesaleMinQty) formData.append('wholesaleMinQty', productInfo.wholesaleMinQty);
             // Append all the images to the form data
             Object.keys(images).forEach(key => {
                 if (images[key]) formData.append('images', images[key]);
@@ -131,7 +135,7 @@ export default function StoreAddProduct() {
             })
             toast.success(data.message)
 
-            setProductInfo({ name: "", description: "", mrp: 0, price: 0, warehouseQuantity: 0, mainCategory: "", category: "", weightKg: "", lengthCm: "", widthCm: "", heightCm: "", importOrigin: "" })
+            setProductInfo({ name: "", description: "", mrp: 0, price: 0, warehouseQuantity: 0, mainCategory: "", category: "", wholesalePrice: "", wholesaleMinQty: "", weightKg: "", lengthCm: "", widthCm: "", heightCm: "", importOrigin: "" })
             setImages({ 1: null, 2: null, 3: null, 4: null })
             setErrors({})
             setTouched({})
@@ -221,6 +225,30 @@ export default function StoreAddProduct() {
                         className={`w-full max-w-45 p-2 px-4 outline-none border rounded ${errors.warehouseQuantity && touched.warehouseQuantity ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
                     />
                     {errors.warehouseQuantity && touched.warehouseQuantity && <p className="text-xs text-red-500">{errors.warehouseQuantity}</p>}
+                </div>
+            </div>
+
+            {/* Wholesale Pricing */}
+            <div className="mt-8 border-t border-slate-100 pt-6">
+                <p className="text-slate-700 font-medium mb-1">Wholesale Pricing</p>
+                <p className="text-xs text-slate-400 mb-4">Optional — set a lower price for bulk buyers. Leave blank to disable.</p>
+                <div className="flex flex-wrap gap-5">
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="wholesalePrice">Wholesale Price (Rwf)</label>
+                        <input
+                            id="wholesalePrice" type="number" name="wholesalePrice" min="0"
+                            onChange={onChangeHandler} value={productInfo.wholesalePrice} placeholder="0"
+                            className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="wholesaleMinQty">Min. Qty for Wholesale</label>
+                        <input
+                            id="wholesaleMinQty" type="number" name="wholesaleMinQty" min="1" step="1"
+                            onChange={onChangeHandler} value={productInfo.wholesaleMinQty} placeholder="e.g. 10"
+                            className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </div>
                 </div>
             </div>
 

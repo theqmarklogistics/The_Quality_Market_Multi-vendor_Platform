@@ -1,6 +1,6 @@
 'use client'
 import { assets } from '@/assets/assets'
-import { ArrowRightIcon, ChevronRightIcon, ShoppingBagIcon } from 'lucide-react'
+import { ArrowRightIcon, ShoppingBagIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React, { useEffect, useState } from 'react'
@@ -56,13 +56,6 @@ const Hero = () => {
                 <div className='relative flex-1 flex flex-col rounded-3xl xl:min-h-100 group overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.18),_transparent_45%),linear-gradient(135deg,_#f8fafc_0%,_#ecfdf5_100%)] border border-green-100/60 shadow-[0_20px_80px_rgba(15,23,42,0.08)]'>
                     <div className='absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(132,204,22,0.14),_transparent_32%)] pointer-events-none' />
                     <div className='relative p-5 sm:p-16'>
-                        {main.badgeText && (
-                            <div className='inline-flex items-center gap-3 bg-white/80 backdrop-blur text-green-700 pr-4 p-1 rounded-full text-xs sm:text-sm shadow-sm border border-green-100'>
-                                <span className='bg-green-600 px-3 py-1 max-sm:ml-1 rounded-full text-white text-xs'>NEWS</span>
-                                {main.badgeText}
-                                <ChevronRightIcon className='group-hover:ml-2 transition-all' size={16} />
-                            </div>
-                        )}
                         <h2 className='text-3xl sm:text-5xl leading-[1.15] my-4 font-semibold bg-gradient-to-r from-slate-800 via-slate-700 to-green-700 bg-clip-text text-transparent max-w-xs sm:max-w-md'>
                             {main.headline}
                         </h2>

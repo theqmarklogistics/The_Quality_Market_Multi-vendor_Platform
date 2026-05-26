@@ -63,6 +63,13 @@ const ProductDetails = ({ product }) => {
                         Save {((product.mrp - product.price) / product.mrp * 100).toFixed(0)}%
                     </span>
                 </div>
+                {product.wholesalePrice && product.wholesaleMinQty && (
+                    <div className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-sm text-blue-700 mb-4">
+                        <span className="font-semibold">Wholesale:</span>
+                        {currency}{Number(product.wholesalePrice).toLocaleString()} per unit
+                        <span className="text-blue-500">when you buy {product.wholesaleMinQty}+</span>
+                    </div>
+                )}
                 <div className="flex items-center gap-2 text-slate-500">
                     <TagIcon size={14} />
                     <p>Save {((product.mrp - product.price) / product.mrp * 100).toFixed(0)}% right now</p>

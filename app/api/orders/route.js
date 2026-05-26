@@ -123,10 +123,17 @@ export async function POST(request) {
             if(!orderByStore.has(storeId)){
                 orderByStore.set(storeId, []);
             }
+            const unitPrice =
+                product.wholesalePrice &&
+                product.wholesaleMinQty &&
+                quantity >= product.wholesaleMinQty
+                    ? product.wholesalePrice
+                    : product.price;
+
             orderByStore.get(storeId).push({
                 id: product.id,
                 quantity,
-                price: product.price,
+                price: unitPrice,
                 warehouseQuantity: product.warehouseQuantity,
                 storeId: product.storeId,
                 name: product.name,

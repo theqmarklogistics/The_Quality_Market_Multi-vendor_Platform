@@ -32,7 +32,7 @@ export async function GET(request) {
 
         const select = {
             id: true, name: true, description: true,
-            mrp: true, price: true, images: true,
+            mrp: true, price: true, wholesalePrice: true, wholesaleMinQty: true, images: true,
             category: true, inStock: true, createdAt: true,
             rating: {
                 select: {
