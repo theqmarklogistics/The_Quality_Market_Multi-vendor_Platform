@@ -15,7 +15,9 @@ const authAdmin = async (userId) => {
             .map((email) => email.trim().toLowerCase())
             .filter(Boolean);
 
-        const primaryEmail = user.emailAddresses[0]?.emailAddress?.toLowerCase();
+        const primaryEmail = user.emailAddresses
+            .find(e => e.id === user.primaryEmailAddressId)
+            ?.emailAddress?.toLowerCase()
 
         return !!primaryEmail && adminEmails.includes(primaryEmail)
 
