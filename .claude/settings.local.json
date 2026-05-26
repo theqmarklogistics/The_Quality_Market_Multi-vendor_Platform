@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp *)",
+      "PowerShell(claude mcp add --transport http inngest-dev http://localhost:8288/mcp)",
+      "Read(//c/Users/K  O  N  G/.claude/**)",
+      "PowerShell(npm config get prefix)",
+      "PowerShell(& \"C:\\\\Users\\\\K  O  N  G\\\\AppData\\\\Roaming\\\\npm\\\\claude.cmd\" mcp add --transport http inngest-dev http://localhost:8288/mcp)",
+      "PowerShell([Environment]::SetEnvironmentVariable\\(\"PATH\", [Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\) + \";C:\\\\Users\\\\K  O  N  G\\\\AppData\\\\Roaming\\\\npm\", \"User\"\\))",
+      "PowerShell(npm show inngest version)",
+      "PowerShell(gh auth status)",
+      "PowerShell(git remote set-url origin https://github.com/theqmarklogistics/The_Quality_Market_Multi-vendor_Platform.git)",
+      "PowerShell(git push -u origin main)",
+      "PowerShell(cmdkey /delete:LegacyGeneric:target=git:https://github.com 2>$null; cmdkey /delete:LegacyGeneric:target=https://github.com 2>$null; git credential reject \"$\\(echo 'protocol=https\\\\nhost=github.com'\\)\" 2>$null; Write-Host \"Credentials cleared\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\K  O  N  G\\.claude"
+    ]
+  }
+}
