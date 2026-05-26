@@ -41,10 +41,13 @@ export default function AdminCoupons() {
         try {
             const token = await getToken();
 
-            newCoupon.discount = Number(newCoupon.discount);
-            newCoupon.expiresAt = new Date(newCoupon.expiresAt);
-            
-            const {data} = await axios.post('/api/admin/coupons',{ coupon:newCoupon}, {
+            const payload = {
+                ...newCoupon,
+                discount: Number(newCoupon.discount),
+                expiresAt: new Date(newCoupon.expiresAt),
+            };
+
+            const {data} = await axios.post('/api/admin/coupons',{ coupon: payload}, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
