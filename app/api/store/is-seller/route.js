@@ -6,9 +6,9 @@ import { NextResponse } from "next/server";
 // Auto-upsert user from Clerk if the Inngest webhook missed creating them.
 // This is a silent fix so the seller dashboard works even after a sync failure.
 async function ensureUser(userId) {
-    const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (existing) return;
     try {
+        const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+        if (existing) return;
         const client = await clerkClient();
         const clerkUser = await client.users.getUser(userId);
         const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? '';
@@ -25,8 +25,8 @@ async function ensureUser(userId) {
             }
         });
     } catch (e) {
-        console.error('ensureUser failed:', e.message);
         // Non-fatal — authSeller will surface user_not_found if this failed
+        console.error('ensureUser failed:', e.message);
     }
 }
 
