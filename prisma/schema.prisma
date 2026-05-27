@@ -436,6 +436,15 @@ model PaymentConfig {
     updatedAt         DateTime @updatedAt
 }
 
+// Admin-configurable announcement banner (single row, id = "default")
+model BannerConfig {
+    id         String   @id @default("default")
+    isActive   Boolean  @default(false)
+    text       String   @default("Get 20% OFF on your first order with code NEW20.")
+    couponCode String?  @default("NEW20")
+    updatedAt  DateTime @updatedAt
+}
+
 // Admin-configurable hero/banner slots ("main" | "card1" | "card2")
 model HeroConfig {
     slot          String   @id  // "main" | "card1" | "card2"
