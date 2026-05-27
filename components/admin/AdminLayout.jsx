@@ -12,7 +12,7 @@ import AdminNotificationWatcher from "./AdminNotificationWatcher"
 
 
 const AdminLayout = ({ children }) => {
-    const {user} = useUser();
+    const { user, isLoaded } = useUser();
     const {getToken} = useAuth();
 
 
@@ -36,11 +36,13 @@ const AdminLayout = ({ children }) => {
     }
 
     useEffect(() => {
-
-        if(user){
-            fetchIsAdmin()
+        if (!isLoaded) return; // Clerk still initializing — wait
+        if (user) {
+            fetchIsAdmin();
+        } else {
+            setLoading(false); // Signed out — stop spinner, show unauthorized
         }
-    }, [user])
+    }, [user, isLoaded])
 
     return loading ? (
         <Loading />

@@ -6,14 +6,14 @@ import { ArrowRightIcon } from "lucide-react"
 import SellerNavbar from "./StoreNavbar"
 import SellerSidebar from "./StoreSidebar"
 import { dummyStoreData } from "@/assets/assets"
-import { useAuth } from "@clerk/nextjs"
+import { useAuth, useUser } from "@clerk/nextjs"
 import axios from "axios"  
 import StoreNotificationWatcher from "./StoreNotificationWatcher"
 
 const StoreLayout = ({ children }) => {
 
-    const {getToken} = useAuth();
-
+    const { getToken } = useAuth();
+    const { isLoaded } = useUser();
 
     const [isSeller, setIsSeller] = useState(false)
     const [loading, setLoading] = useState(true)
@@ -41,8 +41,8 @@ const StoreLayout = ({ children }) => {
     }
 
     useEffect(() => {
-        fetchIsSeller()
-    }, [])
+        if (isLoaded) fetchIsSeller();
+    }, [isLoaded])
 
     return loading ? (
         <Loading />
