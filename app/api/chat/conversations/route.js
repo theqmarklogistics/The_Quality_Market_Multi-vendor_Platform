@@ -1,6 +1,6 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma, { prismaWs } from "@/lib/prisma";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 
 const conversationLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
@@ -182,7 +182,9 @@ export async function POST(request) {
             return NextResponse.json({ conversation: existingConversation });
         }
 
-        const conversation = await prisma.conversation.create({
+        // Nested write (conversation + 2 participants atomically) requires an implicit
+        // transaction — use prismaWs (WebSocket) since PrismaNeonHttp doesn't support those.
+        const conversation = await prismaWs.conversation.create({
             data: {
                 targetType,
                 orderId: orderId || null,
