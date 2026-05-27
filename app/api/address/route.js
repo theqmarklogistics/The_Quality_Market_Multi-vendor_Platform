@@ -32,6 +32,7 @@ export async function POST(request) {
 export async function GET(request) {
     try {
         const { userId } = getAuth(request);
+        if (!userId) return NextResponse.json({ addresses: [] });
         const addresses = await prisma.address.findMany({
             where: { userId }
         });

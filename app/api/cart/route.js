@@ -43,6 +43,7 @@ export async function POST(request) {
 export async function GET(request) {
     try {
         const { userId } = getAuth(request);
+        if (!userId) return NextResponse.json({ cart: {} });
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { cart: true }
