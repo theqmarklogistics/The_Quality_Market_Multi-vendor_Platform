@@ -32,13 +32,9 @@ export async function GET(request) {
             if (statusParam) where.approvalStatus = statusParam;
             if (nameParam) where.name = { contains: nameParam, mode: "insensitive" };
 
-            const [products, total] = await Promise.all([
+            const [rawProducts, total] = await Promise.all([
                 prisma.product.findMany({
                     where,
-                    include: {
-                        store: { select: { id: true, name: true } },
-                        _count: { select: { orderItems: true, ratings: true } }
-                    },
                     orderBy: { createdAt: "desc" },
                     skip,
                     take: pageSize
@@ -46,23 +42,43 @@ export async function GET(request) {
                 prisma.product.count({ where })
             ]);
 
+            // Hydrate store + counts separately (no include — avoids driverAdapters transaction)
+            const storeIds = [...new Set(rawProducts.map(p => p.storeId).filter(Boolean))];
+            const productIds = rawProducts.map(p => p.id);
+            const [stores, orderItemCounts, ratingCounts] = await Promise.all([
+                storeIds.length
+                    ? prisma.store.findMany({ where: { id: { in: storeIds } }, select: { id: true, name: true } })
+                    : [],
+                prisma.orderItem.groupBy({ by: ['productId'], where: { productId: { in: productIds } }, _count: { productId: true } }),
+                prisma.rating.groupBy({ by: ['productId'], where: { productId: { in: productIds } }, _count: { productId: true } })
+            ]);
+            const storeMap = new Map(stores.map(s => [s.id, s]));
+            const orderItemCountMap = new Map(orderItemCounts.map(a => [a.productId, a._count.productId]));
+            const ratingCountMap = new Map(ratingCounts.map(a => [a.productId, a._count.productId]));
+            const products = rawProducts.map(p => ({
+                ...p,
+                store: storeMap.get(p.storeId) || null,
+                _count: { orderItems: orderItemCountMap.get(p.id) || 0, ratings: ratingCountMap.get(p.id) || 0 }
+            }));
+
             return NextResponse.json({ products, total });
         }
 
         // ── Pending approval view (default) ──
         const status = searchParams.get("status") || "PENDING";
 
-        const products = await prisma.product.findMany({
-            where: {
-                approvalStatus: status
-            },
-            include: {
-                store: true
-            },
-            orderBy: {
-                createdAt: "asc"
-            }
+        const rawProducts = await prisma.product.findMany({
+            where: { approvalStatus: status },
+            orderBy: { createdAt: "asc" }
         });
+
+        // Hydrate stores separately (no include — avoids driverAdapters transaction)
+        const storeIds = [...new Set(rawProducts.map(p => p.storeId).filter(Boolean))];
+        const stores = storeIds.length
+            ? await prisma.store.findMany({ where: { id: { in: storeIds } } })
+            : [];
+        const storeMap = new Map(stores.map(s => [s.id, s]));
+        const products = rawProducts.map(p => ({ ...p, store: storeMap.get(p.storeId) || null }));
 
         return NextResponse.json({ products });
     } catch (error) {

@@ -23,20 +23,48 @@ export async function GET(request) {
 
         const where = { paymentProofStatus: proofStatus };
 
-        const [orders, total] = await Promise.all([
+        const [rawOrders, total] = await Promise.all([
             prisma.order.findMany({
                 where,
-                include: {
-                    user: true,
-                    store: true,
-                    orderItems: { include: { product: true } }
-                },
                 orderBy: { createdAt: 'desc' },
                 skip: (page - 1) * limit,
                 take: limit
             }),
             prisma.order.count({ where })
         ]);
+
+        // Hydrate users, stores, orderItems, products separately (no include)
+        let orders = rawOrders;
+        if (rawOrders.length) {
+            const orderIds = rawOrders.map(o => o.id);
+            const userIds = [...new Set(rawOrders.map(o => o.userId).filter(Boolean))];
+            const storeIds = [...new Set(rawOrders.map(o => o.storeId).filter(Boolean))];
+
+            const [orderItems, users, stores] = await Promise.all([
+                prisma.orderItem.findMany({ where: { orderId: { in: orderIds } } }),
+                prisma.user.findMany({ where: { id: { in: userIds } } }),
+                prisma.store.findMany({ where: { id: { in: storeIds } } })
+            ]);
+
+            const productIds = [...new Set(orderItems.map(i => i.productId).filter(Boolean))];
+            const products = productIds.length ? await prisma.product.findMany({ where: { id: { in: productIds } } }) : [];
+
+            const productMap = new Map(products.map(p => [p.id, p]));
+            const userMap = new Map(users.map(u => [u.id, u]));
+            const storeMap = new Map(stores.map(s => [s.id, s]));
+            const orderItemsByOrder = new Map();
+            for (const item of orderItems) {
+                if (!orderItemsByOrder.has(item.orderId)) orderItemsByOrder.set(item.orderId, []);
+                orderItemsByOrder.get(item.orderId).push({ ...item, product: productMap.get(item.productId) || null });
+            }
+
+            orders = rawOrders.map(o => ({
+                ...o,
+                user: userMap.get(o.userId) || null,
+                store: storeMap.get(o.storeId) || null,
+                orderItems: orderItemsByOrder.get(o.id) || []
+            }));
+        }
 
         return NextResponse.json({ orders, total, page, pages: Math.ceil(total / limit) });
     } catch (error) {

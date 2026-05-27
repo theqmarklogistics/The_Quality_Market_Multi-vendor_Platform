@@ -311,18 +311,47 @@ export async function GET(request) {
         if(!userId){
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-        const orders = await prisma.order.findMany({
+        const rawOrders = await prisma.order.findMany({
             where: { userId },
-            include: {
-                orderItems: {include: {product: true}},
-                user: true,
-                address: true,
-                returnRequest: { select: { id: true, status: true, reason: true, createdAt: true } }
-            },
-            orderBy: {
-                createdAt: 'desc'
-            }
+            orderBy: { createdAt: 'desc' }
         });
+
+        if (!rawOrders.length) return NextResponse.json({ orders: [] }, { status: 200 });
+
+        const orderIds = rawOrders.map(o => o.id);
+        const addressIds = [...new Set(rawOrders.map(o => o.addressId).filter(Boolean))];
+
+        // Parallel: orderItems, addresses, returnRequests, user
+        const [orderItems, addresses, returnRequests, user] = await Promise.all([
+            prisma.orderItem.findMany({ where: { orderId: { in: orderIds } } }),
+            prisma.address.findMany({ where: { id: { in: addressIds } } }),
+            prisma.return.findMany({
+                where: { orderId: { in: orderIds } },
+                select: { id: true, status: true, reason: true, createdAt: true, orderId: true }
+            }),
+            prisma.user.findUnique({ where: { id: userId } })
+        ]);
+
+        // Fetch products for all order items
+        const productIds = [...new Set(orderItems.map(i => i.productId).filter(Boolean))];
+        const products = productIds.length ? await prisma.product.findMany({ where: { id: { in: productIds } } }) : [];
+
+        const productMap = new Map(products.map(p => [p.id, p]));
+        const addressMap = new Map(addresses.map(a => [a.id, a]));
+        const returnMap = new Map(returnRequests.map(r => [r.orderId, r]));
+        const orderItemsByOrder = new Map();
+        for (const item of orderItems) {
+            if (!orderItemsByOrder.has(item.orderId)) orderItemsByOrder.set(item.orderId, []);
+            orderItemsByOrder.get(item.orderId).push({ ...item, product: productMap.get(item.productId) || null });
+        }
+
+        const orders = rawOrders.map(o => ({
+            ...o,
+            orderItems: orderItemsByOrder.get(o.id) || [],
+            user,
+            address: addressMap.get(o.addressId) || null,
+            returnRequest: returnMap.get(o.id) || null
+        }));
         return NextResponse.json({ orders }, { status: 200 });
     } catch (error) {
         console.error(error);

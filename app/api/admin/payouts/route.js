@@ -10,16 +10,21 @@ export async function GET(request) {
         const isAdmin = await authAdmin(userId);
         if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-        const [payouts, stores] = await Promise.all([
-            prisma.payout.findMany({
-                include: { store: { select: { id: true, name: true, username: true } } },
-                orderBy: { createdAt: 'desc' },
-            }),
+        const [rawPayouts, stores] = await Promise.all([
+            prisma.payout.findMany({ orderBy: { createdAt: 'desc' } }),
             prisma.store.findMany({
                 where: { isActive: true },
                 select: { id: true, name: true, username: true },
             }),
         ]);
+
+        // Hydrate payout stores separately (no include — avoids driverAdapters transaction)
+        const payoutStoreIds = [...new Set(rawPayouts.map(p => p.storeId).filter(Boolean))];
+        const payoutStores = payoutStoreIds.length
+            ? await prisma.store.findMany({ where: { id: { in: payoutStoreIds } }, select: { id: true, name: true, username: true } })
+            : [];
+        const payoutStoreMap = new Map(payoutStores.map(s => [s.id, s]));
+        const payouts = rawPayouts.map(p => ({ ...p, store: payoutStoreMap.get(p.storeId) || null }));
 
         // Calculate net earnings and unpaid balance per store
         const storeIds = stores.map(s => s.id);
@@ -72,19 +77,23 @@ export async function POST(request) {
             return NextResponse.json({ error: "storeId, amount, periodStart, periodEnd are required" }, { status: 400 });
         }
 
-        const payout = await prisma.payout.create({
+        const createdPayout = await prisma.payout.create({
             data: {
                 storeId,
                 amount: parseFloat(amount),
                 periodStart: new Date(periodStart),
                 periodEnd: new Date(periodEnd),
                 notes: notes?.trim() || null,
-            },
-            include: { store: { select: { name: true } } }
+            }
         });
 
-        const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
-        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'PAYOUT_CREATED', targetType: 'Payout', targetId: payout.id, notes: `Store: ${payout.store.name}, Amount: ${amount}` });
+        // Fetch store separately (no include on create — avoids driverAdapters transaction)
+        const [payoutStore, admin] = await Promise.all([
+            prisma.store.findUnique({ where: { id: storeId }, select: { name: true } }),
+            prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+        ]);
+        const payout = { ...createdPayout, store: payoutStore || null };
+        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'PAYOUT_CREATED', targetType: 'Payout', targetId: payout.id, notes: `Store: ${payoutStore?.name || storeId}, Amount: ${amount}` });
 
         return NextResponse.json({ message: "Payout created", payout }, { status: 201 });
     } catch (error) {

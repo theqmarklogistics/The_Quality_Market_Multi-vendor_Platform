@@ -69,14 +69,15 @@ export async function GET(request) {
             return NextResponse.json({error: "Not Unauthorized"}, {status: 401});
         }
 
-        const stores = await prisma.store.findMany({
-            where: {
-                status: { in: ['pending', 'rejected'] }
-            },
-            include: {
-                user: true
-            }
+        const rawStores = await prisma.store.findMany({
+            where: { status: { in: ['pending', 'rejected'] } }
         });
+
+        // Hydrate users separately (no include — avoids driverAdapters transaction)
+        const userIds = [...new Set(rawStores.map(s => s.userId).filter(Boolean))];
+        const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } } }) : [];
+        const userMap = new Map(users.map(u => [u.id, u]));
+        const stores = rawStores.map(s => ({ ...s, user: userMap.get(s.userId) || null }));
 
         return NextResponse.json({stores});
     } catch (error) {

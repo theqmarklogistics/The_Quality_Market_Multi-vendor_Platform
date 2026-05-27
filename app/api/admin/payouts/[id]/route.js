@@ -13,14 +13,18 @@ export async function PATCH(request, { params }) {
         const { id } = await params;
         const { notes } = await request.json().catch(() => ({}));
 
-        const payout = await prisma.payout.update({
+        const updatedPayout = await prisma.payout.update({
             where: { id },
-            data: { status: 'PAID', paidAt: new Date(), paidBy: userId, notes: notes?.trim() || undefined },
-            include: { store: { select: { name: true } } }
+            data: { status: 'PAID', paidAt: new Date(), paidBy: userId, notes: notes?.trim() || undefined }
         });
 
-        const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
-        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'PAYOUT_MARKED_PAID', targetType: 'Payout', targetId: id, notes: `Store: ${payout.store.name}` });
+        // Fetch store separately (no include on update — avoids driverAdapters transaction)
+        const [payoutStore, admin] = await Promise.all([
+            prisma.store.findUnique({ where: { id: updatedPayout.storeId }, select: { name: true } }),
+            prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+        ]);
+        const payout = { ...updatedPayout, store: payoutStore || null };
+        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'PAYOUT_MARKED_PAID', targetType: 'Payout', targetId: id, notes: `Store: ${payoutStore?.name || updatedPayout.storeId}` });
 
         return NextResponse.json({ message: "Payout marked as paid", payout });
     } catch (error) {
