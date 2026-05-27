@@ -93,7 +93,7 @@ const ProductDetails = ({ product }) => {
                 </div>
                 <hr className="border-gray-300 my-5" />
                 <div className="flex flex-col gap-4 text-slate-500">
-                    <p className="flex gap-3"> <EarthIcon className="text-slate-400" /> Free shipping within supported locations </p>
+                    <p className="flex gap-3"> <EarthIcon className="text-slate-400" /> Shipping fee confirmed by seller after order </p>
                     <p className="flex gap-3"> <CreditCardIcon className="text-slate-400" /> Secure bank transfer or mobile money checkout </p>
                     <p className="flex gap-3"> <UserIcon className="text-slate-400" /> Reviewed by the store before approval </p>
                 </div>

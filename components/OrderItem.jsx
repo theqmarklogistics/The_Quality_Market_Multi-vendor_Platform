@@ -188,7 +188,15 @@ const OrderItem = ({ order, onProofUploaded }) => {
                     </div>
                 </td>
 
-                <td className="text-center max-md:hidden">{currency}{order.total}</td>
+                <td className="text-center max-md:hidden">
+                    <p className="font-medium">{currency}{Number(order.total).toLocaleString()}</p>
+                    {order.shippingQuoted && Number(order.shippingCost) > 0 && (
+                        <p className="text-xs text-slate-400 mt-0.5">incl. {currency}{Number(order.shippingCost).toLocaleString()} shipping</p>
+                    )}
+                    {!order.shippingQuoted && (
+                        <p className="text-xs text-amber-600 mt-0.5">+ shipping pending</p>
+                    )}
+                </td>
 
                 <td className="text-left max-md:hidden">
                     <p>{order.address.name}, {order.address.street},</p>

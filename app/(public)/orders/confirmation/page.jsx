@@ -124,6 +124,18 @@ function ConfirmationContent() {
                                 ))}
                             </div>
 
+                            {order.shippingQuoted && Number(order.shippingCost) > 0 && (
+                                <div className="flex items-center justify-between px-5 py-2 border-t border-slate-100 bg-slate-50/60 text-sm text-slate-500">
+                                    <span>Shipping</span>
+                                    <span>{currency}{Number(order.shippingCost).toLocaleString()}</span>
+                                </div>
+                            )}
+                            {!order.shippingQuoted && (
+                                <div className="flex items-center justify-between px-5 py-2 border-t border-amber-100 bg-amber-50 text-sm">
+                                    <span className="text-amber-700">Shipping</span>
+                                    <span className="text-amber-700 font-medium">Seller will confirm</span>
+                                </div>
+                            )}
                             <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50">
                                 <span className="text-sm text-slate-500">Store total</span>
                                 <span className="font-semibold text-slate-800">{currency}{Number(order.total).toLocaleString()}</span>
