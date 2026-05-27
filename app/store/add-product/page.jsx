@@ -71,6 +71,12 @@ export default function StoreAddProduct() {
         // Store the file immediately so it shows in preview and is included on submit
         setImages(prev => ({ ...prev, [key]: file }));
 
+        // Guard: skip AI analysis for large images (base64 encoding ~33% overhead pushes past serverless limits)
+        if (file.size > 3 * 1024 * 1024) {
+            toast('Image too large for AI analysis (max 3 MB). Fill in details manually.', { icon: '⚠️' });
+            return;
+        }
+
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = async () => {
@@ -95,7 +101,11 @@ export default function StoreAddProduct() {
                         }
                         return "AI could not analyze the image";
                     },
-                    error: (err) => err?.response?.data?.error || err.message,
+                    // Guard: Vercel/Next.js 413 returns { error: { code, message } } — ensure string
+                    error: (err) => {
+                        const e = err?.response?.data?.error;
+                        return (typeof e === 'string' ? e : null) ?? err.message ?? 'Image analysis failed';
+                    },
                 });
             } catch (error) {
                 console.error(error);

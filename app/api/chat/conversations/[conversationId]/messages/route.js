@@ -55,6 +55,13 @@ const markConversationAsRead = async (conversationId, userId) => {
     };
 };
 
+const isAdminUser = async (userId) => {
+    const adminEmails = getAdminEmails();
+    if (!adminEmails.length) return false;
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    return adminEmails.includes((user?.email || "").toLowerCase());
+};
+
 export async function GET(request, { params }) {
     try {
         const { userId } = getAuth(request);
@@ -66,7 +73,8 @@ export async function GET(request, { params }) {
         const { conversationId } = await params;
         const hasAccess = await ensureParticipantAccess(conversationId, userId);
 
-        if (!hasAccess) {
+        // Admins can read any conversation for oversight purposes
+        if (!hasAccess && !(await isAdminUser(userId))) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -115,7 +123,8 @@ export async function POST(request, { params }) {
         const { conversationId } = await params;
         const hasAccess = await ensureParticipantAccess(conversationId, userId);
 
-        if (!hasAccess) {
+        // Admins can send messages into any conversation (oversight / support intervention)
+        if (!hasAccess && !(await isAdminUser(userId))) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
