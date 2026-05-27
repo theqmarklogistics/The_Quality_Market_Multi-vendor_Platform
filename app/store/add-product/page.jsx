@@ -2,10 +2,9 @@
 import { assets } from "@/assets/assets"
 import { useAuth } from "@clerk/nextjs"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "react-hot-toast"
 import axios from "axios"
-import { categoryTree } from "@/lib/constants"
 
 export default function StoreAddProduct() {
 
@@ -30,6 +29,14 @@ export default function StoreAddProduct() {
     const [aiUsed, setAiUsed] = useState(false)
     const [errors, setErrors] = useState({})
     const [touched, setTouched] = useState({})
+    const [categoryOptions, setCategoryOptions] = useState([])
+
+    useEffect(() => {
+        fetch('/api/categories')
+            .then(r => r.json())
+            .then(d => setCategoryOptions((d.categories || []).map(c => c.name)))
+            .catch(() => {})
+    }, [])
 
     const {getToken} = useAuth();
 
@@ -252,44 +259,22 @@ export default function StoreAddProduct() {
                 </div>
             </div>
 
-            <label htmlFor="mainCategory" className="flex flex-col gap-2 my-6">
+            <label htmlFor="category" className="flex flex-col gap-2 my-6">
                 Category
                 <select
-                    id="mainCategory"
-                    value={productInfo.mainCategory}
-                    onChange={e => setProductInfo({ ...productInfo, mainCategory: e.target.value, category: "" })}
+                    id="category"
+                    name="category"
+                    value={productInfo.category}
+                    onChange={e => setProductInfo({ ...productInfo, category: e.target.value })}
                     className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded"
                     required
                 >
                     <option value="">Select a category</option>
-                    {categoryTree.map((item) => (
-                        <option key={item.name} value={item.name}>{item.name}</option>
+                    {categoryOptions.map((name) => (
+                        <option key={name} value={name}>{name}</option>
                     ))}
                 </select>
             </label>
-
-            {productInfo.mainCategory && (
-                <label htmlFor="subcategory" className="flex flex-col gap-2 my-6">
-                    Subcategory
-                    <select
-                        id="subcategory"
-                        value={productInfo.category}
-                        onChange={e => setProductInfo({ ...productInfo, category: e.target.value })}
-                        className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded"
-                        required
-                    >
-                        <option value="">Select a subcategory</option>
-                        {(() => {
-                            const entry = categoryTree.find(c => c.name === productInfo.mainCategory)
-                            if (!entry) return null
-                            const options = [entry.name, ...entry.subcategories]
-                            return options.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))
-                        })()}
-                    </select>
-                </label>
-            )}
 
             {/* Shipping Details */}
             <div className="mt-8 border-t border-slate-100 pt-6">

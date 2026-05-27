@@ -1,8 +1,19 @@
 'use client'
-import { categories } from "@/assets/assets"
+import { useState, useEffect } from 'react'
 import Link from "next/link"
 
 const CategoriesMarquee = () => {
+    const [categories, setCategories] = useState([])
+
+    useEffect(() => {
+        fetch('/api/categories')
+            .then(r => r.json())
+            .then(d => setCategories((d.categories || []).map(c => c.name)))
+            .catch(() => {})
+    }, [])
+
+    if (categories.length === 0) return null
+
     return (
         <div className="overflow-hidden w-full relative max-w-7xl mx-auto select-none group sm:my-20 py-2">
             <div className="absolute left-0 top-0 h-full w-16 sm:w-24 z-10 pointer-events-none bg-gradient-to-r from-white via-white/90 to-transparent" />

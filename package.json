@@ -35,6 +35,9 @@
     "socket.io-client": "^4.8.3",
     "ws": "^8.18.3"
   },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/ws": "^8.18.1",

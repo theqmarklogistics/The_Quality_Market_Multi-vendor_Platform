@@ -1,7 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { productCategories } from '@/lib/constants'
 
 const SELLER_MODEL_OPTIONS = [
   { value: 'LOCAL_SELLER', label: 'Local Seller (Semi-Managed)' },
@@ -10,6 +9,7 @@ const SELLER_MODEL_OPTIONS = [
 ]
 
 export default function CommissionForm({ initialData = null, onSaved = () => {}, onCancel }) {
+  const [dbCategories, setDbCategories] = useState([])
   const [category, setCategory] = useState('')
   const [customCategory, setCustomCategory] = useState('')
   const [useCustom, setUseCustom] = useState(false)
@@ -19,8 +19,15 @@ export default function CommissionForm({ initialData = null, onSaved = () => {},
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    fetch('/api/categories')
+      .then(r => r.json())
+      .then(d => setDbCategories((d.categories || []).map(c => c.name)))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     if (initialData) {
-      const known = productCategories.includes(initialData.category)
+      const known = dbCategories.includes(initialData.category)
       setUseCustom(!known)
       setCategory(known ? initialData.category : '')
       setCustomCategory(known ? '' : (initialData.category || ''))
@@ -91,7 +98,7 @@ export default function CommissionForm({ initialData = null, onSaved = () => {},
         ) : (
           <select className={inputCls} value={category} onChange={e => setCategory(e.target.value)}>
             <option value="">— Select category —</option>
-            {productCategories.map(c => <option key={c} value={c}>{c}</option>)}
+            {dbCategories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
       </div>

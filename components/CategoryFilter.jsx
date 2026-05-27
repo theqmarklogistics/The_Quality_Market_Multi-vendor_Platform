@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter } from "next/navigation"
-import { categoryTree } from "@/lib/constants"
 import {
     Baby,
     Backpack,
@@ -46,7 +45,7 @@ import {
     ChevronRight,
     LayoutGrid,
 } from "lucide-react"
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect, useMemo } from "react"
 
 const categoryIcons = {
     'Baby Products': Baby,
@@ -156,12 +155,20 @@ export default function CategoryFilter({ currentCategory, onSelectCategory, clas
     const router = useRouter()
     const [open, setOpen] = useState(false)
     const [hoveredCategory, setHoveredCategory] = useState(null)
+    const [dbCategories, setDbCategories] = useState([])
     const triggerRef = useRef(null)
     const panelRef = useRef(null)
 
-    const mid = Math.ceil(categoryTree.length / 2)
-    const leftCol = categoryTree.slice(0, mid)
-    const rightCol = categoryTree.slice(mid)
+    useEffect(() => {
+        fetch('/api/categories')
+            .then(r => r.json())
+            .then(d => setDbCategories((d.categories || []).map(c => ({ name: c.name, subcategories: [] }))))
+            .catch(() => {})
+    }, [])
+
+    const mid = Math.ceil(dbCategories.length / 2)
+    const leftCol = dbCategories.slice(0, mid)
+    const rightCol = dbCategories.slice(mid)
 
     const handleSelect = (cat) => {
         if (onSelectCategory) {

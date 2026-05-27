@@ -8,15 +8,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { toast } from "react-hot-toast"
 import axios from "axios"
-import { categoryTree } from "@/lib/constants"
 import { ArrowLeft } from "lucide-react"
-
-function getMainCategory(category) {
-    const entry = categoryTree.find(
-        (c) => c.name === category || c.subcategories.includes(category)
-    )
-    return entry ? entry.name : ""
-}
 
 export default function StoreEditProduct() {
     const params = useParams()
@@ -34,11 +26,18 @@ export default function StoreEditProduct() {
         warehouseQuantity: 0,
         wholesalePrice: "",
         wholesaleMinQty: "",
-        mainCategory: "",
         category: "",
     })
+    const [categoryOptions, setCategoryOptions] = useState([])
 
     const { getToken } = useAuth()
+
+    useEffect(() => {
+        fetch('/api/categories')
+            .then(r => r.json())
+            .then(d => setCategoryOptions((d.categories || []).map(c => c.name)))
+            .catch(() => {})
+    }, [])
 
     useEffect(() => {
         if (!productId) return
@@ -48,7 +47,6 @@ export default function StoreEditProduct() {
                 const { data } = await axios.get(`/api/store/product/${productId}`, {
                     headers: { Authorization: `Bearer ${token}` },
                 })
-                const main = getMainCategory(data.category)
                 setProductInfo({
                     name: data.name,
                     description: data.description,
@@ -57,7 +55,6 @@ export default function StoreEditProduct() {
                     warehouseQuantity: data.warehouseQuantity ?? 0,
                     wholesalePrice: data.wholesalePrice ?? "",
                     wholesaleMinQty: data.wholesaleMinQty ?? "",
-                    mainCategory: main,
                     category: data.category,
                 })
                 const existing = Array.isArray(data.images) ? data.images : []
@@ -298,58 +295,21 @@ export default function StoreEditProduct() {
                 </div>
             </div>
 
-            <label htmlFor="mainCategory" className="flex flex-col gap-2 my-6">
+            <label htmlFor="category" className="flex flex-col gap-2 my-6">
                 Category
                 <select
-                    id="mainCategory"
-                    value={productInfo.mainCategory}
-                    onChange={(e) =>
-                        setProductInfo({
-                            ...productInfo,
-                            mainCategory: e.target.value,
-                            category: "",
-                        })
-                    }
+                    id="category"
+                    value={productInfo.category}
+                    onChange={(e) => setProductInfo({ ...productInfo, category: e.target.value })}
                     className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded"
                     required
                 >
                     <option value="">Select a category</option>
-                    {categoryTree.map((item) => (
-                        <option key={item.name} value={item.name}>
-                            {item.name}
-                        </option>
+                    {categoryOptions.map((name) => (
+                        <option key={name} value={name}>{name}</option>
                     ))}
                 </select>
             </label>
-
-            {productInfo.mainCategory && (
-                <label htmlFor="subcategory" className="flex flex-col gap-2 my-6">
-                    Subcategory
-                    <select
-                        id="subcategory"
-                        value={productInfo.category}
-                        onChange={(e) =>
-                            setProductInfo({ ...productInfo, category: e.target.value })
-                        }
-                        className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded"
-                        required
-                    >
-                        <option value="">Select a subcategory</option>
-                        {(() => {
-                            const entry = categoryTree.find(
-                                (c) => c.name === productInfo.mainCategory
-                            )
-                            if (!entry) return null
-                            const options = [entry.name, ...entry.subcategories]
-                            return options.map((opt) => (
-                                <option key={opt} value={opt}>
-                                    {opt}
-                                </option>
-                            ))
-                        })()}
-                    </select>
-                </label>
-            )}
 
             <div className="flex gap-3 mt-7">
                 <button
