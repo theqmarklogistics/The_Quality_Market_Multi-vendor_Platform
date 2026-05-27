@@ -1,8 +1,10 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { getSocketServer } from "@/lib/socketServer";
 import { inngest } from "@/inngest/client";
+import authAdmin from "@/middlewares/authAdmin";
 
 const getAdminEmails = () =>
     (process.env.ADMIN_EMAIL || "")
@@ -11,55 +13,43 @@ const getAdminEmails = () =>
         .filter(Boolean);
 
 const ensureParticipantAccess = async (conversationId, userId) => {
-    const participant = await prisma.conversationParticipant.findFirst({
-        where: {
-            conversationId,
-            userId
-        }
-    });
-    return !!participant;
+    const participant = await prisma.$queryRaw`
+        SELECT 1
+        FROM "ConversationParticipant"
+        WHERE "conversationId" = ${conversationId} AND "userId" = ${userId}
+        LIMIT 1
+    `;
+    return Array.isArray(participant) && participant.length > 0;
 };
 
 const markConversationAsRead = async (conversationId, userId) => {
-    const unreadMessageIds = await prisma.message.findMany({
-        where: {
-            conversationId,
-            isRead: false,
-            senderId: {
-                not: userId
-            }
-        },
-        select: {
-            id: true
-        }
-    });
+    const unreadMessageIds = await prisma.$queryRaw`
+        SELECT id
+        FROM "Message"
+        WHERE "conversationId" = ${conversationId}
+          AND "isRead" = false
+          AND "senderId" <> ${userId}
+    `;
+    const ids = Array.isArray(unreadMessageIds) ? unreadMessageIds.map((row) => row.id) : [];
 
-    if (!unreadMessageIds.length) {
+    if (!ids.length) {
         return { updatedCount: 0 };
     }
 
-    await prisma.message.updateMany({
-        where: {
-            id: {
-                in: unreadMessageIds.map((message) => message.id)
-            }
-        },
-        data: {
-            isRead: true
-        }
-    });
+    await prisma.$executeRaw`
+        UPDATE "Message"
+        SET "isRead" = true
+        WHERE id IN (${Prisma.join(ids)})
+    `;
 
     return {
-        updatedCount: unreadMessageIds.length,
-        messageIds: unreadMessageIds.map((message) => message.id)
+        updatedCount: ids.length,
+        messageIds: ids
     };
 };
 
 const isAdminUser = async (userId) => {
-    const adminEmails = getAdminEmails();
-    if (!adminEmails.length) return false;
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    return adminEmails.includes((user?.email || "").toLowerCase());
+    return authAdmin(userId);
 };
 
 export async function GET(request, { params }) {
@@ -71,25 +61,31 @@ export async function GET(request, { params }) {
         }
 
         const { conversationId } = await params;
-        const hasAccess = await ensureParticipantAccess(conversationId, userId);
+        const [hasAccess, isAdmin] = await Promise.all([
+            ensureParticipantAccess(conversationId, userId),
+            isAdminUser(userId)
+        ]);
 
         // Admins can read any conversation for oversight purposes
-        if (!hasAccess && !(await isAdminUser(userId))) {
+        if (!hasAccess && !isAdmin) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         const readResult = await markConversationAsRead(conversationId, userId);
 
-        // With driverAdapters (JS engine), findMany+include runs two SELECT queries
-        // and wraps them in a transaction that PrismaNeonHttp rejects.
-        // Fetch messages and senders separately then merge to avoid any transaction.
-        const rawMessages = await prisma.message.findMany({
-            where: { conversationId },
-            orderBy: { createdAt: "asc" }
-        });
+        const rawMessages = await prisma.$queryRaw`
+            SELECT *
+            FROM "Message"
+            WHERE "conversationId" = ${conversationId}
+            ORDER BY "createdAt" ASC
+        `;
         const senderIds = [...new Set(rawMessages.map(m => m.senderId).filter(Boolean))];
         const senders = senderIds.length
-            ? await prisma.user.findMany({ where: { id: { in: senderIds } } })
+            ? await prisma.$queryRaw`
+                SELECT *
+                FROM "User"
+                WHERE id IN (${Prisma.join(senderIds)})
+            `
             : [];
         const senderMap = new Map(senders.map(u => [u.id, u]));
         const messages = rawMessages.map(m => ({ ...m, sender: senderMap.get(m.senderId) || null }));
@@ -123,10 +119,13 @@ export async function POST(request, { params }) {
         }
 
         const { conversationId } = await params;
-        const hasAccess = await ensureParticipantAccess(conversationId, userId);
+        const [hasAccess, isAdmin] = await Promise.all([
+            ensureParticipantAccess(conversationId, userId),
+            isAdminUser(userId)
+        ]);
 
         // Admins can send messages into any conversation (oversight / support intervention)
-        if (!hasAccess && !(await isAdminUser(userId))) {
+        if (!hasAccess && !isAdmin) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -136,33 +135,48 @@ export async function POST(request, { params }) {
             return NextResponse.json({ error: "Message content is required" }, { status: 400 });
         }
 
-        const conversation = await prisma.conversation.findUnique({
-            where: {
-                id: conversationId
-            },
-            select: {
-                targetType: true
-            }
-        });
+        const conversationRows = await prisma.$queryRaw`
+            SELECT "targetType"
+            FROM "Conversation"
+            WHERE id = ${conversationId}
+            LIMIT 1
+        `;
+        const conversation = conversationRows?.[0] || null;
 
-        // PrismaNeonHttp does not support $transaction in any form, and the JS engine
-        // (driverAdapters) wraps any create/findX with `include` in an implicit
-        // transaction. Use flat create + plain user lookup to avoid all transactions.
-        const createdMessage = await prisma.message.create({
-            data: {
-                conversationId,
-                senderId: userId,
-                content: String(content).trim(),
-                isRead: false
-            }
-        });
-        const sender = await prisma.user.findUnique({ where: { id: userId } });
+        // Generate ID for message (cuid-like format)
+        const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const now = new Date();
+
+        // Use raw SQL to avoid implicit transaction wrapping in PrismaNeonHttp
+        await prisma.$executeRaw`
+            INSERT INTO "Message" (id, "conversationId", "senderId", content, "isRead", "createdAt", "updatedAt")
+            VALUES (${messageId}, ${conversationId}, ${userId}, ${String(content).trim()}, false, ${now}, ${now})
+        `;
+
+        const createdMessage = {
+            id: messageId,
+            conversationId,
+            senderId: userId,
+            content: String(content).trim(),
+            isRead: false,
+            createdAt: now,
+            updatedAt: now
+        };
+
+        const senderRows = await prisma.$queryRaw`
+            SELECT *
+            FROM "User"
+            WHERE id = ${userId}
+            LIMIT 1
+        `;
+        const sender = senderRows?.[0] || null;
         const message = { ...createdMessage, sender: sender || null };
 
-        prisma.conversation.update({
-            where: { id: conversationId },
-            data: { updatedAt: new Date() }
-        }).catch(err => console.error('conversation timestamp update failed:', err.message));
+        prisma.$executeRaw`
+            UPDATE "Conversation"
+            SET "updatedAt" = NOW()
+            WHERE id = ${conversationId}
+        `.catch(err => console.error('conversation timestamp update failed:', err.message));
 
         try {
             const io = getSocketServer();
@@ -212,9 +226,12 @@ export async function PUT(request, { params }) {
         }
 
         const { conversationId } = await params;
-        const hasAccess = await ensureParticipantAccess(conversationId, userId);
+        const [hasAccess, isAdmin] = await Promise.all([
+            ensureParticipantAccess(conversationId, userId),
+            isAdminUser(userId)
+        ]);
 
-        if (!hasAccess) {
+        if (!hasAccess && !isAdmin) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 

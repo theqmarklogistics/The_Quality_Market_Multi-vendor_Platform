@@ -35,7 +35,7 @@ export async function GET(request) {
     try {
         const { userId } = getAuth(request);
         if (!userId) {
-            return NextResponse.json({ isSeller: false, reason: 'unauthenticated' }, { status: 401 });
+            return NextResponse.json({ isSeller: false, reason: 'unauthenticated' });
         }
 
         // Ensure the user record exists before delegating to authSeller
@@ -46,7 +46,7 @@ export async function GET(request) {
         // authSeller returns a storeId string when approved; objects when not
         if (typeof result !== 'string') {
             const reason = result?.reason || 'unauthorized';
-            return NextResponse.json({ isSeller: false, reason }, { status: 401 });
+            return NextResponse.json({ isSeller: false, reason });
         }
 
         const storeInfo = await prisma.store.findFirst({

@@ -2,8 +2,49 @@ import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+import authAdmin from "@/middlewares/authAdmin";
 
 const conversationLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
+const getAdminEmails = () =>
+    (process.env.ADMIN_EMAIL || "")
+        .split(",")
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
+
+const hydrateConversation = async (conversationId) => {
+    const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId }
+    });
+    if (!conversation) return null;
+
+    const participants = await prisma.conversationParticipant.findMany({
+        where: { conversationId }
+    });
+    const participantUserIds = [...new Set(participants.map((p) => p.userId))];
+    const users = participantUserIds.length
+        ? await prisma.user.findMany({ where: { id: { in: participantUserIds } } })
+        : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    const [store, order] = await Promise.all([
+        conversation.storeId
+            ? prisma.store.findUnique({ where: { id: conversation.storeId } })
+            : Promise.resolve(null),
+        conversation.orderId
+            ? prisma.order.findUnique({ where: { id: conversation.orderId } })
+            : Promise.resolve(null)
+    ]);
+
+    return {
+        ...conversation,
+        participants: participants.map((participant) => ({
+            ...participant,
+            user: userMap.get(participant.userId) || null
+        })),
+        store,
+        order
+    };
+};
 
 export async function GET(request) {
     try {
@@ -17,8 +58,18 @@ export async function GET(request) {
         // wrapped in a transaction that PrismaNeonHttp rejects.
         // Fetch each piece separately and merge in JS to avoid any transaction.
 
+        const isAdmin = await authAdmin(userId);
+        const conversationFilter = isAdmin
+            ? {
+                OR: [
+                    { participants: { some: { userId } } },
+                    { targetType: "ADMIN" }
+                ]
+            }
+            : { participants: { some: { userId } } };
+
         const rawConversations = await prisma.conversation.findMany({
-            where: { participants: { some: { userId } } },
+            where: conversationFilter,
             orderBy: { updatedAt: "desc" }
         });
 
@@ -142,25 +193,91 @@ export async function POST(request) {
         }
 
         if (targetType === "ADMIN") {
-            const firstAdminEmail = process.env.ADMIN_EMAIL?.split(",")?.[0]?.trim();
-            if (!firstAdminEmail) {
+            const adminEmails = getAdminEmails();
+            if (!adminEmails.length) {
                 return NextResponse.json({ error: "Admin email is not configured" }, { status: 500 });
             }
 
-            const adminUser = await prisma.user.findFirst({
+            const adminUsers = await prisma.user.findMany({
                 where: {
-                    email: firstAdminEmail
+                    email: { in: adminEmails }
                 },
                 select: {
                     id: true
                 }
             });
 
-            if (!adminUser) {
+            if (!adminUsers.length) {
                 return NextResponse.json({ error: "Admin user not found" }, { status: 404 });
             }
 
-            targetUserId = adminUser.id;
+            targetUserId = adminUsers[0].id;
+            const adminIds = adminUsers.map((admin) => admin.id);
+            const adminParticipants = [...new Set(adminIds)];
+
+            const existingConversation = await prisma.conversation.findFirst({
+                where: {
+                    targetType,
+                    orderId: orderId || null,
+                    storeId: targetStoreId,
+                    AND: [
+                        {
+                            participants: {
+                                some: {
+                                    userId
+                                }
+                            }
+                        },
+                        {
+                            participants: {
+                                some: {
+                                    userId: { in: adminParticipants }
+                                }
+                            }
+                        }
+                    ]
+                }
+            });
+
+            if (existingConversation) {
+                let conversation = await hydrateConversation(existingConversation.id);
+                if (conversation) {
+                    const existingIds = new Set(conversation.participants.map((p) => p.userId));
+                    const missingAdminIds = adminParticipants.filter((adminId) => !existingIds.has(adminId));
+                    for (const adminId of missingAdminIds) {
+                        await prisma.conversationParticipant.create({
+                            data: { conversationId: existingConversation.id, userId: adminId }
+                        });
+                    }
+                    if (missingAdminIds.length) {
+                        conversation = await hydrateConversation(existingConversation.id);
+                    }
+                }
+                return NextResponse.json({ conversation });
+            }
+
+            const newConversation = await prisma.conversation.create({
+                data: {
+                    targetType,
+                    orderId: orderId || null,
+                    storeId: targetStoreId,
+                    createdById: userId,
+                }
+            });
+
+            await prisma.conversationParticipant.create({
+                data: { conversationId: newConversation.id, userId }
+            });
+
+            for (const adminId of adminParticipants) {
+                if (adminId === userId) continue;
+                await prisma.conversationParticipant.create({
+                    data: { conversationId: newConversation.id, userId: adminId }
+                });
+            }
+
+            const conversation = await hydrateConversation(newConversation.id);
+            return NextResponse.json({ conversation });
         }
 
         if (!targetUserId) {
@@ -188,14 +305,12 @@ export async function POST(request) {
                         }
                     }
                 ]
-            },
-            include: {
-                participants: true
             }
         });
 
-        if (existingConversation && existingConversation.participants.length === 2) {
-            return NextResponse.json({ conversation: existingConversation });
+        if (existingConversation) {
+            const conversation = await hydrateConversation(existingConversation.id);
+            return NextResponse.json({ conversation });
         }
 
         // Create conversation + participants without a nested write so we stay on the
@@ -227,15 +342,7 @@ export async function POST(request) {
             data: { conversationId: newConversation.id, userId: targetUserId }
         });
 
-        const conversation = await prisma.conversation.findUnique({
-            where: { id: newConversation.id },
-            include: {
-                participants: {
-                    include: { user: true }
-                }
-            }
-        });
-
+        const conversation = await hydrateConversation(newConversation.id);
         return NextResponse.json({ conversation });
     } catch (error) {
         console.error(error);
