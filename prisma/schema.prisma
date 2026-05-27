@@ -445,6 +445,16 @@ model BannerConfig {
     updatedAt  DateTime @updatedAt
 }
 
+// Newsletter subscribers
+model NewsletterSubscriber {
+    id               String    @id @default(cuid())
+    email            String    @unique
+    subscribedAt     DateTime  @default(now())
+    unsubscribedAt   DateTime?
+    unsubscribeToken String    @unique @default(cuid())
+    resendContactId  String?
+}
+
 // Admin-configurable hero/banner slots ("main" | "card1" | "card2")
 model HeroConfig {
     slot          String   @id  // "main" | "card1" | "card2"
