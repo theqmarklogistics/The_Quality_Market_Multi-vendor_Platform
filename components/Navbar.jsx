@@ -28,6 +28,7 @@ const Navbar = () => {
     const [isAdmin, setIsAdmin] = useState(false)
     const [isSeller, setIsSeller] = useState(false)
     const [loadingAccess, setLoadingAccess] = useState(false)
+    const [unreadChats, setUnreadChats] = useState(0)
     const cartCount = useSelector(state => state.cart.total)
 
     useEffect(() => {
@@ -106,6 +107,28 @@ const Navbar = () => {
             mounted = false
         }
     }, [user, getToken])
+
+    // Fetch unread message count when user is present; re-fetches whenever pathname
+    // changes so the badge updates after the user visits a chat room.
+    useEffect(() => {
+        if (!user) { setUnreadChats(0); return }
+        let mounted = true
+        const fetchUnread = async () => {
+            try {
+                const token = await getToken()
+                const { data } = await axios.get('/api/chat/conversations', {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                if (!mounted) return
+                const total = (data.conversations || []).reduce(
+                    (acc, c) => acc + (c._count?.messages || 0), 0
+                )
+                setUnreadChats(total)
+            } catch (_) {}
+        }
+        fetchUnread()
+        return () => { mounted = false }
+    }, [user, pathname, getToken])
 
     const handleSearch = (e) => {
         e.preventDefault()
@@ -199,6 +222,18 @@ const Navbar = () => {
                             <span className="absolute -top-1 left-3 flex items-center justify-center text-[8px] text-white bg-slate-600 size-3.5 rounded-full">{cartCount}</span>
                         </Link>
 
+                        {user && (
+                            <Link href="/chat" className="relative flex items-center gap-2 text-slate-600" aria-label="View chats">
+                                <MessageCircleIcon size={18} />
+                                Chats
+                                {unreadChats > 0 && (
+                                    <span className="absolute -top-1 left-3 flex items-center justify-center text-[8px] text-white bg-indigo-500 size-3.5 rounded-full">
+                                        {unreadChats > 9 ? '9+' : unreadChats}
+                                    </span>
+                                )}
+                            </Link>
+                        )}
+
                         {/* Visible dashboard shortcuts for quick access */}
                         {canShowAccessActions && isSeller && (
                             <Link href="/store" className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm hover:bg-emerald-100">
@@ -251,6 +286,17 @@ const Navbar = () => {
                             <ShoppingCart size={20} />
                             <span className="absolute -top-1 -right-1 flex items-center justify-center text-[8px] text-white bg-slate-600 size-3.5 rounded-full">{cartCount}</span>
                         </Link>
+
+                        {user && (
+                            <Link href="/chat" className="relative text-slate-600" aria-label="View chats">
+                                <MessageCircleIcon size={20} />
+                                {unreadChats > 0 && (
+                                    <span className="absolute -top-1 -right-1 flex items-center justify-center text-[8px] text-white bg-indigo-500 size-3.5 rounded-full">
+                                        {unreadChats > 9 ? '9+' : unreadChats}
+                                    </span>
+                                )}
+                            </Link>
+                        )}
 
                         {user ? (
                             <UserButton>
