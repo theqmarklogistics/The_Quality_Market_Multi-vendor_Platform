@@ -22,6 +22,8 @@ const Navbar = () => {
     const searchParams = useSearchParams();
 
     const [search, setSearch] = useState('')
+    const [selectedCategory, setSelectedCategory] = useState('')
+    const [categories, setCategories] = useState([])
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const [isSeller, setIsSeller] = useState(false)
@@ -30,7 +32,15 @@ const Navbar = () => {
 
     useEffect(() => {
         setSearch(searchParams.get('search') || '')
+        setSelectedCategory(searchParams.get('category') || '')
     }, [searchParams])
+
+    useEffect(() => {
+        fetch('/api/categories')
+            .then(r => r.json())
+            .then(d => setCategories((d.categories || []).map(c => c.name)))
+            .catch(() => {})
+    }, [])
 
     useEffect(() => {
         let mounted = true
@@ -103,6 +113,8 @@ const Navbar = () => {
         const params = new URLSearchParams(searchParams.toString())
         if (query) params.set('search', query)
         else params.delete('search')
+        if (selectedCategory) params.set('category', selectedCategory)
+        else params.delete('category')
         router.push(`/shop${params.toString() ? `?${params.toString()}` : ''}`)
     }
 
@@ -148,6 +160,10 @@ const Navbar = () => {
 
                     <Link href="/" className="relative flex items-center gap-2">
                         <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-12 w-auto object-contain" priority />
+                        <div className="hidden lg:flex flex-col leading-tight">
+                            <span className="font-bold text-slate-800 text-sm">The Quality Market</span>
+                            <span className="text-xs text-amber-600 italic">Quality is our Culture</span>
+                        </div>
                     </Link>
 
                     {/* Desktop Menu */}
@@ -157,14 +173,24 @@ const Navbar = () => {
                         <Link href="/about">About</Link>
                         <Link href="/contact">Contact</Link>
 
-                        <form onSubmit={handleSearch} className="hidden xl:flex items-center w-xs text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full">
-                            <Search size={18} className="text-slate-600" />
-                            <input className="w-full bg-transparent outline-none placeholder-slate-600" type="text" placeholder="Search products" value={search} onChange={(e) => setSearch(e.target.value)} />
-                            {search && (
-                                <button type="button" onClick={clearSearch} className="text-slate-400 hover:text-slate-600 transition">
-                                    <XIcon size={16} />
-                                </button>
-                            )}
+                        <form onSubmit={handleSearch} className="hidden xl:flex items-center text-sm bg-slate-100 rounded-full overflow-hidden">
+                            <select
+                                value={selectedCategory}
+                                onChange={e => setSelectedCategory(e.target.value)}
+                                className="bg-slate-100 text-slate-500 text-xs pl-4 pr-2 py-3 border-r border-slate-300 outline-none cursor-pointer max-w-[120px]"
+                            >
+                                <option value="">All</option>
+                                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                            <div className="flex items-center gap-2 px-3 py-3 flex-1">
+                                <Search size={16} className="text-slate-600 shrink-0" />
+                                <input className="bg-transparent outline-none placeholder-slate-600 w-36" type="text" placeholder="Search products" value={search} onChange={(e) => setSearch(e.target.value)} />
+                                {search && (
+                                    <button type="button" onClick={clearSearch} className="text-slate-400 hover:text-slate-600 transition">
+                                        <XIcon size={16} />
+                                    </button>
+                                )}
+                            </div>
                         </form>
 
                         <Link href="/cart" className="relative flex items-center gap-2 text-slate-600" aria-label="View cart">
@@ -253,6 +279,14 @@ const Navbar = () => {
             {/* Mobile search bar — slides in below the nav row */}
             {mobileSearchOpen && (
                 <div className="sm:hidden px-4 pb-3">
+                    <select
+                        value={selectedCategory}
+                        onChange={e => setSelectedCategory(e.target.value)}
+                        className="mb-2 w-full rounded-full border border-slate-200 bg-slate-50 text-sm px-4 py-2 outline-none text-slate-600"
+                    >
+                        <option value="">All Categories</option>
+                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
                     <form onSubmit={(e) => { handleSearch(e); setMobileSearchOpen(false) }} className="flex items-center gap-2 bg-slate-100 px-4 py-2.5 rounded-full text-sm">
                         <Search size={16} className="text-slate-500 shrink-0" />
                         <input

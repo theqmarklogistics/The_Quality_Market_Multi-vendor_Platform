@@ -4,11 +4,19 @@ import { useEffect, useState } from "react"
 import axios from "axios"
 import toast from "react-hot-toast"
 import Image from "next/image"
-import { PackageCheckIcon, CheckSquareIcon, SquareIcon } from "lucide-react"
+import Link from "next/link"
+import { PackageCheckIcon, CheckSquareIcon, SquareIcon, SearchIcon } from "lucide-react"
+
+const STATUS_BADGE = {
+    APPROVED: 'bg-green-100 text-green-700',
+    PENDING: 'bg-amber-100 text-amber-700',
+    REJECTED: 'bg-red-100 text-red-700',
+}
 
 export default function AdminProducts() {
     const { getToken } = useAuth()
 
+    // ── Pending tab state ──────────────────────────────────────────────────────
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
     const [rejectNotes, setRejectNotes] = useState({})
@@ -17,6 +25,18 @@ export default function AdminProducts() {
     const [bulkRejectNotes, setBulkRejectNotes] = useState('')
     const [bulkMode, setBulkMode] = useState(false)
 
+    // ── Tab & All-products state ───────────────────────────────────────────────
+    const [activeTab, setActiveTab] = useState('pending')
+    const [allProducts, setAllProducts] = useState([])
+    const [allLoading, setAllLoading] = useState(false)
+    const [statusFilter, setStatusFilter] = useState('')
+    const [nameSearch, setNameSearch] = useState('')
+    const [nameInput, setNameInput] = useState('')
+    const [page, setPage] = useState(1)
+    const [total, setTotal] = useState(0)
+    const PAGE_SIZE = 20
+
+    // ── Pending tab helpers ────────────────────────────────────────────────────
     const fetchPendingProducts = async () => {
         try {
             const token = await getToken()
@@ -81,145 +101,351 @@ export default function AdminProducts() {
         return reviewProduct(productId, 'REJECTED', notes)
     }
 
+    // ── All-products tab helpers ───────────────────────────────────────────────
+    const fetchAllProducts = async () => {
+        setAllLoading(true)
+        try {
+            const token = await getToken()
+            const params = new URLSearchParams({ view: 'all', page: String(page), pageSize: String(PAGE_SIZE) })
+            if (statusFilter) params.set('status', statusFilter)
+            if (nameSearch) params.set('name', nameSearch)
+            const { data } = await axios.get(`/api/admin/products?${params}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setAllProducts(data.products || [])
+            setTotal(data.total || 0)
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
+        setAllLoading(false)
+    }
+
     useEffect(() => { fetchPendingProducts() }, [])
+
+    useEffect(() => {
+        if (activeTab === 'all') fetchAllProducts()
+    }, [activeTab, page, statusFilter, nameSearch])
+
+    const handleNameSearch = (e) => {
+        e.preventDefault()
+        setPage(1)
+        setNameSearch(nameInput.trim())
+    }
 
     if (loading) return <p className="text-slate-500">Loading pending products...</p>
 
     return (
         <div className="text-slate-500 mb-28">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <h1 className="text-2xl">Approve <span className="text-slate-800 font-medium">Products</span></h1>
-                {products.length > 0 && (
-                    <button onClick={() => { setBulkMode(v => !v); setSelected(new Set()) }}
-                        className={`text-sm rounded-full px-3 py-1.5 border transition ${bulkMode ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                        {bulkMode ? 'Cancel bulk' : 'Bulk select'}
-                    </button>
-                )}
+            {/* Tabs */}
+            <div className="flex gap-1 mb-6 border-b border-slate-200">
+                <button
+                    onClick={() => setActiveTab('pending')}
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition ${activeTab === 'pending' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-px' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Pending Approval
+                    {products.length > 0 && (
+                        <span className="ml-2 bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full">{products.length}</span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('all')}
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition ${activeTab === 'all' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-px' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    All Products
+                </button>
             </div>
 
-            {bulkMode && products.length > 0 && (
-                <div className="flex flex-wrap items-center gap-3 mb-4 p-4 rounded-xl bg-slate-50 border border-slate-200 max-w-5xl">
-                    <button onClick={toggleSelectAll} className="text-sm text-slate-600 hover:text-slate-800 inline-flex items-center gap-1.5">
-                        {selected.size === products.length
-                            ? <CheckSquareIcon size={16} className="text-slate-800" />
-                            : <SquareIcon size={16} />
-                        }
-                        {selected.size === products.length ? 'Deselect all' : 'Select all'}
-                    </button>
-                    <span className="text-xs text-slate-400">{selected.size} selected</span>
-                    {selected.size > 0 && (
-                        <>
-                            <button onClick={() => toast.promise(bulkReview('APPROVED'), { loading: 'Approving…' })}
-                                className="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition">
-                                Approve {selected.size}
+            {/* ── Pending Approval Tab ── */}
+            {activeTab === 'pending' && (
+                <>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <h1 className="text-2xl">Approve <span className="text-slate-800 font-medium">Products</span></h1>
+                        {products.length > 0 && (
+                            <button onClick={() => { setBulkMode(v => !v); setSelected(new Set()) }}
+                                className={`text-sm rounded-full px-3 py-1.5 border transition ${bulkMode ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                                {bulkMode ? 'Cancel bulk' : 'Bulk select'}
                             </button>
-                            <div className="flex gap-2 items-center flex-wrap">
-                                <input
-                                    type="text"
-                                    placeholder="Rejection reason (optional)"
-                                    value={bulkRejectNotes}
-                                    onChange={e => setBulkRejectNotes(e.target.value)}
-                                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-slate-400 w-52"
-                                />
-                                <button onClick={() => toast.promise(bulkReview('REJECTED'), { loading: 'Rejecting…' })}
-                                    className="px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition">
-                                    Reject {selected.size}
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
 
-            {products.length > 0 ? (
-                <div className="flex flex-col gap-4 mt-4 max-w-5xl">
-                    {products.map((product) => (
-                        <div key={product.id} className={`bg-white border rounded-lg shadow-sm p-4 transition ${bulkMode && selected.has(product.id) ? 'border-slate-400 bg-slate-50' : 'border-slate-200'}`}>
-                            <div className="flex gap-4">
-                                {bulkMode && (
-                                    <button onClick={() => toggleSelect(product.id)} className="mt-1 shrink-0">
-                                        {selected.has(product.id)
-                                            ? <CheckSquareIcon size={20} className="text-slate-800" />
-                                            : <SquareIcon size={20} className="text-slate-400" />
-                                        }
+                    {bulkMode && products.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-3 mb-4 p-4 rounded-xl bg-slate-50 border border-slate-200 max-w-5xl">
+                            <button onClick={toggleSelectAll} className="text-sm text-slate-600 hover:text-slate-800 inline-flex items-center gap-1.5">
+                                {selected.size === products.length
+                                    ? <CheckSquareIcon size={16} className="text-slate-800" />
+                                    : <SquareIcon size={16} />
+                                }
+                                {selected.size === products.length ? 'Deselect all' : 'Select all'}
+                            </button>
+                            <span className="text-xs text-slate-400">{selected.size} selected</span>
+                            {selected.size > 0 && (
+                                <>
+                                    <button onClick={() => toast.promise(bulkReview('APPROVED'), { loading: 'Approving…' })}
+                                        className="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition">
+                                        Approve {selected.size}
                                     </button>
-                                )}
-                                {product.images?.[0] && (
-                                    <Image
-                                        src={product.images[0]}
-                                        alt={product.name}
-                                        width={120}
-                                        height={120}
-                                        className="h-24 w-24 rounded-md object-cover border border-slate-200 shrink-0"
-                                    />
-                                )}
-                                <div className="flex-1">
-                                    <p className="text-slate-800 font-medium text-lg">{product.name}</p>
-                                    <p className="text-sm text-slate-500">Store: {product.store?.name}</p>
-                                    <p className="text-sm">Category: {product.category}</p>
-                                    <p className="text-sm">Price: {product.price?.toLocaleString()}</p>
-                                    <div className="text-sm flex items-center gap-2">
-                                        Qty: {product.warehouseQuantity}
-                                        {product.warehouseQuantity === 0 && (
-                                            <span className="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-xs font-medium">Out of stock</span>
-                                        )}
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                        <input
+                                            type="text"
+                                            placeholder="Rejection reason (optional)"
+                                            value={bulkRejectNotes}
+                                            onChange={e => setBulkRejectNotes(e.target.value)}
+                                            className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm outline-none focus:border-slate-400 w-52"
+                                        />
+                                        <button onClick={() => toast.promise(bulkReview('REJECTED'), { loading: 'Rejecting…' })}
+                                            className="px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition">
+                                            Reject {selected.size}
+                                        </button>
                                     </div>
-                                </div>
-                            </div>
+                                </>
+                            )}
+                        </div>
+                    )}
 
-                            {!bulkMode && (
-                                <div className="mt-3">
-                                    {rejectingId === product.id ? (
-                                        <div className="space-y-2 max-w-lg">
-                                            <textarea
-                                                rows={3}
-                                                autoFocus
-                                                placeholder="Reason for rejection (shown to seller)…"
-                                                value={rejectNotes[product.id] || ''}
-                                                onChange={e => setRejectNotes(prev => ({ ...prev, [product.id]: e.target.value }))}
-                                                className="w-full rounded-lg border border-red-200 bg-red-50/50 px-3 py-2 text-sm outline-none focus:border-red-300 resize-none"
-                                            />
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => toast.promise(submitRejection(product.id), { loading: 'Rejecting…', success: 'Product rejected', error: e => e.message })}
-                                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition"
-                                                >
-                                                    Confirm Reject
-                                                </button>
-                                                <button
-                                                    onClick={() => setRejectingId(null)}
-                                                    className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition"
-                                                >
-                                                    Cancel
-                                                </button>
+                    {products.length > 0 ? (
+                        <div className="flex flex-col gap-4 mt-4 max-w-5xl">
+                            {products.map((product) => (
+                                <div key={product.id} className={`bg-white border rounded-xl shadow-sm p-5 transition ${bulkMode && selected.has(product.id) ? 'border-slate-400 bg-slate-50' : 'border-slate-200'}`}>
+                                    <div className="flex gap-4">
+                                        {bulkMode && (
+                                            <button onClick={() => toggleSelect(product.id)} className="mt-1 shrink-0">
+                                                {selected.has(product.id)
+                                                    ? <CheckSquareIcon size={20} className="text-slate-800" />
+                                                    : <SquareIcon size={20} className="text-slate-400" />
+                                                }
+                                            </button>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            {/* Images row */}
+                                            {product.images?.length > 0 && (
+                                                <div className="flex gap-2 flex-wrap mb-4">
+                                                    {product.images.map((img, idx) => (
+                                                        <Image
+                                                            key={idx}
+                                                            src={img}
+                                                            alt={product.name}
+                                                            width={80}
+                                                            height={80}
+                                                            className="h-20 w-20 rounded-lg object-cover border border-slate-200"
+                                                        />
+                                                    ))}
+                                                </div>
+                                            )}
+
+                                            {/* Name + store + meta */}
+                                            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                                                <p className="text-slate-800 font-semibold text-lg leading-tight">{product.name}</p>
+                                                <span className="text-xs text-slate-400 shrink-0">Listed {new Date(product.createdAt).toLocaleDateString()}</span>
                                             </div>
+                                            <p className="text-sm text-slate-500 mb-0.5">
+                                                Store:{' '}
+                                                {product.store?.id
+                                                    ? <Link href={`/admin/stores/${product.store.id}`} className="text-blue-600 hover:underline">{product.store.name}</Link>
+                                                    : product.store?.name
+                                                }
+                                            </p>
+                                            <p className="text-sm mb-3">Category: <span className="text-slate-700">{product.category}</span></p>
+
+                                            {/* Description */}
+                                            {product.description && (
+                                                <p className="text-sm text-slate-600 leading-relaxed mb-3 max-w-2xl">{product.description}</p>
+                                            )}
+
+                                            {/* Pricing */}
+                                            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-2">
+                                                <span>MRP: <strong className="text-slate-700">Rwf {product.mrp?.toLocaleString()}</strong></span>
+                                                <span>Offer: <strong className="text-slate-700">Rwf {product.price?.toLocaleString()}</strong></span>
+                                                {product.wholesalePrice && (
+                                                    <span>Wholesale: <strong className="text-slate-700">Rwf {Number(product.wholesalePrice).toLocaleString()}</strong> (min {product.wholesaleMinQty || 1})</span>
+                                                )}
+                                            </div>
+
+                                            {/* Stock */}
+                                            <div className="text-sm flex items-center gap-2 mb-2">
+                                                <span>Qty: {product.warehouseQuantity}</span>
+                                                {product.warehouseQuantity === 0 && (
+                                                    <span className="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-xs font-medium">Out of stock</span>
+                                                )}
+                                            </div>
+
+                                            {/* Shipping & origin */}
+                                            {(product.weightKg || product.lengthCm || product.importOrigin) && (
+                                                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-500">
+                                                    {(product.weightKg || product.lengthCm) && (
+                                                        <span>
+                                                            Shipping:{product.weightKg && ` ${product.weightKg} kg`}
+                                                            {product.lengthCm && ` · ${product.lengthCm}×${product.widthCm}×${product.heightCm} cm`}
+                                                        </span>
+                                                    )}
+                                                    {product.importOrigin && (
+                                                        <span>Origin: <strong className="text-slate-700">{product.importOrigin}</strong></span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                    ) : (
-                                        <div className="flex gap-3">
-                                            <button
-                                                onClick={() => toast.promise(reviewProduct(product.id, 'APPROVED'), { loading: 'Approving…', success: 'Product approved', error: e => e.message })}
-                                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition"
-                                            >
-                                                Approve
-                                            </button>
-                                            <button
-                                                onClick={() => setRejectingId(product.id)}
-                                                className="px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 text-sm font-medium transition"
-                                            >
-                                                Reject…
-                                            </button>
+                                    </div>
+
+                                    {!bulkMode && (
+                                        <div className="mt-4 border-t border-slate-100 pt-4">
+                                            {rejectingId === product.id ? (
+                                                <div className="space-y-2 max-w-lg">
+                                                    <textarea
+                                                        rows={3}
+                                                        autoFocus
+                                                        placeholder="Reason for rejection (shown to seller)…"
+                                                        value={rejectNotes[product.id] || ''}
+                                                        onChange={e => setRejectNotes(prev => ({ ...prev, [product.id]: e.target.value }))}
+                                                        className="w-full rounded-lg border border-red-200 bg-red-50/50 px-3 py-2 text-sm outline-none focus:border-red-300 resize-none"
+                                                    />
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => toast.promise(submitRejection(product.id), { loading: 'Rejecting…', success: 'Product rejected', error: e => e.message })}
+                                                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition"
+                                                        >
+                                                            Confirm Reject
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setRejectingId(null)}
+                                                            className="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-3">
+                                                    <button
+                                                        onClick={() => toast.promise(reviewProduct(product.id, 'APPROVED'), { loading: 'Approving…', success: 'Product approved', error: e => e.message })}
+                                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setRejectingId(product.id)}
+                                                        className="px-4 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600 text-sm font-medium transition"
+                                                    >
+                                                        Reject…
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
-                            )}
+                            ))}
                         </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-80">
-                    <PackageCheckIcon size={40} className="text-slate-300 mb-3" />
-                    <p className="text-2xl text-slate-400 font-medium">No Pending Products</p>
-                </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-80">
+                            <PackageCheckIcon size={40} className="text-slate-300 mb-3" />
+                            <p className="text-2xl text-slate-400 font-medium">No Pending Products</p>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* ── All Products Tab ── */}
+            {activeTab === 'all' && (
+                <>
+                    <div className="flex flex-wrap items-center gap-3 mb-5">
+                        <h1 className="text-2xl flex-1">All <span className="text-slate-800 font-medium">Products</span></h1>
+                        {/* Status filter */}
+                        <select
+                            value={statusFilter}
+                            onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
+                            className="border border-slate-200 rounded-full px-4 py-2 text-sm outline-none text-slate-600 bg-white"
+                        >
+                            <option value="">All statuses</option>
+                            <option value="PENDING">Pending</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                        </select>
+                        {/* Name search */}
+                        <form onSubmit={handleNameSearch} className="flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 bg-white">
+                            <SearchIcon size={14} className="text-slate-400" />
+                            <input
+                                type="text"
+                                value={nameInput}
+                                onChange={e => setNameInput(e.target.value)}
+                                placeholder="Search by name…"
+                                className="outline-none text-sm text-slate-700 w-40 bg-transparent"
+                            />
+                        </form>
+                    </div>
+
+                    {allLoading ? (
+                        <p className="text-slate-400 text-sm py-8">Loading products…</p>
+                    ) : allProducts.length === 0 ? (
+                        <p className="text-slate-400 text-sm py-8">No products found.</p>
+                    ) : (
+                        <>
+                            <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 bg-slate-50 text-xs text-slate-400 font-medium">
+                                            <th className="text-left px-4 py-3">Product</th>
+                                            <th className="text-left px-3 py-3">Store</th>
+                                            <th className="text-left px-3 py-3">Category</th>
+                                            <th className="text-left px-3 py-3">Status</th>
+                                            <th className="text-right px-3 py-3">Price (Rwf)</th>
+                                            <th className="text-right px-3 py-3">Orders</th>
+                                            <th className="text-right px-3 py-3">Reviews</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {allProducts.map(p => (
+                                            <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition">
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        {p.images?.[0] && (
+                                                            <Image src={p.images[0]} alt={p.name} width={40} height={40} className="h-10 w-10 rounded-md object-cover border border-slate-100 shrink-0" />
+                                                        )}
+                                                        <span className="font-medium text-slate-700 line-clamp-2 max-w-[200px]">{p.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-3">
+                                                    {p.store?.id
+                                                        ? <Link href={`/admin/stores/${p.store.id}`} className="text-blue-600 hover:underline">{p.store.name}</Link>
+                                                        : <span className="text-slate-400">—</span>
+                                                    }
+                                                </td>
+                                                <td className="px-3 py-3 text-slate-500">{p.category || '—'}</td>
+                                                <td className="px-3 py-3">
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[p.approvalStatus] || 'bg-slate-100 text-slate-500'}`}>
+                                                        {p.approvalStatus}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-3 text-right text-slate-700">{p.price?.toLocaleString()}</td>
+                                                <td className="px-3 py-3 text-right font-medium text-slate-700">{p._count?.orderItems ?? 0}</td>
+                                                <td className="px-3 py-3 text-right text-slate-500">{p._count?.ratings ?? 0}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Pagination */}
+                            <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+                                <span>{total} product{total !== 1 ? 's' : ''} total</span>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                                        disabled={page === 1}
+                                        className="px-3 py-1.5 border border-slate-200 rounded-full hover:bg-slate-50 disabled:opacity-40 transition"
+                                    >
+                                        Previous
+                                    </button>
+                                    <span className="px-3 py-1.5">Page {page} of {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
+                                    <button
+                                        onClick={() => setPage(p => p + 1)}
+                                        disabled={page >= Math.ceil(total / PAGE_SIZE)}
+                                        className="px-3 py-1.5 border border-slate-200 rounded-full hover:bg-slate-50 disabled:opacity-40 transition"
+                                    >
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </>
             )}
         </div>
     )

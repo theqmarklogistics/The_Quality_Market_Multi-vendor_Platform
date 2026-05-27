@@ -6,6 +6,38 @@ import { useState, useEffect } from "react"
 import { toast } from "react-hot-toast"
 import axios from "axios"
 
+const COUNTRIES = [
+    'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
+    'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain',
+    'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia',
+    'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso',
+    'Burundi', 'Cabo Verde', 'Cambodia', 'Cameroon', 'Canada', 'Central African Republic',
+    'Chad', 'Chile', 'China', 'Colombia', 'Comoros', 'Congo', 'Costa Rica', 'Croatia',
+    'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Djibouti', 'Dominica',
+    'Dominican Republic', 'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea',
+    'Estonia', 'Eswatini', 'Ethiopia', 'Fiji', 'Finland', 'France', 'Gabon', 'Gambia',
+    'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea',
+    'Guinea-Bissau', 'Guyana', 'Haiti', 'Honduras', 'Hungary', 'Iceland', 'India',
+    'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan',
+    'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan', 'Laos', 'Latvia', 'Lebanon',
+    'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Madagascar',
+    'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania',
+    'Mauritius', 'Mexico', 'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro',
+    'Morocco', 'Mozambique', 'Myanmar', 'Namibia', 'Nauru', 'Nepal', 'Netherlands',
+    'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia',
+    'Norway', 'Oman', 'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea',
+    'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Russia',
+    'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines',
+    'Samoa', 'San Marino', 'São Tomé and Príncipe', 'Saudi Arabia', 'Senegal', 'Serbia',
+    'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands',
+    'Somalia', 'South Africa', 'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan',
+    'Suriname', 'Sweden', 'Switzerland', 'Syria', 'Taiwan', 'Tajikistan', 'Tanzania',
+    'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey',
+    'Turkmenistan', 'Tuvalu', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom',
+    'United States', 'Uruguay', 'Uzbekistan', 'Vanuatu', 'Vatican City', 'Venezuela',
+    'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe'
+]
+
 export default function StoreAddProduct() {
 
     const [images, setImages] = useState({ 1: null, 2: null, 3: null, 4: null })
@@ -25,6 +57,7 @@ export default function StoreAddProduct() {
         heightCm: "",
         importOrigin: "",
     })
+    const [importCountry, setImportCountry] = useState('')
     const [loading, setLoading] = useState(false)
     const [aiUsed, setAiUsed] = useState(false)
     const [errors, setErrors] = useState({})
@@ -136,7 +169,8 @@ export default function StoreAddProduct() {
             if (productInfo.lengthCm) formData.append('lengthCm', productInfo.lengthCm);
             if (productInfo.widthCm) formData.append('widthCm', productInfo.widthCm);
             if (productInfo.heightCm) formData.append('heightCm', productInfo.heightCm);
-            if (productInfo.importOrigin) formData.append('importOrigin', productInfo.importOrigin);
+            // importOrigin: use selected country if "IMPORTED", otherwise empty (Local)
+            formData.append('importOrigin', productInfo.importOrigin === 'IMPORTED' ? importCountry : '');
             if (productInfo.wholesalePrice) formData.append('wholesalePrice', productInfo.wholesalePrice);
             if (productInfo.wholesaleMinQty) formData.append('wholesaleMinQty', productInfo.wholesaleMinQty);
             // Append all the images to the form data
@@ -153,6 +187,7 @@ export default function StoreAddProduct() {
             toast.success(data.message)
 
             setProductInfo({ name: "", description: "", mrp: 0, price: 0, warehouseQuantity: 0, mainCategory: "", category: "", wholesalePrice: "", wholesaleMinQty: "", weightKg: "", lengthCm: "", widthCm: "", heightCm: "", importOrigin: "" })
+            setImportCountry('')
             setImages({ 1: null, 2: null, 3: null, 4: null })
             setErrors({})
             setTouched({})
@@ -326,7 +361,7 @@ export default function StoreAddProduct() {
                 </div>
                 <div>
                     <p className="text-sm text-slate-600 mb-2">Product Origin</p>
-                    <div className="flex gap-5">
+                    <div className="flex gap-5 flex-wrap">
                         <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600">
                             <input
                                 type="radio" name="importOrigin" value=""
@@ -337,13 +372,26 @@ export default function StoreAddProduct() {
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600">
                             <input
-                                type="radio" name="importOrigin" value="CHINA"
-                                checked={productInfo.importOrigin === 'CHINA'}
+                                type="radio" name="importOrigin" value="IMPORTED"
+                                checked={productInfo.importOrigin === 'IMPORTED'}
                                 onChange={onChangeHandler}
                             />
-                            Imported from China
+                            Imported
                         </label>
                     </div>
+                    {productInfo.importOrigin === 'IMPORTED' && (
+                        <div className="mt-3">
+                            <select
+                                value={importCountry}
+                                onChange={e => setImportCountry(e.target.value)}
+                                className="w-full max-w-xs p-2 px-4 outline-none border border-slate-200 rounded text-sm text-slate-700"
+                                required
+                            >
+                                <option value="">Select country of origin</option>
+                                {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                    )}
                 </div>
             </div>
 

@@ -18,6 +18,38 @@ export async function GET(request) {
         }
 
         const { searchParams } = new URL(request.url);
+        const view = searchParams.get("view");
+
+        // ── All-products view (with pagination, status filter, name search) ──
+        if (view === "all") {
+            const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+            const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "20")));
+            const skip = (page - 1) * pageSize;
+            const statusParam = searchParams.get("status") || "";
+            const nameParam = searchParams.get("name") || "";
+
+            const where = {};
+            if (statusParam) where.approvalStatus = statusParam;
+            if (nameParam) where.name = { contains: nameParam, mode: "insensitive" };
+
+            const [products, total] = await Promise.all([
+                prisma.product.findMany({
+                    where,
+                    include: {
+                        store: { select: { id: true, name: true } },
+                        _count: { select: { orderItems: true, ratings: true } }
+                    },
+                    orderBy: { createdAt: "desc" },
+                    skip,
+                    take: pageSize
+                }),
+                prisma.product.count({ where })
+            ]);
+
+            return NextResponse.json({ products, total });
+        }
+
+        // ── Pending approval view (default) ──
         const status = searchParams.get("status") || "PENDING";
 
         const products = await prisma.product.findMany({

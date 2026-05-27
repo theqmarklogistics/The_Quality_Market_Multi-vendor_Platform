@@ -5,7 +5,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import { PencilIcon, SaveIcon, TagIcon, Trash2Icon, XIcon } from 'lucide-react'
 
-const EMPTY_FORM = { name: '', commissionPercent: '', sortOrder: '' }
+const EMPTY_FORM = { name: '', sortOrder: '' }
 
 export default function AdminCategories() {
     const { getToken } = useAuth()
@@ -37,7 +37,6 @@ export default function AdminCategories() {
         setEditId(cat.id)
         setForm({
             name: cat.name,
-            commissionPercent: cat.commissionPercent,
             sortOrder: cat.sortOrder,
         })
     }
@@ -55,7 +54,6 @@ export default function AdminCategories() {
             const token = await getToken()
             const payload = {
                 name: form.name.trim(),
-                commissionPercent: form.commissionPercent !== '' ? Number(form.commissionPercent) : 0,
                 sortOrder: form.sortOrder !== '' ? Number(form.sortOrder) : 0,
             }
             if (editId) {
@@ -133,7 +131,6 @@ export default function AdminCategories() {
                                 <thead>
                                     <tr className="border-b border-slate-100 bg-slate-50">
                                         <th className="text-left px-5 py-3 text-xs text-slate-400 font-medium">Name</th>
-                                        <th className="text-left px-3 py-3 text-xs text-slate-400 font-medium">Commission</th>
                                         <th className="text-left px-3 py-3 text-xs text-slate-400 font-medium">Active</th>
                                         <th className="px-3 py-3 text-xs text-slate-400 font-medium text-right">Actions</th>
                                     </tr>
@@ -142,11 +139,6 @@ export default function AdminCategories() {
                                     {categories.map(cat => (
                                         <tr key={cat.id} className={`border-b border-slate-50 hover:bg-slate-50 transition ${editId === cat.id ? 'bg-green-50' : ''}`}>
                                             <td className="px-5 py-3 text-slate-700 font-medium">{cat.name}</td>
-                                            <td className="px-3 py-3 text-slate-500">
-                                                {cat.commissionPercent > 0
-                                                    ? <span className="font-medium text-slate-700">{cat.commissionPercent}%</span>
-                                                    : <span className="text-slate-300">—</span>}
-                                            </td>
                                             <td className="px-3 py-3">
                                                 <button
                                                     onClick={() => toggleActive(cat)}
@@ -197,22 +189,6 @@ export default function AdminCategories() {
                                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                                 placeholder="e.g. Electronics"
                                 required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs text-slate-500 font-medium mb-1">
-                                Commission % <span className="font-normal text-slate-400">(platform fee per sale)</span>
-                            </label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max="100"
-                                className={inputCls}
-                                value={form.commissionPercent}
-                                onChange={e => setForm(f => ({ ...f, commissionPercent: e.target.value }))}
-                                placeholder="e.g. 5.5"
                             />
                         </div>
 
