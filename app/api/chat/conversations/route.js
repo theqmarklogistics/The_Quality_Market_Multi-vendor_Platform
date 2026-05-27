@@ -1,6 +1,6 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import prisma, { prismaWs } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 
 const conversationLimiter = createRateLimiter({ max: 10, windowMs: 60_000 });
@@ -182,26 +182,38 @@ export async function POST(request) {
             return NextResponse.json({ conversation: existingConversation });
         }
 
-        // Nested write (conversation + 2 participants atomically) requires an implicit
-        // transaction — use prismaWs (WebSocket) since PrismaNeonHttp doesn't support those.
-        const conversation = await prismaWs.conversation.create({
+        // Create conversation + participants without a nested write so we stay on the
+        // HTTP adapter (PrismaNeonHttp) entirely. Nested writes require an implicit
+        // transaction which the HTTP adapter doesn't support, and the WebSocket adapter
+        // (prismaWs) is unreliable on Vercel when Neon auto-suspends.
+        //
+        // Steps:
+        //  1. Flat conversation create (single INSERT — no implicit transaction)
+        //  2. Batch $transaction to add both participants atomically (HTTP-compatible)
+        //  3. Re-fetch with participants for the response shape callers expect
+        const newConversation = await prisma.conversation.create({
             data: {
                 targetType,
                 orderId: orderId || null,
                 storeId: targetStoreId,
                 createdById: userId,
-                participants: {
-                    create: [
-                        { userId },
-                        { userId: targetUserId }
-                    ]
-                }
-            },
+            }
+        });
+
+        await prisma.$transaction([
+            prisma.conversationParticipant.create({
+                data: { conversationId: newConversation.id, userId }
+            }),
+            prisma.conversationParticipant.create({
+                data: { conversationId: newConversation.id, userId: targetUserId }
+            })
+        ]);
+
+        const conversation = await prisma.conversation.findUnique({
+            where: { id: newConversation.id },
             include: {
                 participants: {
-                    include: {
-                        user: true
-                    }
+                    include: { user: true }
                 }
             }
         });
