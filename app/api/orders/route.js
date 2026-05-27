@@ -211,6 +211,9 @@ export async function POST(request) {
                 const shippingRes = await calculateOrderShippingForStore(tx, storeId, address, storeItems);
                 const shippingCost = shippingRes?.cost || 0;
                 const shippingRuleId = shippingRes?.ruleId || null;
+                // LOCAL_SELLER: seller quotes shipping after seeing address (starts unquoted)
+                // FULL_MANAGED: shipping auto-calculated from zone × weight tariff (already quoted)
+                const shippingQuoted = shippingRes?.shippingQuoted ?? true;
 
                 // Add shipping cost once per store order
                 total += shippingCost;
@@ -242,6 +245,7 @@ export async function POST(request) {
                         addressId,
                         total: parseFloat(total.toFixed(2)),
                         shippingCost: parseFloat((shippingCost || 0).toFixed(2)),
+                        shippingQuoted,
                         shippingRuleId: shippingRuleId,
                         commission: commissionBreakdown.length ? commissionBreakdown : {},
                         paymentMethod: selectedPaymentMethod,

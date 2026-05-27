@@ -136,6 +136,8 @@ model Order {
     paymentReceivedAt DateTime?
     // Persisted shipping cost applied to this order
     shippingCost  Float?        @default(0)
+    // Whether the shipping fee has been confirmed (false = seller still needs to set it for LOCAL_SELLER)
+    shippingQuoted Boolean      @default(false)
     // Reference to the shipping rule applied (if any)
     shippingRuleId String?
     // Commission breakdown stored as JSON per-item

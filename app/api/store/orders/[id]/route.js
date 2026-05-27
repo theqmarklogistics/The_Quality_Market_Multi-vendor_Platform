@@ -15,14 +15,10 @@ export async function PATCH(request, { params }) {
         }
 
         const { id: orderId } = await params;
-        const { status } = await request.json();
+        const body = await request.json();
 
-        if (!orderId || !status) {
-            return NextResponse.json({ error: "Missing order ID or status" }, { status: 400 });
-        }
-
-        if (!SELLER_ALLOWED_STATUSES.includes(status)) {
-            return NextResponse.json({ error: `Sellers can only set status to: ${SELLER_ALLOWED_STATUSES.join(', ')}` }, { status: 403 });
+        if (!orderId) {
+            return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
         }
 
         const order = await prisma.order.findFirst({
@@ -31,6 +27,32 @@ export async function PATCH(request, { params }) {
 
         if (!order) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
+        }
+
+        // ── Set shipping fee (LOCAL_SELLER) ────────────────────────────────────
+        if (body.shippingCost !== undefined) {
+            const fee = parseFloat(body.shippingCost);
+            if (isNaN(fee) || fee < 0) {
+                return NextResponse.json({ error: "Invalid shipping fee" }, { status: 400 });
+            }
+            const oldFee = order.shippingCost ?? 0;
+            const newTotal = parseFloat((order.total - oldFee + fee).toFixed(2));
+            await prisma.order.update({
+                where: { id: orderId },
+                data: { shippingCost: fee, shippingQuoted: true, total: newTotal }
+            });
+            return NextResponse.json({ message: "Shipping fee set", shippingCost: fee, total: newTotal });
+        }
+
+        // ── Update order status ────────────────────────────────────────────────
+        const { status } = body;
+
+        if (!status) {
+            return NextResponse.json({ error: "Missing status or shippingCost in request body" }, { status: 400 });
+        }
+
+        if (!SELLER_ALLOWED_STATUSES.includes(status)) {
+            return NextResponse.json({ error: `Sellers can only set status to: ${SELLER_ALLOWED_STATUSES.join(', ')}` }, { status: 403 });
         }
 
         await prisma.order.update({

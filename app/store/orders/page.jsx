@@ -5,7 +5,7 @@ import Pagination from "@/components/Pagination"
 import { useAuth } from "@clerk/nextjs"
 import axios from "axios"
 import toast from "react-hot-toast"
-import { SearchIcon, XIcon, ShoppingBagIcon } from "lucide-react"
+import { SearchIcon, XIcon, ShoppingBagIcon, TruckIcon } from "lucide-react"
 
 const ORDER_STATUSES = ['', 'ORDER_PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED']
 
@@ -64,9 +64,11 @@ export default function StoreOrders() {
     const handleStatusFilter = (st) => { setStatusFilter(st) }
 
     const [updatingStatus, setUpdatingStatus] = useState(false)
+    const [shippingInput, setShippingInput] = useState('')
+    const [settingShipping, setSettingShipping] = useState(false)
 
-    const openModal = (order) => setSelectedOrder(order)
-    const closeModal = () => setSelectedOrder(null)
+    const openModal = (order) => { setSelectedOrder(order); setShippingInput('') }
+    const closeModal = () => { setSelectedOrder(null); setShippingInput('') }
 
     const updateOrderStatus = async (orderId, status) => {
         setUpdatingStatus(true)
@@ -83,6 +85,30 @@ export default function StoreOrders() {
             toast.error(error?.response?.data?.error || error.message)
         } finally {
             setUpdatingStatus(false)
+        }
+    }
+
+    const setShippingFee = async (orderId) => {
+        const fee = parseFloat(shippingInput)
+        if (isNaN(fee) || fee < 0) {
+            toast.error('Enter a valid shipping fee (0 or more)')
+            return
+        }
+        setSettingShipping(true)
+        try {
+            const token = await getToken()
+            const { data } = await axios.patch(`/api/store/orders/${orderId}`, { shippingCost: fee }, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            const updated = { ...selectedOrder, shippingCost: data.shippingCost, total: data.total, shippingQuoted: true }
+            setSelectedOrder(updated)
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, shippingCost: data.shippingCost, total: data.total, shippingQuoted: true } : o))
+            toast.success('Shipping fee set')
+            setShippingInput('')
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        } finally {
+            setSettingShipping(false)
         }
     }
 
@@ -155,7 +181,12 @@ export default function StoreOrders() {
                                     >
                                         <td className="pl-6 text-green-600">{(page - 1) * 20 + index + 1}</td>
                                         <td className="px-4 py-3">{order.user?.name}</td>
-                                        <td className="px-4 py-3 font-medium text-slate-800">{currency} {Number(order.total).toLocaleString()}</td>
+                                        <td className="px-4 py-3 font-medium text-slate-800">
+                            {currency} {Number(order.total).toLocaleString()}
+                            {!order.shippingQuoted && (
+                                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold align-middle">+shipping</span>
+                            )}
+                        </td>
                                         <td className="px-4 py-3">
                                             <span className={`text-xs px-2 py-1 rounded-full ${order.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                                 {order.paymentStatus || (order.isPaid ? 'PAID' : 'PENDING')}
@@ -213,9 +244,50 @@ export default function StoreOrders() {
                         <div className="mb-4 space-y-1">
                             <p><span className="text-green-700">Status:</span> {selectedOrder.status}</p>
                             <p><span className="text-green-700">Payment:</span> {selectedOrder.paymentStatus || (selectedOrder.isPaid ? 'PAID' : 'PENDING')}</p>
+                            <p>
+                                <span className="text-green-700">Shipping:</span>{' '}
+                                {selectedOrder.shippingQuoted
+                                    ? `${currency} ${Number(selectedOrder.shippingCost ?? 0).toLocaleString()}`
+                                    : <span className="text-amber-600 font-medium">Pending — set below</span>
+                                }
+                            </p>
                             <p><span className="text-green-700">Total:</span> {currency} {Number(selectedOrder.total).toLocaleString()}</p>
                             <p><span className="text-green-700">Date:</span> {new Date(selectedOrder.createdAt).toLocaleString()}</p>
                         </div>
+
+                        {/* ── Shipping fee quote (LOCAL_SELLER only) ── */}
+                        {!selectedOrder.shippingQuoted && (
+                            <div className="mb-4 p-4 rounded-lg border border-amber-200 bg-amber-50">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <TruckIcon size={16} className="text-amber-600" />
+                                    <p className="text-sm font-semibold text-amber-800">Set Shipping Fee</p>
+                                </div>
+                                <p className="text-xs text-amber-700 mb-3">
+                                    Check the customer's address above, then enter the delivery fee you will charge.
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center border border-slate-200 rounded overflow-hidden bg-white">
+                                        <span className="px-3 py-2 text-sm text-slate-500 bg-slate-50 border-r border-slate-200">{currency}</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="100"
+                                            placeholder="0"
+                                            value={shippingInput}
+                                            onChange={e => setShippingInput(e.target.value)}
+                                            className="w-32 px-3 py-2 text-sm outline-none text-slate-800"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => setShippingFee(selectedOrder.id)}
+                                        disabled={settingShipping}
+                                        className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition disabled:opacity-60"
+                                    >
+                                        {settingShipping ? 'Saving…' : 'Confirm Fee'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {['ORDER_PLACED', 'PROCESSING'].includes(selectedOrder.status) && (
                             <div className="mb-4 flex flex-wrap gap-2">
