@@ -26,8 +26,19 @@ export async function POST(request, { params }) {
             return NextResponse.json({ error: "Return request not found" }, { status: 404 });
         }
 
-        const updated = await prisma.$transaction(async (tx) => {
-            const ret = await tx.return.update({
+        // Move order lookup outside the transaction (batch transactions can't contain reads
+        // that conditionally gate further writes — and PrismaNeonHttp requires batch form)
+        let orderItemsToRestore = [];
+        if (status === 'COMPLETED') {
+            const order = await prisma.order.findUnique({
+                where: { id: returnRequest.orderId },
+                include: { orderItems: true }
+            });
+            orderItemsToRestore = order?.orderItems ?? [];
+        }
+
+        const [updated] = await prisma.$transaction([
+            prisma.return.update({
                 where: { id },
                 data: {
                     status,
@@ -35,27 +46,15 @@ export async function POST(request, { params }) {
                     reviewedBy: userId,
                     reviewedAt: new Date(),
                 }
-            });
-
-            // Restore stock when return is completed
-            if (status === 'COMPLETED') {
-                const order = await tx.order.findUnique({
-                    where: { id: returnRequest.orderId },
-                    include: { orderItems: true }
-                });
-                for (const item of order.orderItems) {
-                    await tx.product.update({
-                        where: { id: item.productId },
-                        data: {
-                            warehouseQuantity: { increment: item.quantity },
-                            inStock: true,
-                        }
-                    });
+            }),
+            ...orderItemsToRestore.map(item => prisma.product.update({
+                where: { id: item.productId },
+                data: {
+                    warehouseQuantity: { increment: item.quantity },
+                    inStock: true,
                 }
-            }
-
-            return ret;
-        });
+            }))
+        ]);
 
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
         logAdminAction({ adminId: userId, adminName: admin?.name || '', action: `RETURN_${status}`, targetType: 'Return', targetId: id, notes: adminNotes });

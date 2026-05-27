@@ -143,8 +143,8 @@ export async function POST(request, { params }) {
             }
         });
 
-        const message = await prisma.$transaction(async (tx) => {
-            const createdMessage = await tx.message.create({
+        const [message] = await prisma.$transaction([
+            prisma.message.create({
                 data: {
                     conversationId,
                     senderId: userId,
@@ -154,19 +154,16 @@ export async function POST(request, { params }) {
                 include: {
                     sender: true
                 }
-            });
-
-            await tx.conversation.update({
+            }),
+            prisma.conversation.update({
                 where: {
                     id: conversationId
                 },
                 data: {
                     updatedAt: new Date()
                 }
-            });
-
-            return createdMessage;
-        });
+            })
+        ]);
 
         try {
             const io = getSocketServer();

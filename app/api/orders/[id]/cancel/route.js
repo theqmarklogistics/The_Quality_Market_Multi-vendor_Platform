@@ -27,22 +27,19 @@ export async function POST(request, { params }) {
             );
         }
 
-        await prisma.$transaction(async (tx) => {
-            for (const item of order.orderItems) {
-                await tx.product.update({
-                    where: { id: item.productId },
-                    data: {
-                        warehouseQuantity: { increment: item.quantity },
-                        inStock: true
-                    }
-                });
-            }
-
-            await tx.order.update({
+        await prisma.$transaction([
+            ...order.orderItems.map(item => prisma.product.update({
+                where: { id: item.productId },
+                data: {
+                    warehouseQuantity: { increment: item.quantity },
+                    inStock: true
+                }
+            })),
+            prisma.order.update({
                 where: { id },
                 data: { paymentStatus: 'CANCELLED' }
-            });
-        });
+            })
+        ]);
 
         return NextResponse.json({ message: "Order cancelled successfully" });
     } catch (error) {

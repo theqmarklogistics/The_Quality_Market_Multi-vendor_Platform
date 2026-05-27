@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import prisma, { prismaWs } from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
 import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
 import { getSocketServer } from "@/lib/socketServer";
@@ -152,7 +152,7 @@ export async function POST(request) {
         let isShippingFeeAdded = false;
         const paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000);
 
-        await prisma.$transaction(async (tx) => {
+        await prismaWs.$transaction(async (tx) => {
             // Create orders for each seller
             for(const [storeId, storeItems] of orderByStore.entries()){
                 for (const item of storeItems) {
