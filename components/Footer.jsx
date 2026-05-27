@@ -54,11 +54,15 @@ const Footer = () => {
             <div className="max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row items-start justify-between gap-10 py-10 border-b border-slate-500/30 text-slate-500">
                     <div>
-                        <Link href="/" className="inline-block">
-                            <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-14 w-auto object-contain" />
-                        </Link>
-                        <p className="font-bold text-slate-800 text-lg mt-2">The Quality Market</p>
-                        <p className="text-xs text-amber-600 italic">Quality is our Culture</p>
+                        <div className="flex items-center gap-3">
+                            <Link href="/" className="inline-block shrink-0">
+                                <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-14 w-auto object-contain" />
+                            </Link>
+                            <div className="flex flex-col leading-tight">
+                                <span className="font-bold text-lg" style={{ color: '#4f6bcb' }}>The Quality Market</span>
+                                <span className="text-xs italic" style={{ color: '#79cc4f' }}>Quality is our Culture</span>
+                            </div>
+                        </div>
                         <p className="max-w-[420px] mt-4 text-sm leading-7">Welcome to The Quality Market, your destination for trusted gadgets, useful accessories, and store-approved products that make everyday shopping feel simple and reliable.</p>
                         <div className="flex items-center gap-3 mt-5">
                             {socialIcons.map((item, i) => (
@@ -85,7 +89,7 @@ const Footer = () => {
                     </div>
                 </div>
                 <p className="py-4 text-sm text-slate-500">
-                    Copyright 2026 © <strong className="text-slate-700">The Quality Market</strong>. All rights reserved.
+                    Copyright 2026 © <strong style={{ color: '#4f6bcb' }}>The Quality Market</strong>. All rights reserved.
                 </p>
             </div>
         </footer>

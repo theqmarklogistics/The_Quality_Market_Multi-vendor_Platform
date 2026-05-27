@@ -159,10 +159,10 @@ const Navbar = () => {
                 <div className="flex items-center justify-between max-w-7xl mx-auto py-4  transition-all">
 
                     <Link href="/" className="relative flex items-center gap-2">
-                        <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-12 w-auto object-contain" priority />
+                        <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-14 w-auto object-contain" priority />
                         <div className="hidden lg:flex flex-col leading-tight">
-                            <span className="font-bold text-slate-800 text-sm">The Quality Market</span>
-                            <span className="text-xs text-amber-600 italic">Quality is our Culture</span>
+                            <span className="font-bold text-sm" style={{ color: '#4f6bcb' }}>The Quality Market</span>
+                            <span className="text-xs italic" style={{ color: '#79cc4f' }}>Quality is our Culture</span>
                         </div>
                     </Link>
 
@@ -177,9 +177,9 @@ const Navbar = () => {
                             <select
                                 value={selectedCategory}
                                 onChange={e => setSelectedCategory(e.target.value)}
-                                className="bg-slate-100 text-slate-500 text-xs pl-4 pr-2 py-3 border-r border-slate-300 outline-none cursor-pointer max-w-[120px]"
+                                className="bg-slate-100 text-slate-500 text-xs pl-4 pr-2 py-3 border-r border-slate-300 outline-none cursor-pointer max-w-[130px]"
                             >
-                                <option value="">All</option>
+                                <option value="">Category</option>
                                 {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                             </select>
                             <div className="flex items-center gap-2 px-3 py-3 flex-1">
@@ -287,6 +287,7 @@ const Navbar = () => {
                         <option value="">All Categories</option>
                         {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
+
                     <form onSubmit={(e) => { handleSearch(e); setMobileSearchOpen(false) }} className="flex items-center gap-2 bg-slate-100 px-4 py-2.5 rounded-full text-sm">
                         <Search size={16} className="text-slate-500 shrink-0" />
                         <input
