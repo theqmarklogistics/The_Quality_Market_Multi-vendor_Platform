@@ -18,6 +18,7 @@ const StoreLayout = ({ children }) => {
     const [isSeller, setIsSeller] = useState(false)
     const [loading, setLoading] = useState(true)
     const [storeInfo, setStoreInfo] = useState(null)
+    const [denyReason, setDenyReason] = useState(null)
 
     const fetchIsSeller = async () => {
         try {
@@ -29,8 +30,10 @@ const StoreLayout = ({ children }) => {
             })
             setIsSeller(data.isSeller)
             setStoreInfo(data.storeInfo)
+            if (!data.isSeller) setDenyReason(data.reason || 'unauthorized')
         } catch (error) {
             console.error(error);
+            setDenyReason('error')
         }
         finally {
             setLoading(false)
@@ -56,7 +59,31 @@ const StoreLayout = ({ children }) => {
         </div>
     ) : (
         <div className="min-h-screen flex flex-col items-center justify-center text-center px-6">
-            <h1 className="text-2xl sm:text-4xl font-semibold text-slate-400">You are not authorized to access this page</h1>
+            {denyReason === 'store_pending' ? (
+                <>
+                    <h1 className="text-2xl sm:text-3xl font-semibold text-slate-700">Your store is pending approval</h1>
+                    <p className="text-slate-400 mt-3 max-w-sm">Our team is reviewing your store application. You'll get access once it's approved.</p>
+                </>
+            ) : denyReason === 'store_rejected' ? (
+                <>
+                    <h1 className="text-2xl sm:text-3xl font-semibold text-red-500">Your store application was rejected</h1>
+                    <p className="text-slate-400 mt-3 max-w-sm">Please contact support for more information or to re-apply.</p>
+                </>
+            ) : denyReason === 'store_inactive' ? (
+                <>
+                    <h1 className="text-2xl sm:text-3xl font-semibold text-slate-700">Your store has been deactivated</h1>
+                    <p className="text-slate-400 mt-3 max-w-sm">Your store is currently inactive. Please contact admin to reactivate it.</p>
+                </>
+            ) : denyReason === 'no_store' ? (
+                <>
+                    <h1 className="text-2xl sm:text-3xl font-semibold text-slate-700">No store found</h1>
+                    <p className="text-slate-400 mt-3 max-w-sm">You haven't applied to open a store yet.</p>
+                </>
+            ) : (
+                <>
+                    <h1 className="text-2xl sm:text-4xl font-semibold text-slate-400">You are not authorized to access this page</h1>
+                </>
+            )}
             <Link href="/" className="bg-slate-700 text-white flex items-center gap-2 mt-8 p-2 px-6 max-sm:text-sm rounded-full">
                 Go to home <ArrowRightIcon size={18} />
             </Link>

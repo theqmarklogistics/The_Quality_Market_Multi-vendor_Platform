@@ -9,18 +9,18 @@ import { NextResponse } from "next/server";
 export async function GET(request) {
     try {
         const {userId} = getAuth(request);
-        const isSeller = await authSeller(userId);
+        const result = await authSeller(userId);
 
-        if(!isSeller){
-            return NextResponse.json({error: "Not Unauthorized"}, {status: 401});
+        // authSeller returns a storeId string when approved; objects when not
+        if (typeof result !== 'string') {
+            const reason = result?.reason || 'unauthorized';
+            return NextResponse.json({ isSeller: false, reason }, { status: 401 });
         }
 
         const storeInfo = await prisma.store.findFirst({
-            where: {
-                userId
-            }
+            where: { userId }
         });
-        
+
         return NextResponse.json({isSeller: true, storeInfo});
 
     } catch (error) {
