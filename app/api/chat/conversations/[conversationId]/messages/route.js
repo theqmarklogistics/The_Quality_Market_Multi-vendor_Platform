@@ -144,19 +144,20 @@ export async function POST(request, { params }) {
         });
 
         // PrismaNeonHttp does not support $transaction in any form.
-        // Create the message first (we need it for the response), then bump the
-        // conversation timestamp. If the timestamp update fails, the message is still
-        // saved — only the sort order of the conversation list may be momentarily off.
-        const message = await prisma.message.create({
+        // Do NOT use `include` on create — it triggers an implicit transaction and
+        // PrismaNeonHttp rejects with "Transactions are not supported in HTTP mode".
+        // Instead: flat create first, then a separate findUnique with include.
+        const createdMessage = await prisma.message.create({
             data: {
                 conversationId,
                 senderId: userId,
                 content: String(content).trim(),
                 isRead: false
-            },
-            include: {
-                sender: true
             }
+        });
+        const message = await prisma.message.findUnique({
+            where: { id: createdMessage.id },
+            include: { sender: true }
         });
 
         prisma.conversation.update({

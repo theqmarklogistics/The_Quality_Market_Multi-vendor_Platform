@@ -50,12 +50,18 @@ export default function ChatRoom({ conversationId }) {
 
         try {
             const token = await getToken()
-            await axios.post(`/api/chat/conversations/${conversationId}/messages`, {
+            const res = await axios.post(`/api/chat/conversations/${conversationId}/messages`, {
                 content: messageInput
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             setMessageInput("")
+            // Append the returned message immediately so the sender sees it without waiting for the next poll
+            if (res.data?.message) {
+                setMessages(prev =>
+                    prev.some(m => m.id === res.data.message.id) ? prev : [...prev, res.data.message]
+                )
+            }
         } catch (error) {
             toast.error(error?.response?.data?.error || error.message)
         }
@@ -79,12 +85,15 @@ export default function ChatRoom({ conversationId }) {
             socket = initializeSocket(token)
 
             if (!socket) {
-                // Socket.IO not available (e.g., Vercel serverless) — poll for new messages every 5 s
+                // Socket.IO not available (e.g., Vercel serverless) — poll for new messages every 5 s.
+                // Call getToken() fresh each iteration — the closure token may have expired.
                 pollInterval = setInterval(async () => {
                     if (!mounted) return
                     try {
+                        const freshToken = await getToken()
+                        if (!freshToken) return
                         const res = await axios.get(`/api/chat/conversations/${conversationId}/messages`, {
-                            headers: { Authorization: `Bearer ${token}` }
+                            headers: { Authorization: `Bearer ${freshToken}` }
                         })
                         setMessages(res.data.messages || [])
                     } catch { /* ignore polling errors */ }
