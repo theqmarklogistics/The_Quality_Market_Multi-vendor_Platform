@@ -27,19 +27,21 @@ export async function POST(request, { params }) {
             );
         }
 
-        await prisma.$transaction([
-            ...order.orderItems.map(item => prisma.product.update({
+        // PrismaNeonHttp does not support $transaction in any form.
+        // Restore stock first (parallel HTTP requests), then cancel the order.
+        // If the order update fails after stock is restored, the order remains PENDING
+        // and admin can correct it — better than cancelling without restoring stock.
+        await Promise.all(
+            order.orderItems.map(item => prisma.product.update({
                 where: { id: item.productId },
-                data: {
-                    warehouseQuantity: { increment: item.quantity },
-                    inStock: true
-                }
-            })),
-            prisma.order.update({
-                where: { id },
-                data: { paymentStatus: 'CANCELLED' }
-            })
-        ]);
+                data: { warehouseQuantity: { increment: item.quantity }, inStock: true }
+            }))
+        );
+
+        await prisma.order.update({
+            where: { id },
+            data: { paymentStatus: 'CANCELLED' }
+        });
 
         return NextResponse.json({ message: "Order cancelled successfully" });
     } catch (error) {

@@ -143,27 +143,26 @@ export async function POST(request, { params }) {
             }
         });
 
-        const [message] = await prisma.$transaction([
-            prisma.message.create({
-                data: {
-                    conversationId,
-                    senderId: userId,
-                    content: String(content).trim(),
-                    isRead: false
-                },
-                include: {
-                    sender: true
-                }
-            }),
-            prisma.conversation.update({
-                where: {
-                    id: conversationId
-                },
-                data: {
-                    updatedAt: new Date()
-                }
-            })
-        ]);
+        // PrismaNeonHttp does not support $transaction in any form.
+        // Create the message first (we need it for the response), then bump the
+        // conversation timestamp. If the timestamp update fails, the message is still
+        // saved — only the sort order of the conversation list may be momentarily off.
+        const message = await prisma.message.create({
+            data: {
+                conversationId,
+                senderId: userId,
+                content: String(content).trim(),
+                isRead: false
+            },
+            include: {
+                sender: true
+            }
+        });
+
+        prisma.conversation.update({
+            where: { id: conversationId },
+            data: { updatedAt: new Date() }
+        }).catch(err => console.error('conversation timestamp update failed:', err.message));
 
         try {
             const io = getSocketServer();

@@ -152,6 +152,11 @@ export async function POST(request) {
         let isShippingFeeAdded = false;
         const paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000);
 
+        // Preheat: send one HTTP query first so Neon wakes from auto-suspend before
+        // the WebSocket handshake. The WebSocket handshake only succeeds reliably
+        // when Neon is already active — this guarantees it.
+        await prisma.$queryRaw`SELECT 1`;
+
         await prismaWs.$transaction(async (tx) => {
             // Create orders for each seller
             for(const [storeId, storeItems] of orderByStore.entries()){

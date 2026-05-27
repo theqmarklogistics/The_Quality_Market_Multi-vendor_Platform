@@ -200,14 +200,16 @@ export async function POST(request) {
             }
         });
 
-        await prisma.$transaction([
-            prisma.conversationParticipant.create({
-                data: { conversationId: newConversation.id, userId }
-            }),
-            prisma.conversationParticipant.create({
-                data: { conversationId: newConversation.id, userId: targetUserId }
-            })
-        ]);
+        // PrismaNeonHttp does not support $transaction in any form.
+        // Two sequential creates are safe here — if the second fails, the conversation
+        // has no participants and is invisible to both users (all queries filter by
+        // participants.some.userId). Next attempt will create a fresh conversation.
+        await prisma.conversationParticipant.create({
+            data: { conversationId: newConversation.id, userId }
+        });
+        await prisma.conversationParticipant.create({
+            data: { conversationId: newConversation.id, userId: targetUserId }
+        });
 
         const conversation = await prisma.conversation.findUnique({
             where: { id: newConversation.id },

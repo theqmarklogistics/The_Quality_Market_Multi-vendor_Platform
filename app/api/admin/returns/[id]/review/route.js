@@ -37,24 +37,26 @@ export async function POST(request, { params }) {
             orderItemsToRestore = order?.orderItems ?? [];
         }
 
-        const [updated] = await prisma.$transaction([
-            prisma.return.update({
-                where: { id },
-                data: {
-                    status,
-                    adminNotes: adminNotes?.trim() || null,
-                    reviewedBy: userId,
-                    reviewedAt: new Date(),
-                }
-            }),
-            ...orderItemsToRestore.map(item => prisma.product.update({
-                where: { id: item.productId },
-                data: {
-                    warehouseQuantity: { increment: item.quantity },
-                    inStock: true,
-                }
-            }))
-        ]);
+        // PrismaNeonHttp does not support $transaction in any form.
+        // Update the return status first, then restore stock in parallel.
+        const updated = await prisma.return.update({
+            where: { id },
+            data: {
+                status,
+                adminNotes: adminNotes?.trim() || null,
+                reviewedBy: userId,
+                reviewedAt: new Date(),
+            }
+        });
+
+        if (orderItemsToRestore.length > 0) {
+            await Promise.all(
+                orderItemsToRestore.map(item => prisma.product.update({
+                    where: { id: item.productId },
+                    data: { warehouseQuantity: { increment: item.quantity }, inStock: true }
+                }))
+            );
+        }
 
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
         logAdminAction({ adminId: userId, adminName: admin?.name || '', action: `RETURN_${status}`, targetType: 'Return', targetId: id, notes: adminNotes });
