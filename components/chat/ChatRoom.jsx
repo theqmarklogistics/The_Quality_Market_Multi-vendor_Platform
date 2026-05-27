@@ -16,10 +16,48 @@ export default function ChatRoom({ conversationId }) {
 
     const scrollRef = useRef(null)
 
+    const participantUsers = useMemo(() => {
+        return conversation?.participants || []
+    }, [conversation])
+
+    const isViewerParticipant = useMemo(() => {
+        if (!user?.id || !participantUsers.length) return false
+        return participantUsers.some((participant) => participant.userId === user.id)
+    }, [participantUsers, user?.id])
+
     const otherParticipant = useMemo(() => {
-        if (!conversation?.participants || !user?.id) return null
-        return conversation.participants.find((participant) => participant.userId !== user.id)?.user || null
-    }, [conversation, user])
+        if (!participantUsers.length || !user?.id) return null
+        return participantUsers.find((participant) => participant.userId !== user.id)?.user || null
+    }, [participantUsers, user?.id])
+
+    const chatHeader = useMemo(() => {
+        if (!conversation) {
+            return { title: "Conversation", subtitle: "" }
+        }
+
+        if (isViewerParticipant) {
+            return {
+                title: otherParticipant?.name || "Participant",
+                subtitle: conversation.targetType === "ADMIN" ? "Admin Support" : "Store Chat"
+            }
+        }
+
+        const createdBy = participantUsers.find((participant) => participant.userId === conversation.createdById);
+        const createdByName = createdBy?.user?.name || createdBy?.user?.email || "Customer";
+
+        if (conversation.targetType === "STORE") {
+            const storeName = conversation.store?.name || "Store";
+            return {
+                title: `${createdByName} ↔ ${storeName}`,
+                subtitle: "Store conversation"
+            }
+        }
+
+        return {
+            title: createdByName,
+            subtitle: "Admin support chat"
+        }
+    }, [conversation, isViewerParticipant, otherParticipant, participantUsers])
 
     const fetchConversationData = async () => {
         try {
@@ -96,6 +134,11 @@ export default function ChatRoom({ conversationId }) {
                             headers: { Authorization: `Bearer ${freshToken}` }
                         })
                         setMessages(res.data.messages || [])
+                        if (isViewerParticipant) {
+                            await axios.put(`/api/chat/conversations/${conversationId}/messages`, {}, {
+                                headers: { Authorization: `Bearer ${freshToken}` }
+                            }).catch(() => null)
+                        }
                     } catch { /* ignore polling errors */ }
                 }, 5000)
                 return
@@ -111,9 +154,12 @@ export default function ChatRoom({ conversationId }) {
                 setMessages((prev) => prev.some((item) => item.id === incomingMessage.id) ? prev : [...prev, incomingMessage])
 
                 if (incomingMessage.senderId !== user?.id) {
-                    axios.put(`/api/chat/conversations/${conversationId}/messages`, {}, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    }).catch(() => null)
+                    getToken().then((freshToken) => {
+                        if (!freshToken) return
+                        axios.put(`/api/chat/conversations/${conversationId}/messages`, {}, {
+                            headers: { Authorization: `Bearer ${freshToken}` }
+                        }).catch(() => null)
+                    })
                 }
             })
 
@@ -139,7 +185,7 @@ export default function ChatRoom({ conversationId }) {
                 // Keep socket connected for other conversations
             }
         }
-    }, [conversationId, user?.id])
+    }, [conversationId, user?.id, isViewerParticipant, getToken])
 
     useEffect(() => {
         scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -150,9 +196,11 @@ export default function ChatRoom({ conversationId }) {
     return (
         <div className="w-full max-w-5xl mx-auto border border-slate-200 rounded-xl overflow-hidden bg-white">
             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-                <p className="text-sm text-slate-500">Conversation with</p>
+                <p className="text-sm text-slate-500">
+                    {chatHeader.subtitle || "Conversation with"}
+                </p>
                 <h1 className="text-xl text-slate-800 font-medium">
-                    {otherParticipant?.name || 'Participant'}
+                    {chatHeader.title}
                 </h1>
             </div>
 

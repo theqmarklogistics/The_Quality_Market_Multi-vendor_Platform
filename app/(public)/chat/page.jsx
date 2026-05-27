@@ -1,7 +1,7 @@
 'use client'
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth, useUser } from "@clerk/nextjs"
+import { SignedIn, SignedOut, SignIn, useAuth, useUser } from "@clerk/nextjs"
 import axios from "axios"
 import toast from "react-hot-toast"
 import ConversationList from "@/components/chat/ConversationList"
@@ -35,24 +35,33 @@ export default function BuyerChatsPage() {
     }
 
     return (
-        <div className="mx-6 my-16 min-h-[60vh]">
-            <div className="max-w-6xl mx-auto">
-                <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-                    <div>
-                        <h1 className="text-2xl text-slate-700">My Chats</h1>
-                        <p className="text-slate-500 mt-1">Your conversations with admin and store owners appear here.</p>
+        <>
+            <SignedIn>
+                <div className="mx-6 my-16 min-h-[60vh]">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+                            <div>
+                                <h1 className="text-2xl text-slate-700">My Chats</h1>
+                                <p className="text-slate-500 mt-1">Your conversations with admin and store owners appear here.</p>
+                            </div>
+                            <button
+                                onClick={startAdminChat}
+                                disabled={starting || !user}
+                                className="flex items-center gap-2 bg-slate-800 text-white text-sm px-5 py-2.5 rounded-full hover:bg-slate-900 disabled:opacity-50 transition shrink-0"
+                            >
+                                <MessageCircleIcon size={16} />
+                                {starting ? 'Starting…' : 'Contact Admin'}
+                            </button>
+                        </div>
+                        <ConversationList basePath="/chat" />
                     </div>
-                    <button
-                        onClick={startAdminChat}
-                        disabled={starting || !user}
-                        className="flex items-center gap-2 bg-slate-800 text-white text-sm px-5 py-2.5 rounded-full hover:bg-slate-900 disabled:opacity-50 transition shrink-0"
-                    >
-                        <MessageCircleIcon size={16} />
-                        {starting ? 'Starting…' : 'Contact Admin'}
-                    </button>
                 </div>
-                <ConversationList basePath="/chat" />
-            </div>
-        </div>
+            </SignedIn>
+            <SignedOut>
+                <div className="min-h-[60vh] flex items-center justify-center">
+                    <SignIn fallbackRedirectUrl="/chat" routing="hash" />
+                </div>
+            </SignedOut>
+        </>
     )
 }
