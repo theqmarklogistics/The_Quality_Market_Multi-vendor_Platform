@@ -50,23 +50,20 @@ export async function POST(request) {
             data: { email: normalised },
         })
 
-        // Sync to Resend Audience (non-blocking)
-        if (process.env.RESEND_AUDIENCE_ID) {
-            try {
-                const contact = await resend.contacts.create({
-                    audienceId: process.env.RESEND_AUDIENCE_ID,
-                    email: normalised,
-                    unsubscribed: false,
+        // Sync to Resend contacts (non-blocking)
+        try {
+            const contact = await resend.contacts.create({
+                email: normalised,
+                unsubscribed: false,
+            })
+            if (contact?.data?.id) {
+                await prisma.newsletterSubscriber.update({
+                    where: { email: normalised },
+                    data: { resendContactId: contact.data.id },
                 })
-                if (contact?.data?.id) {
-                    await prisma.newsletterSubscriber.update({
-                        where: { email: normalised },
-                        data: { resendContactId: contact.data.id },
-                    })
-                }
-            } catch (err) {
-                console.error('Resend audience sync failed (non-fatal):', err.message)
             }
+        } catch (err) {
+            console.error('Resend contact sync failed (non-fatal):', err.message)
         }
 
         // Send welcome email (non-blocking)

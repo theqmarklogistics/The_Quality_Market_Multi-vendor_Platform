@@ -32,16 +32,11 @@ export async function GET(request) {
             data: { unsubscribedAt: new Date() },
         })
 
-        // Remove from Resend Audience (non-blocking)
-        if (process.env.RESEND_AUDIENCE_ID && subscriber.resendContactId) {
-            try {
-                await resend.contacts.remove({
-                    audienceId: process.env.RESEND_AUDIENCE_ID,
-                    id: subscriber.resendContactId,
-                })
-            } catch (err) {
-                console.error('Resend contact removal failed (non-fatal):', err.message)
-            }
+        // Remove from Resend (non-blocking) — use email as the stable identifier
+        try {
+            await resend.contacts.remove({ email: subscriber.email })
+        } catch (err) {
+            console.error('Resend contact removal failed (non-fatal):', err.message)
         }
 
         return NextResponse.redirect(new URL('/?unsubscribed=1', request.url))
