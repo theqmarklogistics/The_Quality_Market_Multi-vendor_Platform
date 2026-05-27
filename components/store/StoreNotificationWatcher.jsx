@@ -23,6 +23,8 @@ const StoreNotificationWatcher = () => {
                 if (!active || !token) return
 
                 socket = initializeSocket(token)
+                if (!socket) return // Socket.IO not available (e.g., Vercel); no-op for store notifications
+
                 socket.emit('join-store-room')
 
                 socket.on('store-notification', (payload) => {

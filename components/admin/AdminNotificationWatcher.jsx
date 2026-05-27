@@ -60,22 +60,25 @@ const AdminNotificationWatcher = () => {
                 if (!active || !token) return
 
                 socket = initializeSocket(token)
-                socket.emit('join-admin-room')
 
-                socket.on('admin-notification', async (payload) => {
-                    const key = payload?.key
-                    const message = payload?.message || NOTIFICATION_MESSAGES[key] || 'New admin notification'
+                if (socket) {
+                    socket.emit('join-admin-room')
 
-                    const now = Date.now()
-                    if (now - lastToastAtRef.current > 700) {
-                        toast(message, { icon: '🔔', duration: 4500 })
-                        emitBrowserNotification('The Quality Market Admin', message)
-                        lastToastAtRef.current = now
-                    }
+                    socket.on('admin-notification', async (payload) => {
+                        const key = payload?.key
+                        const message = payload?.message || NOTIFICATION_MESSAGES[key] || 'New admin notification'
 
-                    await fetchCounts().catch(() => null)
-                })
+                        const now = Date.now()
+                        if (now - lastToastAtRef.current > 700) {
+                            toast(message, { icon: '🔔', duration: 4500 })
+                            emitBrowserNotification('The Quality Market Admin', message)
+                            lastToastAtRef.current = now
+                        }
 
+                        await fetchCounts().catch(() => null)
+                    })
+                }
+                // Whether or not Socket.IO is available, always poll on a 60 s interval
                 await fetchCounts().catch(() => null)
 
                 interval = setInterval(() => {

@@ -70,12 +70,27 @@ export default function ChatRoom({ conversationId }) {
 
         let socket = null
         let mounted = true
+        let pollInterval = null
 
         const initRealtime = async () => {
             const token = await getToken()
             if (!mounted || !token) return
 
             socket = initializeSocket(token)
+
+            if (!socket) {
+                // Socket.IO not available (e.g., Vercel serverless) — poll for new messages every 5 s
+                pollInterval = setInterval(async () => {
+                    if (!mounted) return
+                    try {
+                        const res = await axios.get(`/api/chat/conversations/${conversationId}/messages`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        })
+                        setMessages(res.data.messages || [])
+                    } catch { /* ignore polling errors */ }
+                }, 5000)
+                return
+            }
 
             // Join the conversation room
             socket.emit('join-conversation', conversationId)
@@ -107,6 +122,7 @@ export default function ChatRoom({ conversationId }) {
 
         return () => {
             mounted = false
+            if (pollInterval) clearInterval(pollInterval)
             if (socket) {
                 socket.emit('leave-conversation', conversationId)
                 socket.off('new-message')
