@@ -80,17 +80,19 @@ export async function GET(request, { params }) {
 
         const readResult = await markConversationAsRead(conversationId, userId);
 
-        const messages = await prisma.message.findMany({
-            where: {
-                conversationId
-            },
-            include: {
-                sender: true
-            },
-            orderBy: {
-                createdAt: "asc"
-            }
+        // With driverAdapters (JS engine), findMany+include runs two SELECT queries
+        // and wraps them in a transaction that PrismaNeonHttp rejects.
+        // Fetch messages and senders separately then merge to avoid any transaction.
+        const rawMessages = await prisma.message.findMany({
+            where: { conversationId },
+            orderBy: { createdAt: "asc" }
         });
+        const senderIds = [...new Set(rawMessages.map(m => m.senderId).filter(Boolean))];
+        const senders = senderIds.length
+            ? await prisma.user.findMany({ where: { id: { in: senderIds } } })
+            : [];
+        const senderMap = new Map(senders.map(u => [u.id, u]));
+        const messages = rawMessages.map(m => ({ ...m, sender: senderMap.get(m.senderId) || null }));
 
         if (readResult.updatedCount > 0) {
             try {
@@ -143,10 +145,9 @@ export async function POST(request, { params }) {
             }
         });
 
-        // PrismaNeonHttp does not support $transaction in any form.
-        // Do NOT use `include` on create — it triggers an implicit transaction and
-        // PrismaNeonHttp rejects with "Transactions are not supported in HTTP mode".
-        // Instead: flat create first, then a separate findUnique with include.
+        // PrismaNeonHttp does not support $transaction in any form, and the JS engine
+        // (driverAdapters) wraps any create/findX with `include` in an implicit
+        // transaction. Use flat create + plain user lookup to avoid all transactions.
         const createdMessage = await prisma.message.create({
             data: {
                 conversationId,
@@ -155,10 +156,8 @@ export async function POST(request, { params }) {
                 isRead: false
             }
         });
-        const message = await prisma.message.findUnique({
-            where: { id: createdMessage.id },
-            include: { sender: true }
-        });
+        const sender = await prisma.user.findUnique({ where: { id: userId } });
+        const message = { ...createdMessage, sender: sender || null };
 
         prisma.conversation.update({
             where: { id: conversationId },

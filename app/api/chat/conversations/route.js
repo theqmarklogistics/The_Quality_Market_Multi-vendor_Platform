@@ -13,43 +13,59 @@ export async function GET(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const conversations = await prisma.conversation.findMany({
-            where: {
-                participants: {
-                    some: {
-                        userId
-                    }
-                }
-            },
-            include: {
-                participants: {
-                    include: {
-                        user: true
-                    }
-                },
-                messages: {
-                    orderBy: {
-                        createdAt: "desc"
-                    },
-                    take: 1
-                },
-                _count: {
-                    select: {
-                        messages: {
-                            where: {
-                                isRead: false,
-                                senderId: {
-                                    not: userId
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            orderBy: {
-                updatedAt: "desc"
-            }
+        // With driverAdapters (JS engine), findMany+include runs multiple SELECTs
+        // wrapped in a transaction that PrismaNeonHttp rejects.
+        // Fetch each piece separately and merge in JS to avoid any transaction.
+
+        const rawConversations = await prisma.conversation.findMany({
+            where: { participants: { some: { userId } } },
+            orderBy: { updatedAt: "desc" }
         });
+
+        if (!rawConversations.length) {
+            return NextResponse.json({ conversations: [] });
+        }
+
+        const conversationIds = rawConversations.map(c => c.id);
+
+        // Parallel: participants list, last message per conv, unread count per conv
+        const [participants, lastMessages, unreadCounts] = await Promise.all([
+            prisma.conversationParticipant.findMany({
+                where: { conversationId: { in: conversationIds } }
+            }),
+            Promise.all(
+                conversationIds.map(id =>
+                    prisma.message.findFirst({
+                        where: { conversationId: id },
+                        orderBy: { createdAt: "desc" }
+                    })
+                )
+            ),
+            Promise.all(
+                conversationIds.map(id =>
+                    prisma.message.count({
+                        where: { conversationId: id, isRead: false, senderId: { not: userId } }
+                    })
+                )
+            )
+        ]);
+
+        // Batch-fetch all participant users in one query
+        const participantUserIds = [...new Set(participants.map(p => p.userId))];
+        const users = participantUserIds.length
+            ? await prisma.user.findMany({ where: { id: { in: participantUserIds } } })
+            : [];
+        const userMap = new Map(users.map(u => [u.id, u]));
+
+        // Merge into the shape the frontend expects
+        const conversations = rawConversations.map((conv, i) => ({
+            ...conv,
+            participants: participants
+                .filter(p => p.conversationId === conv.id)
+                .map(p => ({ ...p, user: userMap.get(p.userId) || null })),
+            messages: lastMessages[i] ? [lastMessages[i]] : [],
+            _count: { messages: unreadCounts[i] }
+        }));
 
         return NextResponse.json({ conversations });
     } catch (error) {
