@@ -2,6 +2,8 @@ import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getSocketServer } from "@/lib/socketServer";
+import { generateInvoice } from "@/lib/generateInvoice";
+import { sendInvoiceEmail } from "@/lib/email";
 
 export async function POST(request, { params }) {
     try {
@@ -10,19 +12,53 @@ export async function POST(request, { params }) {
 
         const { id: orderId } = await params;
 
-        const order = await prisma.order.findFirst({
-            where: { id: orderId, userId },
-            select: { id: true, paymentStatus: true, invoiceStatus: true, invoiceRequested: true },
-        });
+        // Fetch full order details — needed for both auto-send (MoMo) and admin-queue (Bank)
+        const [order, paymentConfig] = await Promise.all([
+            prisma.order.findFirst({
+                where: { id: orderId, userId },
+                include: {
+                    orderItems: { include: { product: { select: { name: true, images: true } } } },
+                    user: { select: { name: true, email: true } },
+                    address: true,
+                },
+            }),
+            prisma.paymentConfig.findUnique({ where: { id: 'default' } }),
+        ]);
 
         if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         if (order.paymentStatus !== 'PENDING') return NextResponse.json({ error: 'Invoice can only be requested for pending orders' }, { status: 400 });
         if (order.invoiceStatus === 'SENT') return NextResponse.json({ error: 'Invoice has already been sent to your email' }, { status: 400 });
 
-        await prisma.order.update({
-            where: { id: orderId },
-            data: { invoiceRequested: true, invoiceRequestedAt: new Date() },
-        });
+        const isMomo = order.paymentMethod === 'MTN_MOMO';
+
+        if (isMomo) {
+            // MTN MoMo: generate and send immediately — no admin approval needed
+            if (!order.user?.email) return NextResponse.json({ error: 'No email on file for this account' }, { status: 400 });
+
+            const pdfBuffer = await generateInvoice({ order, paymentConfig });
+            await sendInvoiceEmail({ to: order.user.email, orderId: order.id, pdfBuffer });
+
+            await prisma.$executeRaw`
+                UPDATE "Order"
+                SET "invoiceRequested" = true,
+                    "invoiceRequestedAt" = NOW(),
+                    "invoiceStatus" = 'SENT',
+                    "invoiceSentAt" = NOW(),
+                    "updatedAt" = NOW()
+                WHERE id = ${orderId}
+            `;
+
+            return NextResponse.json({ message: 'Invoice sent to your email!' });
+        }
+
+        // Bank Transfer: queue for admin review as before
+        await prisma.$executeRaw`
+            UPDATE "Order"
+            SET "invoiceRequested" = true,
+                "invoiceRequestedAt" = NOW(),
+                "updatedAt" = NOW()
+            WHERE id = ${orderId}
+        `;
 
         try {
             const io = getSocketServer();

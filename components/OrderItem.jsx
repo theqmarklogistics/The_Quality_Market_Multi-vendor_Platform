@@ -17,6 +17,7 @@ const OrderItem = ({ order, onProofUploaded }) => {
     const [returnModal, setReturnModal] = useState(false);
     const [returnReason, setReturnReason] = useState('');
     const [invoiceRequested, setInvoiceRequested] = useState(order.invoiceRequested || false);
+    const [invoiceSentNow, setInvoiceSentNow] = useState(false);
     const [invoiceRequesting, setInvoiceRequesting] = useState(false);
     const { getToken } = useAuth();
     const router = useRouter();
@@ -99,11 +100,15 @@ const OrderItem = ({ order, onProofUploaded }) => {
         setInvoiceRequesting(true)
         try {
             const token = await getToken()
-            await axios.post(`/api/orders/${order.id}/request-invoice`, {}, {
+            const { data } = await axios.post(`/api/orders/${order.id}/request-invoice`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            setInvoiceRequested(true)
-            toast.success('Invoice requested — admin will send it to your email shortly.')
+            if (order.paymentMethod === 'MTN_MOMO') {
+                setInvoiceSentNow(true)
+            } else {
+                setInvoiceRequested(true)
+            }
+            toast.success(data.message)
         } catch (err) {
             toast.error(err?.response?.data?.error || 'Failed to request invoice')
         } finally {
@@ -112,7 +117,7 @@ const OrderItem = ({ order, onProofUploaded }) => {
     }
 
     const showInvoiceAction = order.paymentStatus === 'PENDING'
-    const invoiceSent = order.invoiceStatus === 'SENT'
+    const invoiceSent = order.invoiceStatus === 'SENT' || invoiceSentNow
 
     return (
         <>
