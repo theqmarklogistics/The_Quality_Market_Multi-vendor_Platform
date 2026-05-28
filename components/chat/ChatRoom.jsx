@@ -23,12 +23,12 @@ export default function ChatRoom({ conversationId }) {
     const isViewerParticipant = useMemo(() => {
         if (!user?.id || !participantUsers.length) return false
         return participantUsers.some((participant) => participant.userId === user.id)
-    }, [participantUsers, user?.id])
+    }, [participantUsers, user])
 
     const otherParticipant = useMemo(() => {
         if (!participantUsers.length || !user?.id) return null
         return participantUsers.find((participant) => participant.userId !== user.id)?.user || null
-    }, [participantUsers, user?.id])
+    }, [participantUsers, user])
 
     const chatHeader = useMemo(() => {
         if (!conversation) {
