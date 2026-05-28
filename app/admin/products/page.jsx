@@ -5,7 +5,19 @@ import axios from "axios"
 import toast from "react-hot-toast"
 import Image from "next/image"
 import Link from "next/link"
-import { PackageCheckIcon, CheckSquareIcon, SquareIcon, SearchIcon } from "lucide-react"
+import ApprovedProductsChart from "@/components/admin/ApprovedProductsChart"
+import {
+    PackageCheckIcon,
+    CheckSquareIcon,
+    SquareIcon,
+    SearchIcon,
+    TrendingUpIcon,
+    PackageIcon,
+    StoreIcon,
+    StarIcon,
+    ArrowUpDownIcon,
+    CalendarIcon,
+} from "lucide-react"
 
 const STATUS_BADGE = {
     APPROVED: 'bg-green-100 text-green-700',
@@ -13,8 +25,35 @@ const STATUS_BADGE = {
     REJECTED: 'bg-red-100 text-red-700',
 }
 
+function MetricCard({ label, value, icon: Icon, tone = 'slate', hint }) {
+    const bg = {
+        slate: 'bg-slate-50',
+        green: 'bg-green-50',
+        blue: 'bg-blue-50',
+        amber: 'bg-amber-50',
+        violet: 'bg-violet-50',
+    }
+    const ic = {
+        slate: 'text-slate-500',
+        green: 'text-green-600',
+        blue: 'text-blue-600',
+        amber: 'text-amber-600',
+        violet: 'text-violet-600',
+    }
+
+    return (
+        <div className={`rounded-xl border border-slate-200 p-5 ${bg[tone] || bg.slate}`}>
+            <div className={`mb-3 ${ic[tone] || ic.slate}`}><Icon size={22} /></div>
+            <p className="text-2xl font-bold text-slate-800">{value}</p>
+            <p className="text-sm text-slate-500 mt-0.5">{label}</p>
+            {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
+        </div>
+    )
+}
+
 export default function AdminProducts() {
     const { getToken } = useAuth()
+    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'Rwf'
 
     // ── Pending tab state ──────────────────────────────────────────────────────
     const [products, setProducts] = useState([])
@@ -35,6 +74,14 @@ export default function AdminProducts() {
     const [page, setPage] = useState(1)
     const [total, setTotal] = useState(0)
     const PAGE_SIZE = 20
+
+    const [performanceData, setPerformanceData] = useState(null)
+    const [performanceLoading, setPerformanceLoading] = useState(false)
+    const [performanceDays, setPerformanceDays] = useState('30')
+    const [performanceSortBy, setPerformanceSortBy] = useState('revenue')
+    const [performanceSortDir, setPerformanceSortDir] = useState('desc')
+    const [performancePage, setPerformancePage] = useState(1)
+    const [performancePageSize, setPerformancePageSize] = useState(10)
 
     // ── Pending tab helpers ────────────────────────────────────────────────────
     const fetchPendingProducts = async () => {
@@ -120,16 +167,46 @@ export default function AdminProducts() {
         setAllLoading(false)
     }
 
+    const fetchPerformanceProducts = async () => {
+        setPerformanceLoading(true)
+        try {
+            const token = await getToken()
+            const params = new URLSearchParams({
+                days: performanceDays,
+                sortBy: performanceSortBy,
+                sortDir: performanceSortDir,
+                page: String(performancePage),
+                pageSize: String(performancePageSize),
+            })
+            const { data } = await axios.get(`/api/admin/products/performance?${params}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            setPerformanceData(data)
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
+        setPerformanceLoading(false)
+    }
+
     useEffect(() => { fetchPendingProducts() }, [])
 
     useEffect(() => {
         if (activeTab === 'all') fetchAllProducts()
     }, [activeTab, page, statusFilter, nameSearch])
 
+    useEffect(() => {
+        if (activeTab === 'analytics') fetchPerformanceProducts()
+    }, [activeTab, performanceDays, performanceSortBy, performanceSortDir, performancePage, performancePageSize])
+
     const handleNameSearch = (e) => {
         e.preventDefault()
         setPage(1)
         setNameSearch(nameInput.trim())
+    }
+
+    const handlePerformanceFilterChange = (setter, value) => {
+        setter(value)
+        setPerformancePage(1)
     }
 
     if (loading) return <p className="text-slate-500">Loading pending products...</p>
@@ -152,6 +229,12 @@ export default function AdminProducts() {
                     className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition ${activeTab === 'all' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-px' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     All Products
+                </button>
+                <button
+                    onClick={() => setActiveTab('analytics')}
+                    className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition ${activeTab === 'analytics' ? 'bg-white border border-b-white border-slate-200 text-slate-800 -mb-px' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Approved Analytics
                 </button>
             </div>
 
@@ -443,6 +526,165 @@ export default function AdminProducts() {
                                     </button>
                                 </div>
                             </div>
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* ── Approved Analytics Tab ── */}
+            {activeTab === 'analytics' && (
+                <>
+                    <div className="flex flex-wrap items-center gap-3 mb-5">
+                        <h1 className="text-2xl flex-1">Approved <span className="text-slate-800 font-medium">Analytics</span></h1>
+                        <div className="flex flex-wrap gap-2">
+                            {['7', '30', '90', 'all'].map((value) => (
+                                <button
+                                    key={value}
+                                    onClick={() => handlePerformanceFilterChange(setPerformanceDays, value)}
+                                    className={`px-3 py-1.5 rounded-full text-sm border transition ${performanceDays === value ? 'bg-slate-800 text-white border-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                    {value === 'all' ? 'All time' : `${value}d`}
+                                </button>
+                            ))}
+                        </div>
+                        <select
+                            value={performanceSortBy}
+                            onChange={e => handlePerformanceFilterChange(setPerformanceSortBy, e.target.value)}
+                            className="border border-slate-200 rounded-full px-4 py-2 text-sm outline-none text-slate-600 bg-white"
+                        >
+                            <option value="revenue">Sort by revenue</option>
+                            <option value="unitsSold">Sort by units sold</option>
+                            <option value="orders">Sort by orders</option>
+                            <option value="rating">Sort by rating</option>
+                            <option value="stock">Sort by stock</option>
+                            <option value="age">Sort by approval age</option>
+                            <option value="name">Sort by name</option>
+                        </select>
+                        <button
+                            onClick={() => {
+                                setPerformanceSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+                                setPerformancePage(1)
+                            }}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition"
+                        >
+                            <ArrowUpDownIcon size={15} />
+                            {performanceSortDir === 'asc' ? 'Ascending' : 'Descending'}
+                        </button>
+                    </div>
+
+                    {performanceLoading ? (
+                        <p className="text-slate-400 text-sm py-8">Loading approved product analytics…</p>
+                    ) : !performanceData ? (
+                        <p className="text-slate-400 text-sm py-8">No analytics data available.</p>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6 max-w-6xl">
+                                <MetricCard label="Approved Products" value={performanceData.summary?.approvedProducts ?? 0} icon={PackageIcon} tone="slate" />
+                                <MetricCard label="Revenue" value={`${currency} ${Number(performanceData.summary?.totalRevenue || 0).toLocaleString()}`} icon={TrendingUpIcon} tone="green" hint={`Range: ${performanceDays === 'all' ? 'all time' : `${performanceDays} days`}`} />
+                                <MetricCard label="Units Sold" value={Number(performanceData.summary?.totalUnitsSold || 0).toLocaleString()} icon={PackageCheckIcon} tone="blue" />
+                                <MetricCard label="Orders" value={Number(performanceData.summary?.totalOrders || 0).toLocaleString()} icon={SearchIcon} tone="amber" />
+                                <MetricCard label="Average Rating" value={(performanceData.summary?.averageRating || 0).toFixed(1)} icon={StarIcon} tone="violet" hint={`${Number(performanceData.summary?.reviewCount || 0).toLocaleString()} reviews`} />
+                                <MetricCard label="Inventory Remaining" value={Number(performanceData.summary?.totalStock || 0).toLocaleString()} icon={CalendarIcon} tone="slate" />
+                            </div>
+
+                            <div className="bg-white border border-slate-200 rounded-xl p-5 mb-6 max-w-6xl shadow-sm">
+                                {performanceData.trend?.length > 0 ? (
+                                    <ApprovedProductsChart trend={performanceData.trend} />
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-72 text-center">
+                                        <TrendingUpIcon size={34} className="text-slate-300 mb-2" />
+                                        <p className="text-slate-500 font-medium">No sales in the selected range</p>
+                                        <p className="text-sm text-slate-400 mt-1">The chart will populate once approved products have order activity.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {performanceData.products?.length > 0 ? (
+                                <>
+                                    <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white max-w-6xl">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-slate-100 bg-slate-50 text-xs text-slate-400 font-medium">
+                                                    <th className="text-left px-4 py-3">Product</th>
+                                                    <th className="text-left px-3 py-3">Store</th>
+                                                    <th className="text-right px-3 py-3">Units</th>
+                                                    <th className="text-right px-3 py-3">Revenue</th>
+                                                    <th className="text-right px-3 py-3">Orders</th>
+                                                    <th className="text-right px-3 py-3">Rating</th>
+                                                    <th className="text-right px-3 py-3">Stock</th>
+                                                    <th className="text-right px-3 py-3">Approved Age</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {performanceData.products.map(p => (
+                                                    <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition">
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center gap-3">
+                                                                {p.images?.[0] && (
+                                                                    <Image src={p.images[0]} alt={p.name} width={40} height={40} className="h-10 w-10 rounded-md object-cover border border-slate-100 shrink-0" />
+                                                                )}
+                                                                <div className="min-w-0">
+                                                                    <span className="font-medium text-slate-700 line-clamp-2 block max-w-[240px]">{p.name}</span>
+                                                                    <span className="text-xs text-slate-400">Rank #{p.rank}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-3">
+                                                            {p.store?.id
+                                                                ? <Link href={`/admin/stores/${p.store.id}`} className="text-blue-600 hover:underline">{p.store.name}</Link>
+                                                                : <span className="text-slate-400">—</span>
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-3 text-right text-slate-700">{Number(p.unitsSold || 0).toLocaleString()}</td>
+                                                        <td className="px-3 py-3 text-right font-medium text-slate-700">{currency} {Number(p.revenue || 0).toLocaleString()}</td>
+                                                        <td className="px-3 py-3 text-right text-slate-700">{Number(p.orderCount || 0).toLocaleString()}</td>
+                                                        <td className="px-3 py-3 text-right text-slate-700">{Number(p.averageRating || 0).toFixed(1)} <span className="text-slate-400 text-xs">({Number(p.reviewCount || 0)})</span></td>
+                                                        <td className="px-3 py-3 text-right text-slate-700">{Number(p.warehouseQuantity || 0).toLocaleString()}</td>
+                                                        <td className="px-3 py-3 text-right text-slate-400 whitespace-nowrap">{Number(p.approvalAgeDays || 0)} days</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center justify-between gap-3 mt-4 text-sm text-slate-500 max-w-6xl">
+                                        <span>{performanceData.total} approved product{performanceData.total !== 1 ? 's' : ''} total</span>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <select
+                                                value={performancePageSize}
+                                                onChange={e => handlePerformanceFilterChange(setPerformancePageSize, Number(e.target.value))}
+                                                className="border border-slate-200 rounded-full px-3 py-1.5 text-sm outline-none text-slate-600 bg-white"
+                                            >
+                                                <option value={5}>5 / page</option>
+                                                <option value={10}>10 / page</option>
+                                                <option value={20}>20 / page</option>
+                                                <option value={50}>50 / page</option>
+                                            </select>
+                                            <button
+                                                onClick={() => setPerformancePage(p => Math.max(1, p - 1))}
+                                                disabled={performanceData.pagination?.page === 1}
+                                                className="px-3 py-1.5 border border-slate-200 rounded-full hover:bg-slate-50 disabled:opacity-40 transition"
+                                            >
+                                                Previous
+                                            </button>
+                                            <span className="px-3 py-1.5">Page {performanceData.pagination?.page || 1} of {performanceData.pagination?.pages || 1}</span>
+                                            <button
+                                                onClick={() => setPerformancePage(p => Math.min(performanceData.pagination?.pages || 1, p + 1))}
+                                                disabled={(performanceData.pagination?.page || 1) >= (performanceData.pagination?.pages || 1)}
+                                                className="px-3 py-1.5 border border-slate-200 rounded-full hover:bg-slate-50 disabled:opacity-40 transition"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-80 bg-white border border-slate-200 rounded-xl max-w-6xl">
+                                    <PackageIcon size={40} className="text-slate-300 mb-3" />
+                                    <p className="text-2xl text-slate-400 font-medium">No approved products found</p>
+                                    <p className="text-sm text-slate-400 mt-1">Approved products will appear here once they are listed and moderated.</p>
+                                </div>
+                            )}
                         </>
                     )}
                 </>
