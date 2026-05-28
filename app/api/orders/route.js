@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
-import prisma, { prismaWs } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
 import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
 import { getSocketServer } from "@/lib/socketServer";
@@ -93,13 +93,19 @@ export async function POST(request) {
             groupedItems.set(item.id, (groupedItems.get(item.id) || 0) + quantity);
         }
 
-        // Batch-fetch all products in one query to avoid N+1
+        // Batch-fetch all products + their stores (no include — avoids driverAdapters transaction)
         const productIds = [...groupedItems.keys()];
         const fetchedProducts = await prisma.product.findMany({
-            where: { id: { in: productIds } },
-            include: { store: true }
+            where: { id: { in: productIds } }
         });
-        const productMap = new Map(fetchedProducts.map(p => [p.id, p]));
+        const fetchedStoreIds = [...new Set(fetchedProducts.map(p => p.storeId).filter(Boolean))];
+        const fetchedStores = fetchedStoreIds.length
+            ? await prisma.store.findMany({ where: { id: { in: fetchedStoreIds } } })
+            : [];
+        const fetchedStoreMap = new Map(fetchedStores.map(s => [s.id, s]));
+        const productMap = new Map(
+            fetchedProducts.map(p => [p.id, { ...p, store: fetchedStoreMap.get(p.storeId) || null }])
+        );
 
         // Group orders by storeId using Map
         const orderByStore = new Map();
@@ -147,142 +153,126 @@ export async function POST(request) {
             })
         }
 
-        let orderIds = [];
-
-        let isShippingFeeAdded = false;
+        const orderIds = [];
         const paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000);
 
-        // Preheat: send one HTTP query first so Neon wakes from auto-suspend before
-        // the WebSocket handshake. The WebSocket handshake only succeeds reliably
-        // when Neon is already active — this guarantees it.
-        await prisma.$queryRaw`SELECT 1`;
+        // ── Phase 1: Reserve stock (optimistic locking, no transaction) ──────────
+        // Decrement each item atomically. If any decrement fails (race condition or
+        // stale read), restore already-decremented items and abort.
+        const decremented = []; // [{id, quantity}] — for rollback
 
-        await prismaWs.$transaction(async (tx) => {
-            // Create orders for each seller
-            for(const [storeId, storeItems] of orderByStore.entries()){
-                for (const item of storeItems) {
-                    const stockUpdate = await tx.product.updateMany({
-                        where: {
-                            id: item.id,
-                            storeId,
-                            approvalStatus: 'APPROVED',
-                            inStock: true,
-                            warehouseQuantity: {
-                                gte: item.quantity
-                            }
-                        },
-                        data: {
-                            warehouseQuantity: {
-                                decrement: item.quantity
-                            }
-                        }
-                    });
+        for (const [storeId, storeItems] of orderByStore.entries()) {
+            for (const item of storeItems) {
+                const stockUpdate = await prisma.product.updateMany({
+                    where: {
+                        id: item.id,
+                        storeId,
+                        approvalStatus: 'APPROVED',
+                        inStock: true,
+                        warehouseQuantity: { gte: item.quantity }
+                    },
+                    data: { warehouseQuantity: { decrement: item.quantity } }
+                });
 
-                    if (stockUpdate.count !== 1) {
-                        throw new Error(`Insufficient stock for ${item.name}`);
+                if (stockUpdate.count !== 1) {
+                    // Restore already-decremented items before aborting
+                    if (decremented.length) {
+                        await Promise.all(decremented.map(d =>
+                            prisma.product.update({ where: { id: d.id }, data: { warehouseQuantity: { increment: d.quantity } } })
+                        )).catch(console.error);
                     }
-
-                    const remainingProduct = await tx.product.findUnique({
-                        where: { id: item.id },
-                        select: { warehouseQuantity: true }
-                    });
-
-                    const remaining = remainingProduct?.warehouseQuantity ?? 0;
-                    if (remaining <= 0) {
-                        await tx.product.update({ where: { id: item.id }, data: { inStock: false } });
-                    }
-
-                    // Low-stock alert: notify seller via socket when quantity hits threshold
-                    if (remaining > 0 && remaining <= 5) {
-                        try {
-                            const io = getSocketServer();
-                            io.to(`store-room-${storeId}`).emit('store-notification', {
-                                key: 'lowStock',
-                                productId: item.id,
-                                productName: item.name,
-                                warehouseQuantity: remaining,
-                                message: `Low stock: "${item.name}" has only ${remaining} unit${remaining !== 1 ? 's' : ''} left.`
-                            });
-                        } catch {}
-                    }
+                    return NextResponse.json({ error: `Insufficient stock for ${item.name}` }, { status: 400 });
                 }
 
+                decremented.push({ id: item.id, quantity: item.quantity });
+
+                const remaining = await prisma.product.findUnique({
+                    where: { id: item.id },
+                    select: { warehouseQuantity: true }
+                });
+                const qty = remaining?.warehouseQuantity ?? 0;
+                if (qty <= 0) {
+                    await prisma.product.update({ where: { id: item.id }, data: { inStock: false } });
+                }
+                if (qty > 0 && qty <= 5) {
+                    try {
+                        const io = getSocketServer();
+                        io.to(`store-room-${storeId}`).emit('store-notification', {
+                            key: 'lowStock', productId: item.id, productName: item.name,
+                            warehouseQuantity: qty,
+                            message: `Low stock: "${item.name}" has only ${qty} unit${qty !== 1 ? 's' : ''} left.`
+                        });
+                    } catch {}
+                }
+            }
+        }
+
+        // ── Phase 2: Create orders (no nested writes — split into order + items) ─
+        // If order creation fails, restore all decremented stock.
+        try {
+            for (const [storeId, storeItems] of orderByStore.entries()) {
                 let total = storeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-                if(couponCode && coupon){
-                    total -= (total * coupon.discount / 100);
-                }
+                if (couponCode && coupon) total -= (total * coupon.discount / 100);
 
-                // Calculate shipping cost for this store (per-store shipping)
-                const shippingRes = await calculateOrderShippingForStore(tx, storeId, address, storeItems);
+                const shippingRes = await calculateOrderShippingForStore(prisma, storeId, address, storeItems);
                 const shippingCost = shippingRes?.cost || 0;
                 const shippingRuleId = shippingRes?.ruleId || null;
-                // LOCAL_SELLER: seller quotes shipping after seeing address (starts unquoted)
-                // FULL_MANAGED: shipping auto-calculated from zone × weight tariff (already quoted)
                 const shippingQuoted = shippingRes?.shippingQuoted ?? true;
-
-                // Add shipping cost once per store order
                 total += shippingCost;
 
-                // Calculate commission breakdown per item and persist with order
                 const commissionBreakdown = [];
                 for (const item of storeItems) {
                     try {
-                        const comm = await calculateItemCommission(tx, { category: item.category }, item.price, item.sellerModel);
-                        const commissionAmountTotal = parseFloat((comm.commissionAmount * item.quantity).toFixed(2));
+                        const comm = await calculateItemCommission(prisma, { category: item.category }, item.price, item.sellerModel);
                         commissionBreakdown.push({
-                            productId: item.id,
-                            quantity: item.quantity,
+                            productId: item.id, quantity: item.quantity,
                             unitCommission: comm.commissionAmount,
-                            commissionAmount: commissionAmountTotal,
-                            commissionRate: comm.commissionRate,
-                            fixedAmount: comm.fixedAmount,
+                            commissionAmount: parseFloat((comm.commissionAmount * item.quantity).toFixed(2)),
+                            commissionRate: comm.commissionRate, fixedAmount: comm.fixedAmount,
                             appliedRuleId: comm.appliedRuleId
                         });
-                    } catch (err) {
-                        console.error('Commission calc error', err);
-                    }
+                    } catch (err) { console.error('Commission calc error', err); }
                 }
 
-                const order = await tx.order.create({
+                // Flat order create (no nested orderItems — nested writes trigger an
+                // implicit transaction that PrismaNeonHttp rejects)
+                const order = await prisma.order.create({
                     data: {
-                        userId,
-                        storeId,
-                        addressId,
+                        userId, storeId, addressId,
                         total: parseFloat(total.toFixed(2)),
                         shippingCost: parseFloat((shippingCost || 0).toFixed(2)),
-                        shippingQuoted,
-                        shippingRuleId: shippingRuleId,
+                        shippingQuoted, shippingRuleId,
                         commission: commissionBreakdown.length ? commissionBreakdown : {},
                         paymentMethod: selectedPaymentMethod,
-                        paymentStatus: "PENDING",
-                        paymentExpiresAt,
-                        isPaid: false,
-                        isCouponUsed: !!couponCode,
-                        coupon: couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {},
-                        orderItems: {
-                            create: storeItems.map(item => ({
-                                productId: item.id,
-                                quantity: item.quantity,
-                                price: item.price
-                            }))
-                        }
+                        paymentStatus: "PENDING", paymentExpiresAt,
+                        isPaid: false, isCouponUsed: !!couponCode,
+                        coupon: couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {}
                     }
                 });
+
+                // Create order items separately (parallel)
+                await Promise.all(storeItems.map(item =>
+                    prisma.orderItem.create({
+                        data: { orderId: order.id, productId: item.id, quantity: item.quantity, price: item.price }
+                    })
+                ));
+
                 orderIds.push(order.id);
             }
+        } catch (orderError) {
+            // Restore stock if order creation failed
+            await Promise.all(decremented.map(d =>
+                prisma.product.update({ where: { id: d.id }, data: { warehouseQuantity: { increment: d.quantity }, inStock: true } })
+            )).catch(console.error);
+            throw orderError;
+        }
 
-            await tx.user.update({
-                where: { id: userId },
-                data: { cart: {} }
-            });
+        // ── Phase 3: Cleanup (non-critical, failures don't affect order) ─────────
+        prisma.user.update({ where: { id: userId }, data: { cart: {} } }).catch(console.error);
 
-            if(couponCode && coupon){
-                await tx.coupon.update({
-                    where: { code: coupon.code },
-                    data: { usedCount: { increment: 1 } }
-                });
-            }
-        });
+        if (couponCode && coupon) {
+            prisma.coupon.update({ where: { code: coupon.code }, data: { usedCount: { increment: 1 } } }).catch(console.error);
+        }
 
         try {
             const io = getSocketServer();
