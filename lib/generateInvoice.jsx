@@ -5,20 +5,25 @@ import path from 'path';
 
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF';
 
+// Brand colours — match Navbar/Footer exactly
+const BRAND_BLUE = '#4f6bcb';
+const BRAND_GREEN = '#79cc4f';
+
 const styles = StyleSheet.create({
     page: { fontFamily: 'Helvetica', fontSize: 10, color: '#334155', padding: 40, backgroundColor: '#ffffff' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, paddingBottom: 16, borderBottomWidth: 2, borderBottomColor: '#16a34a' },
-    brand: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: '#0f172a' },
-    brandSub: { fontSize: 9, color: '#64748b', marginTop: 3 },
-    invoiceLabel: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#16a34a', textAlign: 'right' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, paddingBottom: 16, borderBottomWidth: 2, borderBottomColor: BRAND_BLUE },
+    brand: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: BRAND_BLUE },
+    brandTagline: { fontSize: 9, color: BRAND_GREEN, marginTop: 2, fontFamily: 'Helvetica-Oblique' },
+    brandSub: { fontSize: 8, color: '#64748b', marginTop: 4 },
+    invoiceLabel: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: BRAND_BLUE, textAlign: 'right' },
     invoiceNum: { fontSize: 9, color: '#64748b', textAlign: 'right', marginTop: 3 },
     section: { marginBottom: 18 },
     sectionTitle: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 },
     row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
     label: { color: '#64748b' },
     value: { fontFamily: 'Helvetica-Bold', color: '#0f172a' },
-    tableHeader: { flexDirection: 'row', backgroundColor: '#f1f5f9', padding: '6 8', borderRadius: 4, marginBottom: 4 },
-    tableHeaderText: { fontFamily: 'Helvetica-Bold', fontSize: 9, color: '#475569' },
+    tableHeader: { flexDirection: 'row', backgroundColor: '#eef1fb', padding: '6 8', borderRadius: 4, marginBottom: 4 },
+    tableHeaderText: { fontFamily: 'Helvetica-Bold', fontSize: 9, color: BRAND_BLUE },
     tableRow: { flexDirection: 'row', padding: '5 8', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
     col1: { flex: 3 },
     col2: { flex: 1, textAlign: 'center' },
@@ -28,15 +33,15 @@ const styles = StyleSheet.create({
     totalRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 },
     totalLabel: { width: 110, color: '#64748b', textAlign: 'right', marginRight: 16 },
     totalValue: { width: 80, textAlign: 'right', fontFamily: 'Helvetica-Bold', color: '#0f172a' },
-    grandTotalRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6, paddingTop: 6, borderTopWidth: 1.5, borderTopColor: '#0f172a' },
+    grandTotalRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 6, paddingTop: 6, borderTopWidth: 1.5, borderTopColor: BRAND_BLUE },
     grandTotalLabel: { width: 110, textAlign: 'right', marginRight: 16, fontFamily: 'Helvetica-Bold', fontSize: 12, color: '#0f172a' },
-    grandTotalValue: { width: 80, textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 12, color: '#16a34a' },
-    paymentBox: { marginTop: 20, padding: 14, backgroundColor: '#f0fdf4', borderRadius: 6, borderWidth: 1, borderColor: '#bbf7d0' },
-    paymentBoxBank: { marginTop: 20, padding: 14, backgroundColor: '#fffbeb', borderRadius: 6, borderWidth: 1, borderColor: '#fde68a' },
-    paymentTitle: { fontFamily: 'Helvetica-Bold', fontSize: 11, color: '#15803d', marginBottom: 8 },
-    paymentTitleBank: { fontFamily: 'Helvetica-Bold', fontSize: 11, color: '#92400e', marginBottom: 8 },
+    grandTotalValue: { width: 80, textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 12, color: BRAND_BLUE },
+    paymentBox: { marginTop: 20, padding: 14, backgroundColor: '#f0f4ff', borderRadius: 6, borderWidth: 1, borderColor: '#c7d2f8' },
+    paymentBoxBank: { marginTop: 20, padding: 14, backgroundColor: '#f0f4ff', borderRadius: 6, borderWidth: 1, borderColor: '#c7d2f8' },
+    paymentTitle: { fontFamily: 'Helvetica-Bold', fontSize: 11, color: BRAND_BLUE, marginBottom: 8 },
+    paymentTitleBank: { fontFamily: 'Helvetica-Bold', fontSize: 11, color: BRAND_BLUE, marginBottom: 8 },
     footer: { marginTop: 32, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', fontSize: 8, color: '#94a3b8', textAlign: 'center' },
-    badge: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#16a34a', borderRadius: 4, color: '#ffffff', fontFamily: 'Helvetica-Bold', fontSize: 9, alignSelf: 'flex-start' },
+    badge: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: BRAND_BLUE, borderRadius: 4, color: '#ffffff', fontFamily: 'Helvetica-Bold', fontSize: 9, alignSelf: 'flex-start' },
 });
 
 function fmt(amount) {
@@ -62,6 +67,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                         )}
                         <View>
                             <Text style={styles.brand}>The Quality Market</Text>
+                            <Text style={styles.brandTagline}>Quality is our Culture</Text>
                             <Text style={styles.brandSub}>Kigali, KN 82 St, Tropical plaza, C26</Text>
                             <Text style={styles.brandSub}>support@thequalitymarket.com  |  +250 783 610 209</Text>
                         </View>
@@ -125,7 +131,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                     {couponDiscount > 0 && (
                         <View style={styles.totalRow}>
                             <Text style={styles.totalLabel}>Coupon ({coupon.code})</Text>
-                            <Text style={[styles.totalValue, { color: '#16a34a' }]}>- {fmt(couponDiscount)}</Text>
+                            <Text style={[styles.totalValue, { color: BRAND_GREEN }]}>- {fmt(couponDiscount)}</Text>
                         </View>
                     )}
                     <View style={styles.grandTotalRow}>
