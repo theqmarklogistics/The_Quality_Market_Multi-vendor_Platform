@@ -1,5 +1,7 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image as PDFImage } from '@react-pdf/renderer';
+import fs from 'fs';
+import path from 'path';
 
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF';
 
@@ -41,7 +43,7 @@ function fmt(amount) {
     return `${currency} ${Number(amount || 0).toLocaleString()}`;
 }
 
-function InvoiceDocument({ order, paymentConfig }) {
+function InvoiceDocument({ order, paymentConfig, logoSrc }) {
     const isMomo = order.paymentMethod === 'MTN_MOMO';
     const subtotal = order.orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const coupon = order.coupon && typeof order.coupon === 'object' ? order.coupon : null;
@@ -54,14 +56,19 @@ function InvoiceDocument({ order, paymentConfig }) {
 
                 {/* Header */}
                 <View style={styles.header}>
-                    <View>
-                        <Text style={styles.brand}>The Quality Market</Text>
-                        <Text style={styles.brandSub}>Kigali, KN 82 St, Tropical plaza, C26</Text>
-                        <Text style={styles.brandSub}>support@thequalitymarket.com  |  +250 783 610 209</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {logoSrc && (
+                            <PDFImage src={logoSrc} style={{ width: 52, height: 30, marginRight: 8, objectFit: 'contain' }} />
+                        )}
+                        <View>
+                            <Text style={styles.brand}>The Quality Market</Text>
+                            <Text style={styles.brandSub}>Kigali, KN 82 St, Tropical plaza, C26</Text>
+                            <Text style={styles.brandSub}>support@thequalitymarket.com  |  +250 783 610 209</Text>
+                        </View>
                     </View>
                     <View>
                         <Text style={styles.invoiceLabel}>INVOICE</Text>
-                        <Text style={styles.invoiceNum}>#{order.id.slice(0, 8).toUpperCase()}</Text>
+                        <Text style={styles.invoiceNum}>Order ID: {order.id.slice(0, 8).toUpperCase()}</Text>
                         <Text style={styles.invoiceNum}>Issued: {new Date().toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
                     </View>
                 </View>
@@ -82,7 +89,7 @@ function InvoiceDocument({ order, paymentConfig }) {
                             <Text>{isMomo ? 'MTN MoMo' : 'Bank Transfer'}</Text>
                         </View>
                         <Text style={[styles.label, { marginTop: 6 }]}>Order date: {new Date(order.createdAt).toLocaleDateString()}</Text>
-                        <Text style={[styles.label, { marginTop: 2 }]}>Reference: {order.id.slice(0, 8).toUpperCase()}</Text>
+                        <Text style={[styles.label, { marginTop: 2 }]}>Order ID: {order.id.slice(0, 8).toUpperCase()}</Text>
                     </View>
                 </View>
 
@@ -162,8 +169,14 @@ function InvoiceDocument({ order, paymentConfig }) {
 }
 
 export async function generateInvoice({ order, paymentConfig }) {
+    let logoSrc = null;
+    try {
+        const filePath = path.join(process.cwd(), 'public', 'the-quality-market-logo.png');
+        logoSrc = `data:image/png;base64,${fs.readFileSync(filePath).toString('base64')}`;
+    } catch {}
+
     const buffer = await renderToBuffer(
-        <InvoiceDocument order={order} paymentConfig={paymentConfig} />
+        <InvoiceDocument order={order} paymentConfig={paymentConfig} logoSrc={logoSrc} />
     );
     return buffer;
 }

@@ -54,15 +54,13 @@ const Footer = () => {
             <div className="max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row items-start justify-between gap-10 py-10 border-b border-slate-500/30 text-slate-500">
                     <div>
-                        <div className="flex items-center gap-3">
-                            <Link href="/" className="inline-block shrink-0">
-                                <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-14 w-auto object-contain" />
-                            </Link>
+                        <Link href="/" className="flex items-center gap-2">
+                            <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-14 w-auto object-contain" />
                             <div className="flex flex-col leading-tight">
-                                <span className="font-bold text-lg" style={{ color: '#4f6bcb' }}>The Quality Market</span>
+                                <span className="font-bold text-sm" style={{ color: '#4f6bcb' }}>The Quality Market</span>
                                 <span className="text-xs italic" style={{ color: '#79cc4f' }}>Quality is our Culture</span>
                             </div>
-                        </div>
+                        </Link>
                         <p className="max-w-[420px] mt-4 text-sm leading-7">Welcome to The Quality Market, your destination for trusted gadgets, useful accessories, and store-approved products that make everyday shopping feel simple and reliable.</p>
                         <div className="flex items-center gap-3 mt-5">
                             {socialIcons.map((item, i) => (
