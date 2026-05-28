@@ -207,8 +207,12 @@ export async function POST(request) {
             }
         }
 
-        // ── Phase 2: Create orders (no nested writes — split into order + items) ─
-        // If order creation fails, restore all decremented stock.
+        // ── Phase 2: Create orders ────────────────────────────────────────────────
+        // The Prisma JS engine (driverAdapters) wraps create() in an implicit
+        // transaction even for flat inserts — PrismaNeonHttp rejects that.
+        // Use $executeRaw so the driver gets a single INSERT with no transaction.
+        // If any insert fails, restore all decremented stock.
+        const now = new Date();
         try {
             for (const [storeId, storeItems] of orderByStore.entries()) {
                 let total = storeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -234,33 +238,44 @@ export async function POST(request) {
                     } catch (err) { console.error('Commission calc error', err); }
                 }
 
-                // Flat order create (no nested orderItems — nested writes trigger an
-                // implicit transaction that PrismaNeonHttp rejects)
-                const order = await prisma.order.create({
-                    data: {
-                        userId, storeId, addressId,
-                        total: parseFloat(total.toFixed(2)),
-                        shippingCost: parseFloat((shippingCost || 0).toFixed(2)),
-                        shippingQuoted, shippingRuleId,
-                        commission: commissionBreakdown.length ? commissionBreakdown : {},
-                        paymentMethod: selectedPaymentMethod,
-                        paymentStatus: "PENDING", paymentExpiresAt,
-                        isPaid: false, isCouponUsed: !!couponCode,
-                        coupon: couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {}
-                    }
-                });
+                const orderId = 'ord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                const commissionJson = JSON.stringify(commissionBreakdown.length ? commissionBreakdown : {});
+                const couponJson = JSON.stringify(couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {});
 
-                // Create order items separately (parallel)
-                await Promise.all(storeItems.map(item =>
-                    prisma.orderItem.create({
-                        data: { orderId: order.id, productId: item.id, quantity: item.quantity, price: item.price }
-                    })
-                ));
+                await prisma.$executeRaw`
+                    INSERT INTO "Order" (
+                        id, "userId", "storeId", "addressId",
+                        total, status,
+                        "shippingCost", "shippingQuoted", "shippingRuleId",
+                        commission,
+                        "paymentMethod", "paymentStatus", "paymentExpiresAt",
+                        "isPaid", "isCouponUsed", coupon,
+                        "invoiceRequested", "paymentProofStatus",
+                        "createdAt", "updatedAt"
+                    ) VALUES (
+                        ${orderId}, ${userId}, ${storeId}, ${addressId},
+                        ${parseFloat(total.toFixed(2))}, 'ORDER_PLACED'::"OrderStatus",
+                        ${parseFloat((shippingCost || 0).toFixed(2))}, ${shippingQuoted}, ${shippingRuleId},
+                        ${commissionJson}::jsonb,
+                        ${selectedPaymentMethod}::"PaymentMethod", 'PENDING'::"PaymentStatus", ${paymentExpiresAt},
+                        false, ${!!couponCode}, ${couponJson}::jsonb,
+                        false, 'NOT_SUBMITTED'::"PaymentProofStatus",
+                        ${now}, ${now}
+                    )
+                `;
 
-                orderIds.push(order.id);
+                // Insert order items as individual raw statements (no transaction)
+                for (const item of storeItems) {
+                    await prisma.$executeRaw`
+                        INSERT INTO "OrderItem" ("orderId", "productId", quantity, price)
+                        VALUES (${orderId}, ${item.id}, ${item.quantity}, ${item.price})
+                    `;
+                }
+
+                orderIds.push(orderId);
             }
         } catch (orderError) {
-            // Restore stock if order creation failed
+            // Restore stock if any insert failed
             await Promise.all(decremented.map(d =>
                 prisma.product.update({ where: { id: d.id }, data: { warehouseQuantity: { increment: d.quantity }, inStock: true } })
             )).catch(console.error);
