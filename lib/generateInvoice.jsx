@@ -63,7 +63,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                 <View style={styles.header}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {logoSrc && (
-                            <PDFImage src={logoSrc} style={{ width: 52, height: 30, marginRight: 8, objectFit: 'contain' }} />
+                            <PDFImage src={logoSrc} style={{ width: 90, height: 50, marginRight: 10, objectFit: 'contain' }} />
                         )}
                         <View>
                             <Text style={styles.brand}>The Quality Market</Text>
