@@ -481,7 +481,7 @@ export default function AdminProducts() {
                                                         {p.images?.[0] && (
                                                             <Image src={p.images[0]} alt={p.name} width={40} height={40} className="h-10 w-10 rounded-md object-cover border border-slate-100 shrink-0" />
                                                         )}
-                                                        <span className="font-medium text-slate-700 line-clamp-2 max-w-[200px]">{p.name}</span>
+                                                        <Link href={`/admin/products/${p.id}/analytics`} className="font-medium text-slate-700 line-clamp-2 max-w-[200px]">{p.name}</Link>
                                                     </div>
                                                 </td>
                                                 <td className="px-3 py-3">
@@ -624,7 +624,7 @@ export default function AdminProducts() {
                                                                     <Image src={p.images[0]} alt={p.name} width={40} height={40} className="h-10 w-10 rounded-md object-cover border border-slate-100 shrink-0" />
                                                                 )}
                                                                 <div className="min-w-0">
-                                                                    <span className="font-medium text-slate-700 line-clamp-2 block max-w-[240px]">{p.name}</span>
+                                                                    <Link href={`/admin/products/${p.id}/analytics`} className="font-medium text-slate-700 line-clamp-2 block max-w-[240px]">{p.name}</Link>
                                                                     <span className="text-xs text-slate-400">Rank #{p.rank}</span>
                                                                 </div>
                                                             </div>
