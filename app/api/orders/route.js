@@ -163,22 +163,29 @@ export async function POST(request) {
 
         for (const [storeId, storeItems] of orderByStore.entries()) {
             for (const item of storeItems) {
-                const stockUpdate = await prisma.product.updateMany({
-                    where: {
-                        id: item.id,
-                        storeId,
-                        approvalStatus: 'APPROVED',
-                        inStock: true,
-                        warehouseQuantity: { gte: item.quantity }
-                    },
-                    data: { warehouseQuantity: { decrement: item.quantity } }
-                });
+                // Use $queryRaw so the JS engine cannot wrap this in an implicit transaction.
+                // Returns the updated row's id if the WHERE conditions matched, empty array if not.
+                const stockRows = await prisma.$queryRaw`
+                    UPDATE "Product"
+                    SET "warehouseQuantity" = "warehouseQuantity" - ${item.quantity},
+                        "updatedAt" = NOW()
+                    WHERE id = ${item.id}
+                      AND "storeId" = ${storeId}
+                      AND "approvalStatus" = 'APPROVED'::"ProductApprovalStatus"
+                      AND "inStock" = true
+                      AND "warehouseQuantity" >= ${item.quantity}
+                    RETURNING id
+                `;
 
-                if (stockUpdate.count !== 1) {
-                    // Restore already-decremented items before aborting
+                if (!stockRows || stockRows.length === 0) {
                     if (decremented.length) {
                         await Promise.all(decremented.map(d =>
-                            prisma.product.update({ where: { id: d.id }, data: { warehouseQuantity: { increment: d.quantity } } })
+                            prisma.$executeRaw`
+                                UPDATE "Product"
+                                SET "warehouseQuantity" = "warehouseQuantity" + ${d.quantity},
+                                    "inStock" = true, "updatedAt" = NOW()
+                                WHERE id = ${d.id}
+                            `
                         )).catch(console.error);
                     }
                     return NextResponse.json({ error: `Insufficient stock for ${item.name}` }, { status: 400 });
@@ -186,13 +193,14 @@ export async function POST(request) {
 
                 decremented.push({ id: item.id, quantity: item.quantity });
 
-                const remaining = await prisma.product.findUnique({
-                    where: { id: item.id },
-                    select: { warehouseQuantity: true }
-                });
-                const qty = remaining?.warehouseQuantity ?? 0;
+                const remainingRows = await prisma.$queryRaw`
+                    SELECT "warehouseQuantity" FROM "Product" WHERE id = ${item.id} LIMIT 1
+                `;
+                const qty = Number(remainingRows?.[0]?.warehouseQuantity ?? 0);
                 if (qty <= 0) {
-                    await prisma.product.update({ where: { id: item.id }, data: { inStock: false } });
+                    await prisma.$executeRaw`
+                        UPDATE "Product" SET "inStock" = false, "updatedAt" = NOW() WHERE id = ${item.id}
+                    `;
                 }
                 if (qty > 0 && qty <= 5) {
                     try {
@@ -275,18 +283,22 @@ export async function POST(request) {
                 orderIds.push(orderId);
             }
         } catch (orderError) {
-            // Restore stock if any insert failed
             await Promise.all(decremented.map(d =>
-                prisma.product.update({ where: { id: d.id }, data: { warehouseQuantity: { increment: d.quantity }, inStock: true } })
+                prisma.$executeRaw`
+                    UPDATE "Product"
+                    SET "warehouseQuantity" = "warehouseQuantity" + ${d.quantity},
+                        "inStock" = true, "updatedAt" = NOW()
+                    WHERE id = ${d.id}
+                `
             )).catch(console.error);
             throw orderError;
         }
 
-        // ── Phase 3: Cleanup (non-critical, failures don't affect order) ─────────
-        prisma.user.update({ where: { id: userId }, data: { cart: {} } }).catch(console.error);
+        // ── Phase 3: Cleanup — raw SQL so the JS engine cannot wrap in a transaction
+        prisma.$executeRaw`UPDATE "User" SET cart = '{}'::jsonb WHERE id = ${userId}`.catch(console.error);
 
         if (couponCode && coupon) {
-            prisma.coupon.update({ where: { code: coupon.code }, data: { usedCount: { increment: 1 } } }).catch(console.error);
+            prisma.$executeRaw`UPDATE "Coupon" SET "usedCount" = "usedCount" + 1 WHERE code = ${coupon.code}`.catch(console.error);
         }
 
         try {
