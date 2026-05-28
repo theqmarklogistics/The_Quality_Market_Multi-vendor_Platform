@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
+import { randomBytes } from "crypto";
 import prisma from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
 import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
@@ -246,7 +247,7 @@ export async function POST(request) {
                     } catch (err) { console.error('Commission calc error', err); }
                 }
 
-                const orderId = 'ord_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                const orderId = 'ord_' + randomBytes(8).toString('hex');
                 const commissionJson = JSON.stringify(commissionBreakdown.length ? commissionBreakdown : {});
                 const couponJson = JSON.stringify(couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {});
 

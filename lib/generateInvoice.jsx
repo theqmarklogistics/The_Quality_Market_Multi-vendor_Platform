@@ -74,7 +74,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                     </View>
                     <View>
                         <Text style={styles.invoiceLabel}>INVOICE</Text>
-                        <Text style={styles.invoiceNum}>Order ID: {order.id.slice(0, 8).toUpperCase()}</Text>
+                        <Text style={styles.invoiceNum}>Order ID: {order.id.slice(0, 16).toUpperCase()}</Text>
                         <Text style={styles.invoiceNum}>Issued: {new Date().toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
                     </View>
                 </View>
@@ -95,7 +95,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                             <Text>{isMomo ? 'MTN MoMo' : 'Bank Transfer'}</Text>
                         </View>
                         <Text style={[styles.label, { marginTop: 6 }]}>Order date: {new Date(order.createdAt).toLocaleDateString()}</Text>
-                        <Text style={[styles.label, { marginTop: 2 }]}>Order ID: {order.id.slice(0, 8).toUpperCase()}</Text>
+                        <Text style={[styles.label, { marginTop: 2 }]}>Order ID: {order.id.slice(0, 16).toUpperCase()}</Text>
                     </View>
                 </View>
 
@@ -147,7 +147,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                         <View style={styles.row}><Text style={styles.label}>Account Name:</Text><Text style={styles.value}>{paymentConfig?.momoAccountName || '—'}</Text></View>
                         <View style={styles.row}><Text style={styles.label}>Pay Code:</Text><Text style={styles.value}>{paymentConfig?.momoPayCode || '—'}</Text></View>
                         <View style={styles.row}><Text style={styles.label}>Amount to Pay:</Text><Text style={styles.value}>{fmt(order.total)}</Text></View>
-                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{order.id.slice(0, 8).toUpperCase()}</Text> as the payment note.</Text>
+                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{order.id.slice(0, 16).toUpperCase()}</Text> as the payment note.</Text>
                     </View>
                 ) : (
                     <View style={styles.paymentBoxBank}>
@@ -159,7 +159,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                             <View style={styles.row}><Text style={styles.label}>Branch:</Text><Text style={styles.value}>{paymentConfig.bankBranch}</Text></View>
                         )}
                         <View style={styles.row}><Text style={styles.label}>Amount to Transfer:</Text><Text style={styles.value}>{fmt(order.total)}</Text></View>
-                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{order.id.slice(0, 8).toUpperCase()}</Text> as the transfer description.</Text>
+                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{order.id.slice(0, 16).toUpperCase()}</Text> as the transfer description.</Text>
                     </View>
                 )}
 

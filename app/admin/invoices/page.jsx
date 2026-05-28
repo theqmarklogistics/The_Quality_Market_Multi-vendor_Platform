@@ -88,7 +88,7 @@ const AdminInvoicesPage = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {pending.map(order => (
                                     <tr key={order.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">#{order.id.slice(0, 8)}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">#{order.id.slice(0, 16)}</td>
                                         <td className="px-4 py-3 text-slate-700">
                                             <div>{order.user?.name || '—'}</div>
                                             <div className="text-xs text-slate-400">{order.user?.email}</div>
@@ -138,7 +138,7 @@ const AdminInvoicesPage = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {sent.map(order => (
                                     <tr key={order.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">#{order.id.slice(0, 8)}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">#{order.id.slice(0, 16)}</td>
                                         <td className="px-4 py-3 text-slate-700">
                                             <div>{order.user?.name || '—'}</div>
                                             <div className="text-xs text-slate-400">{order.user?.email}</div>
