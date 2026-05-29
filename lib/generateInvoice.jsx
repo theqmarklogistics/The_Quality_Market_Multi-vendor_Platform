@@ -238,8 +238,8 @@ function StoreContractDocument({ store, owner, issuedAt }) {
                 </View>
 
                 <Text style={contractStyles.footer}>
-                    The Quality Market &mdash; Kigali, KN 82 St, Tropical plaza, C26{'
-'}support@thequalitymarket.com &nbsp;|&nbsp; +250 783 610 209
+                    The Quality Market - Kigali, KN 82 St, Tropical plaza, C26{"\n"}
+                    support@thequalitymarket.com | +250 783 610 209
                 </Text>
             </Page>
         </Document>
