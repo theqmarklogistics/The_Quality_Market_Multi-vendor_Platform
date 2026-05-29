@@ -1,11 +1,11 @@
 import prisma from '@/lib/prisma'
-import { getAuth } from '@clerk/nextjs/server'
+import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default async function FinancialDashboardPage() {
-  const { userId } = getAuth()
+  const { userId } = auth()
   if (!userId) return redirect('/sign-in')
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
