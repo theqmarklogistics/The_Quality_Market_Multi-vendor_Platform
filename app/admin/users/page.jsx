@@ -6,9 +6,6 @@ import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 
 const ROLE_OPTIONS = [
-    { value: 'CUSTOMER', label: 'Customer' },
-    { value: 'ADMIN', label: 'Admin' },
-    { value: 'SELLER', label: 'Seller' },
     { value: 'LOGISTICS_MANAGER', label: 'Logistics manager' },
     { value: 'FINANCIAL_OPERATIONAL', label: 'Financial operational' },
     { value: 'WAREHOUSE_KEEPER', label: 'Warehouse keeper' },
@@ -21,7 +18,7 @@ export default function AdminUsersPage() {
     const [loading, setLoading] = useState(true)
     const [users, setUsers] = useState([])
     const [emailInput, setEmailInput] = useState('')
-    const [roleInput, setRoleInput] = useState('SELLER')
+    const [roleInput, setRoleInput] = useState('LOGISTICS_MANAGER')
 
     const fetchUsers = async () => {
         try {
@@ -41,7 +38,7 @@ export default function AdminUsersPage() {
         if (user) fetchUsers()
     }, [user])
 
-    const saveRole = async (event) => {
+    const inviteUser = async (event) => {
         event.preventDefault()
         try {
             const token = await getToken()
@@ -64,9 +61,9 @@ export default function AdminUsersPage() {
     return (
         <div className="text-slate-500 mb-28">
             <h1 className="text-2xl">Manage <span className="text-slate-800 font-medium">Users</span></h1>
-            <p className="text-sm text-slate-400 mt-1">Assign dashboard roles to users who already have an account.</p>
+            <p className="text-sm text-slate-400 mt-1">Invite a user and assign a dashboard role. They will receive an email invite.</p>
 
-            <form onSubmit={saveRole} className="mt-6 flex flex-wrap gap-3 items-end bg-white border border-slate-200 rounded-xl p-4 max-w-3xl">
+            <form onSubmit={inviteUser} className="mt-6 flex flex-wrap gap-3 items-end bg-white border border-slate-200 rounded-xl p-4 max-w-3xl">
                 <label className="flex-1 min-w-64">
                     <span className="block text-xs font-medium text-slate-500 mb-1">User email</span>
                     <input
@@ -91,7 +88,7 @@ export default function AdminUsersPage() {
                     </select>
                 </label>
                 <button type="submit" className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-900">
-                    Save role
+                    Send invite
                 </button>
             </form>
 

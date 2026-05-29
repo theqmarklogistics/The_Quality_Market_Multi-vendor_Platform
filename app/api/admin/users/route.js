@@ -1,12 +1,10 @@
-import { getAuth } from "@clerk/nextjs/server";
+import { clerkClient, getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
+import { sendRoleInviteEmail } from "@/lib/email";
 
 const ALLOWED_ROLES = [
-    'CUSTOMER',
-    'ADMIN',
-    'SELLER',
     'LOGISTICS_MANAGER',
     'FINANCIAL_OPERATIONAL',
     'WAREHOUSE_KEEPER',
@@ -48,17 +46,33 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
         }
 
-        const user = await prisma.user.findFirst({ where: { email: normalizedEmail } });
-        if (!user) {
-            return NextResponse.json({ error: 'User not found. They must sign in once before a role can be assigned.' }, { status: 404 });
+        const existing = await prisma.user.findFirst({ where: { email: normalizedEmail } });
+        if (existing) {
+            await prisma.user.update({
+                where: { id: existing.id },
+                data: { role: normalizedRole },
+            });
+
+            return NextResponse.json({ message: 'User role updated successfully' });
         }
 
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { role: normalizedRole },
+        const client = await clerkClient();
+        const invitation = await client.invitations.createInvitation({
+            emailAddress: normalizedEmail,
+            publicMetadata: { role: normalizedRole },
+            redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://thequalitymarket.com'}/sign-in`,
         });
 
-        return NextResponse.json({ message: 'User role updated successfully' });
+        const inviteUrl = invitation?.url;
+        if (inviteUrl) {
+            await sendRoleInviteEmail({
+                to: normalizedEmail,
+                role: normalizedRole,
+                inviteUrl,
+            });
+        }
+
+        return NextResponse.json({ message: 'Invite sent successfully' });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });
