@@ -187,10 +187,6 @@ export default function ChatRoom({ conversationId }) {
         }
     }, [conversationId, user?.id, isViewerParticipant, getToken])
 
-    useEffect(() => {
-        scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages])
-
     if (loading) return <p className="text-slate-500">Loading chat...</p>
 
     return (

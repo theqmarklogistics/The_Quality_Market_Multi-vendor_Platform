@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
+import { logAdminAction } from "@/lib/auditLog";
 
 export async function GET(request, { params }) {
     try {
@@ -132,5 +133,40 @@ export async function GET(request, { params }) {
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 500 });
+    }
+}
+
+export async function DELETE(request, { params }) {
+    try {
+        const { userId } = getAuth(request);
+        const isAdmin = await authAdmin(userId);
+        if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const { storeId } = await params;
+        const store = await prisma.store.findUnique({ where: { id: storeId }, select: { id: true, status: true, name: true } });
+        if (!store) return NextResponse.json({ error: "Store not found" }, { status: 404 });
+        if (String(store.status).toLowerCase() !== 'rejected') {
+            return NextResponse.json({ error: "Only rejected stores can be archived" }, { status: 400 });
+        }
+
+        await prisma.store.update({
+            where: { id: storeId },
+            data: { status: 'archived', isActive: false, archivedAt: new Date() }
+        });
+
+        const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+        logAdminAction({
+            adminId: userId,
+            adminName: admin?.name || '',
+            action: 'STORE_ARCHIVED',
+            targetType: 'Store',
+            targetId: storeId,
+            notes: `Archived rejected store: ${store.name}`
+        });
+
+        return NextResponse.json({ message: 'Store archived successfully' });
+    } catch (error) {
+        console.error(error);
+        return NextResponse.json({ error: error.message || error.code }, { status: 400 });
     }
 }

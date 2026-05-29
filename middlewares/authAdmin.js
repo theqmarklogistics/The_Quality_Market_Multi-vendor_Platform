@@ -1,4 +1,5 @@
 import { clerkClient } from "@clerk/nextjs/server";
+import prisma from "@/lib/prisma";
 
 
 
@@ -6,6 +7,15 @@ import { clerkClient } from "@clerk/nextjs/server";
 const authAdmin = async (userId) => {
     try {
         if(!userId) return false;
+
+        const userRecord = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true }
+        })
+
+        if (userRecord?.role === 'ADMIN') {
+            return true
+        }
 
         const client = await clerkClient();
         const user = await client.users.getUser(userId);

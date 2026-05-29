@@ -15,6 +15,7 @@ model User {
     name  String
     email String
     image String
+    role  UserRole @default(CUSTOMER)
     cart  Json   @default("{}")
 
     // Relations
@@ -74,6 +75,7 @@ enum OrderStatus {
     PROCESSING
     SHIPPED
     DELIVERED
+    OTHER
 }
 
 enum PaymentMethod {
@@ -151,6 +153,8 @@ model Order {
     invoiceRequestedAt DateTime?
     invoiceStatus      String?   // null | "SENT"
     invoiceSentAt      DateTime?
+    publicStatusNote   String?
+    customStatusLabel  String?
     orderItems    OrderItem[]
 
     // Relations
@@ -245,6 +249,7 @@ model Store {
     status          String   @default("pending")
     isActive        Boolean  @default(false)
     rejectionNotes  String?
+    archivedAt      DateTime?
     logo        String
     email       String
     contact     String
@@ -312,6 +317,15 @@ model Message {
 enum SellerModel {
     FULL_MANAGED
     LOCAL_SELLER
+}
+
+enum UserRole {
+    CUSTOMER
+    ADMIN
+    SELLER
+    LOGISTICS_MANAGER
+    FINANCIAL_OPERATIONAL
+    WAREHOUSE_KEEPER
 }
 
 enum ShippingRuleType {

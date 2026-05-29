@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from "next/navigation"
-import { ClipboardListIcon, CircleDollarSignIcon, CreditCardIcon, FileTextIcon, HomeIcon, LayoutPanelTopIcon, MailIcon, MegaphoneIcon, MessageCircleIcon, PackageCheckIcon, PercentIcon, RotateCcwIcon, ShieldCheckIcon, StoreIcon, TagIcon, TagsIcon, TicketPercentIcon, TruckIcon } from "lucide-react"
+import { ClipboardListIcon, CircleDollarSignIcon, CreditCardIcon, FileTextIcon, HomeIcon, LayoutPanelTopIcon, MailIcon, MegaphoneIcon, MessageCircleIcon, PackageCheckIcon, PercentIcon, RotateCcwIcon, ShieldCheckIcon, StoreIcon, TagIcon, TagsIcon, TicketPercentIcon, TruckIcon, UsersIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useUser } from "@clerk/nextjs"
@@ -33,6 +33,10 @@ const AdminSidebar = () => {
         { name: 'Returns', href: '/admin/returns', icon: RotateCcwIcon },
         { name: 'Payouts', href: '/admin/payouts', icon: CircleDollarSignIcon },
         { name: 'Invoices', href: '/admin/invoices', icon: FileTextIcon, badge: counts.pendingInvoiceRequests },
+        { name: 'Users', href: '/admin/users', icon: UsersIcon },
+        { name: 'Logistics Dashboard', href: '/logistics', icon: TruckIcon },
+        { name: 'Finance Dashboard', href: '/financial', icon: CreditCardIcon },
+        { name: 'Warehouse Dashboard', href: '/warehouse', icon: PackageCheckIcon },
         { name: 'Payment Config', href: '/admin/payment-config', icon: CreditCardIcon },
         { name: 'Audit Log', href: '/admin/audit', icon: ClipboardListIcon },
         { name: 'Hero Banners', href: '/admin/hero', icon: LayoutPanelTopIcon },

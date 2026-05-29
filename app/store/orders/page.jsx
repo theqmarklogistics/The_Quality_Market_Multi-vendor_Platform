@@ -65,21 +65,22 @@ export default function StoreOrders() {
 
     const [updatingStatus, setUpdatingStatus] = useState(false)
     const [shippingInput, setShippingInput] = useState('')
+    const [shippingNoteInput, setShippingNoteInput] = useState('')
     const [settingShipping, setSettingShipping] = useState(false)
 
-    const openModal = (order) => { setSelectedOrder(order); setShippingInput('') }
-    const closeModal = () => { setSelectedOrder(null); setShippingInput('') }
+    const openModal = (order) => { setSelectedOrder(order); setShippingInput(''); setShippingNoteInput(order?.publicStatusNote || '') }
+    const closeModal = () => { setSelectedOrder(null); setShippingInput(''); setShippingNoteInput('') }
 
-    const updateOrderStatus = async (orderId, status) => {
+    const updateOrderStatus = async (orderId, status, extra = {}) => {
         setUpdatingStatus(true)
         try {
             const token = await getToken()
-            await axios.patch(`/api/store/orders/${orderId}`, { status }, {
+            await axios.patch(`/api/store/orders/${orderId}`, { status, ...extra }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            const updated = { ...selectedOrder, status }
+            const updated = { ...selectedOrder, status, ...extra }
             setSelectedOrder(updated)
-            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status, ...extra } : o))
             toast.success(`Order marked as ${status.toLowerCase()}`)
         } catch (error) {
             toast.error(error?.response?.data?.error || error.message)
@@ -110,6 +111,12 @@ export default function StoreOrders() {
         } finally {
             setSettingShipping(false)
         }
+    }
+
+    const submitShippedUpdate = async () => {
+        await updateOrderStatus(selectedOrder.id, 'SHIPPED', {
+            publicStatusNote: shippingNoteInput.trim() || null
+        })
     }
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF'
@@ -194,7 +201,7 @@ export default function StoreOrders() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">
-                                                {STATUS_LABELS[order.status] || order.status}
+                                                {STATUS_LABELS[order.status] || order.customStatusLabel || order.status}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
@@ -242,8 +249,11 @@ export default function StoreOrders() {
                         </div>
 
                         <div className="mb-4 space-y-1">
-                            <p><span className="text-green-700">Status:</span> {selectedOrder.status}</p>
+                            <p><span className="text-green-700">Status:</span> {STATUS_LABELS[selectedOrder.status] || selectedOrder.customStatusLabel || selectedOrder.status}</p>
                             <p><span className="text-green-700">Payment:</span> {selectedOrder.paymentStatus || (selectedOrder.isPaid ? 'PAID' : 'PENDING')}</p>
+                            {selectedOrder.publicStatusNote && (
+                                <p><span className="text-green-700">Public note:</span> {selectedOrder.publicStatusNote}</p>
+                            )}
                             <p>
                                 <span className="text-green-700">Shipping:</span>{' '}
                                 {selectedOrder.shippingQuoted
@@ -301,13 +311,22 @@ export default function StoreOrders() {
                                     </button>
                                 )}
                                 {selectedOrder.status === 'PROCESSING' && (
-                                    <button
-                                        onClick={() => updateOrderStatus(selectedOrder.id, 'SHIPPED')}
-                                        disabled={updatingStatus}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition disabled:opacity-60"
-                                    >
-                                        {updatingStatus ? 'Updating…' : 'Mark as Shipped'}
-                                    </button>
+                                    <div className="w-full space-y-2">
+                                        <textarea
+                                            rows={3}
+                                            value={shippingNoteInput}
+                                            onChange={e => setShippingNoteInput(e.target.value)}
+                                            placeholder="Add a delivery location or public note for the customer"
+                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-400 resize-none"
+                                        />
+                                        <button
+                                            onClick={submitShippedUpdate}
+                                            disabled={updatingStatus}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition disabled:opacity-60"
+                                        >
+                                            {updatingStatus ? 'Updating…' : 'Mark as Shipped'}
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         )}

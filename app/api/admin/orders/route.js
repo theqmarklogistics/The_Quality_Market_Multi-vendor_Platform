@@ -4,7 +4,7 @@ import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { logAdminAction } from "@/lib/auditLog";
 
-const ALLOWED_ORDER_STATUSES = ["ORDER_PLACED", "PROCESSING", "SHIPPED", "DELIVERED"];
+const ALLOWED_ORDER_STATUSES = ["ORDER_PLACED", "PROCESSING", "SHIPPED", "DELIVERED", "OTHER"];
 
 const VALID_TRANSITIONS = {
     ORDER_PLACED: ['PROCESSING'],
@@ -95,7 +95,7 @@ export async function POST(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { orderId, status } = await request.json();
+        const { orderId, status, customStatusLabel, publicStatusNote } = await request.json();
 
         if (!orderId || !status) {
             return NextResponse.json({ error: "Missing order update details" }, { status: 400 });
@@ -111,16 +111,25 @@ export async function POST(request) {
         }
 
         const allowed = VALID_TRANSITIONS[order.status] || [];
-        if (!allowed.includes(status)) {
+        if (status !== 'OTHER' && !allowed.includes(status)) {
             return NextResponse.json({
                 error: `Cannot transition from ${order.status} to ${status}. Expected: ${allowed.join(', ') || 'none'}`
             }, { status: 400 });
         }
 
-        await prisma.order.update({ where: { id: orderId }, data: { status } });
+        const updateData = { status };
+        if (status === 'OTHER') {
+            updateData.customStatusLabel = customStatusLabel?.trim() || 'Other';
+        }
+        if (publicStatusNote !== undefined) {
+            updateData.publicStatusNote = publicStatusNote?.trim() || null;
+        }
+
+        await prisma.order.update({ where: { id: orderId }, data: updateData });
 
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
-        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'ORDER_STATUS_UPDATED', targetType: 'Order', targetId: orderId, notes: `${order.status} → ${status}` });
+        const label = status === 'OTHER' ? (customStatusLabel?.trim() || 'Other') : status;
+        logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'ORDER_STATUS_UPDATED', targetType: 'Order', targetId: orderId, notes: `${order.status} → ${label}` });
 
         return NextResponse.json({ message: "Order status updated successfully" });
     } catch (error) {

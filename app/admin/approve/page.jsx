@@ -29,10 +29,10 @@ export default function AdminApprove() {
         setLoading(false)
     }
 
-    const handleApprove = async ({ storeId, status, notes }) => {
+    const handleApprove = async ({ storeId, status, notes, action }) => {
         try {
             const token = await getToken()
-            const { data } = await axios.post('/api/admin/approve-store', { storeId, status, notes }, {
+            const { data } = await axios.post('/api/admin/approve-store', { storeId, status, notes, action }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             toast.success(data.message)
@@ -105,6 +105,14 @@ export default function AdminApprove() {
                                         >
                                             Reject…
                                         </button>
+                                        {store.status === 'rejected' && (
+                                            <button
+                                                onClick={() => toast.promise(handleApprove({ storeId: store.id, status: 'archived', action: 'archive' }), { loading: 'Archiving…', success: 'Archived', error: e => e.message })}
+                                                className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 text-sm font-medium transition"
+                                            >
+                                                Archive
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>

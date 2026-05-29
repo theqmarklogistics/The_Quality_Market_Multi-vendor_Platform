@@ -6,13 +6,14 @@ import toast from "react-hot-toast"
 import Pagination from "@/components/Pagination"
 import { ShoppingBagIcon, SearchIcon, XIcon } from "lucide-react"
 
-const ORDER_STATUSES = ['', 'ORDER_PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED']
+const ORDER_STATUSES = ['', 'ORDER_PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'OTHER']
 
 const STATUS_LABELS = {
     ORDER_PLACED: 'Placed',
     PROCESSING: 'Processing',
     SHIPPED: 'Shipped',
-    DELIVERED: 'Delivered'
+    DELIVERED: 'Delivered',
+    OTHER: 'Other'
 }
 
 export default function AdminOrders() {
@@ -26,6 +27,7 @@ export default function AdminOrders() {
     const [searchInput, setSearchInput] = useState('')
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
+    const [statusDrafts, setStatusDrafts] = useState({})
 
     const fetchOrders = useCallback(async (pg = 1, q = '', st = '') => {
         setLoading(true)
@@ -50,17 +52,54 @@ export default function AdminOrders() {
 
     useEffect(() => { fetchOrders(1, search, statusFilter) }, [search, statusFilter])
 
-    const updateStatus = async (orderId, status) => {
+    const updateStatus = async (orderId, status, extra = {}) => {
         try {
             const token = await getToken()
-            const { data } = await axios.post('/api/admin/orders', { orderId, status }, {
+            const { data } = await axios.post('/api/admin/orders', { orderId, status, ...extra }, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             toast.success(data.message)
-            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status, ...extra } : o))
         } catch (error) {
             toast.error(error?.response?.data?.error || error.message)
         }
+    }
+
+    const handleStatusSelect = (order, value) => {
+        if (value === 'OTHER') {
+            setOrders(prev => prev.map(item => item.id === order.id ? { ...item, status: 'OTHER' } : item))
+            setStatusDrafts(prev => ({
+                ...prev,
+                [order.id]: {
+                    ...prev[order.id],
+                    status: 'OTHER',
+                    customStatusLabel: prev[order.id]?.customStatusLabel || order.customStatusLabel || '',
+                }
+            }))
+            return
+        }
+
+        setStatusDrafts(prev => {
+            const next = { ...prev }
+            delete next[order.id]
+            return next
+        })
+
+        setOrders(prev => prev.map(item => item.id === order.id ? { ...item, status: value } : item))
+
+        if (confirm(`Change order status to "${value}"?`)) {
+            updateStatus(order.id, value)
+        }
+    }
+
+    const saveCustomStatus = (orderId) => {
+        const draft = statusDrafts[orderId] || {}
+        const customStatusLabel = draft.customStatusLabel?.trim()
+        if (!customStatusLabel) {
+            toast.error('Enter a custom status label')
+            return
+        }
+        updateStatus(orderId, 'OTHER', { customStatusLabel })
     }
 
     const handleSearch = (e) => { e.preventDefault(); setSearch(searchInput.trim()) }
@@ -133,19 +172,41 @@ export default function AdminOrders() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <select
-                                                value={order.status}
-                                                onChange={e => {
-                                                    if (confirm(`Change order status to "${e.target.value}"?`)) {
-                                                        updateStatus(order.id, e.target.value)
-                                                    }
-                                                }}
-                                                className="border border-gray-300 rounded-md text-sm focus:ring focus:ring-blue-200 px-1 py-0.5"
-                                            >
-                                                {ORDER_STATUSES.filter(Boolean).map(s => (
-                                                    <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>
-                                                ))}
-                                            </select>
+                                            <div className="flex flex-col gap-2">
+                                                <select
+                                                    value={order.status}
+                                                    onChange={e => handleStatusSelect(order, e.target.value)}
+                                                    className="border border-gray-300 rounded-md text-sm focus:ring focus:ring-blue-200 px-1 py-0.5"
+                                                >
+                                                    {ORDER_STATUSES.filter(Boolean).map(s => (
+                                                        <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>
+                                                    ))}
+                                                </select>
+                                                {(order.status === 'OTHER' || statusDrafts[order.id]?.status === 'OTHER') && (
+                                                    <div className="flex flex-col gap-2">
+                                                        <input
+                                                            value={statusDrafts[order.id]?.customStatusLabel ?? order.customStatusLabel ?? ''}
+                                                            onChange={e => setStatusDrafts(prev => ({
+                                                                ...prev,
+                                                                [order.id]: {
+                                                                    ...prev[order.id],
+                                                                    status: 'OTHER',
+                                                                    customStatusLabel: e.target.value,
+                                                                }
+                                                            }))}
+                                                            placeholder="Custom status label"
+                                                            className="border border-gray-300 rounded-md text-sm px-2 py-1 focus:ring focus:ring-blue-200"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => saveCustomStatus(order.id)}
+                                                            className="self-start px-3 py-1.5 rounded-md bg-slate-800 text-white text-xs font-medium hover:bg-slate-900"
+                                                        >
+                                                            Save label
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

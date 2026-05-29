@@ -55,9 +55,14 @@ export async function PATCH(request, { params }) {
             return NextResponse.json({ error: `Sellers can only set status to: ${SELLER_ALLOWED_STATUSES.join(', ')}` }, { status: 403 });
         }
 
+        const updateData = { status };
+        if (body.publicStatusNote !== undefined) {
+            updateData.publicStatusNote = body.publicStatusNote?.trim() || null;
+        }
+
         await prisma.order.update({
             where: { id: orderId },
-            data: { status }
+            data: updateData
         });
 
         return NextResponse.json({ message: `Order marked as ${status.toLowerCase()}` });

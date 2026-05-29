@@ -44,6 +44,21 @@ const styles = StyleSheet.create({
     badge: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: BRAND_BLUE, borderRadius: 4, color: '#ffffff', fontFamily: 'Helvetica-Bold', fontSize: 9, alignSelf: 'flex-start' },
 });
 
+const contractStyles = StyleSheet.create({
+    page: { fontFamily: 'Helvetica', fontSize: 10, color: '#334155', padding: 40, backgroundColor: '#ffffff' },
+    header: { marginBottom: 24, paddingBottom: 14, borderBottomWidth: 2, borderBottomColor: BRAND_BLUE },
+    brand: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: BRAND_BLUE },
+    title: { fontSize: 22, fontFamily: 'Helvetica-Bold', color: '#0f172a', marginTop: 12 },
+    subtitle: { fontSize: 10, color: '#64748b', marginTop: 4 },
+    section: { marginBottom: 16 },
+    sectionTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: BRAND_BLUE, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 },
+    label: { color: '#64748b' },
+    value: { fontFamily: 'Helvetica-Bold', color: '#0f172a' },
+    paragraph: { fontSize: 10, lineHeight: 1.6, marginBottom: 8 },
+    bullet: { fontSize: 10, marginBottom: 5 },
+    footer: { marginTop: 24, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0', fontSize: 8, color: '#94a3b8', textAlign: 'center' },
+});
+
 function fmt(amount) {
     return `${currency} ${Number(amount || 0).toLocaleString()}`;
 }
@@ -183,6 +198,57 @@ export async function generateInvoice({ order, paymentConfig }) {
 
     const buffer = await renderToBuffer(
         <InvoiceDocument order={order} paymentConfig={paymentConfig} logoSrc={logoSrc} />
+    );
+    return buffer;
+}
+
+function StoreContractDocument({ store, owner, issuedAt }) {
+    return (
+        <Document>
+            <Page size="A4" style={contractStyles.page}>
+                <View style={contractStyles.header}>
+                    <Text style={contractStyles.brand}>The Quality Market</Text>
+                    <Text style={contractStyles.title}>Store Partnership Contract</Text>
+                    <Text style={contractStyles.subtitle}>Issued on {issuedAt.toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+                </View>
+
+                <View style={contractStyles.section}>
+                    <Text style={contractStyles.sectionTitle}>Merchant Details</Text>
+                    <Text style={contractStyles.paragraph}><Text style={contractStyles.label}>Store Name: </Text><Text style={contractStyles.value}>{store?.name || '—'}</Text></Text>
+                    <Text style={contractStyles.paragraph}><Text style={contractStyles.label}>Username: </Text><Text style={contractStyles.value}>{store?.username || '—'}</Text></Text>
+                    <Text style={contractStyles.paragraph}><Text style={contractStyles.label}>Owner: </Text><Text style={contractStyles.value}>{owner?.name || '—'}</Text></Text>
+                    <Text style={contractStyles.paragraph}><Text style={contractStyles.label}>Email: </Text><Text style={contractStyles.value}>{owner?.email || store?.email || '—'}</Text></Text>
+                    <Text style={contractStyles.paragraph}><Text style={contractStyles.label}>Contact: </Text><Text style={contractStyles.value}>{store?.contact || '—'}</Text></Text>
+                    <Text style={contractStyles.paragraph}><Text style={contractStyles.label}>Address: </Text><Text style={contractStyles.value}>{store?.address || '—'}</Text></Text>
+                </View>
+
+                <View style={contractStyles.section}>
+                    <Text style={contractStyles.sectionTitle}>Agreement Summary</Text>
+                    <Text style={contractStyles.bullet}>• The store is authorized to sell approved products on The Quality Market platform.</Text>
+                    <Text style={contractStyles.bullet}>• The merchant agrees to follow platform rules, fulfillment timelines, and customer support standards.</Text>
+                    <Text style={contractStyles.bullet}>• Settlement, commissions, and operational requirements remain subject to the platform policies in force at the time of sale.</Text>
+                    <Text style={contractStyles.bullet}>• This document serves as a confirmation of approval and onboarding, not as a legal replacement for the full merchant agreement.</Text>
+                </View>
+
+                <View style={contractStyles.section}>
+                    <Text style={contractStyles.sectionTitle}>Confirmation</Text>
+                    <Text style={contractStyles.paragraph}>
+                        Congratulations on your store approval. Your dashboard is now active and you may begin managing products, orders, and customer chats.
+                    </Text>
+                </View>
+
+                <Text style={contractStyles.footer}>
+                    The Quality Market &mdash; Kigali, KN 82 St, Tropical plaza, C26{'
+'}support@thequalitymarket.com &nbsp;|&nbsp; +250 783 610 209
+                </Text>
+            </Page>
+        </Document>
+    )
+}
+
+export async function generateStoreContract({ store, owner }) {
+    const buffer = await renderToBuffer(
+        <StoreContractDocument store={store} owner={owner} issuedAt={new Date()} />
     );
     return buffer;
 }
