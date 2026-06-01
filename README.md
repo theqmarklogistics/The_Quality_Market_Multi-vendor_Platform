@@ -138,25 +138,25 @@ The platform is localized to the Rwandan market (RWF currency) but is architecte
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) |
-| UI | React 19, Tailwind CSS 4 |
-| Icons | Lucide React |
-| Charts | Recharts |
-| Authentication | Clerk (`@clerk/nextjs`) |
-| Database | PostgreSQL via Neon (serverless) |
-| ORM | Prisma 6 with Neon adapter |
-| State Management | Redux Toolkit + React-Redux |
-| Real-time | Socket.IO 4 (custom Node.js server) |
-| Image Hosting | ImageKit |
-| AI | Google Gemini (via OpenAI-compatible API) |
-| Background Jobs | Inngest |
-| Email | Resend |
-| PDF Generation | `@react-pdf/renderer` |
-| Analytics | Vercel Analytics |
-| HTTP Client | Axios |
-| Date Utilities | date-fns |
-| Notifications | React Hot Toast |
-| Font | Outfit (via `next/font`) |
+| Framework | [Next.js 15](https://nextjs.org) (App Router) |
+| UI | [React 19](https://react.dev), [Tailwind CSS 4](https://tailwindcss.com) |
+| Icons | [Lucide React](https://lucide.dev) |
+| Charts | [Recharts](https://recharts.org) |
+| Authentication | [Clerk](https://clerk.com) (`@clerk/nextjs`) |
+| Database | PostgreSQL via [Neon](https://neon.tech) (serverless) |
+| ORM | [Prisma 6](https://www.prisma.io) with Neon adapter |
+| State Management | [Redux Toolkit](https://redux-toolkit.js.org) + React-Redux |
+| Real-time | [Socket.IO 4](https://socket.io) (custom Node.js server) |
+| Image Hosting | [ImageKit](https://imagekit.io) |
+| AI | [Google Gemini](https://aistudio.google.com) (via OpenAI-compatible API) |
+| Background Jobs | [Inngest](https://www.inngest.com) |
+| Email | [Resend](https://resend.com) |
+| PDF Generation | [`@react-pdf/renderer`](https://react-pdf.org) |
+| Analytics | [Vercel Analytics](https://vercel.com/analytics) |
+| HTTP Client | [Axios](https://axios-http.com) |
+| Date Utilities | [date-fns](https://date-fns.org) |
+| Notifications | [React Hot Toast](https://react-hot-toast.com) |
+| Font | [Outfit](https://fonts.google.com/specimen/Outfit) (via `next/font`) |
 
 ---
 
@@ -256,30 +256,25 @@ ADMIN_EMAIL=admin@example.com
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 
-# --- Database (Neon PostgreSQL) ---
-# Get these from https://neon.tech
+# --- Database (Neon PostgreSQL) — https://neon.tech ---
 DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
 DIRECT_URL=postgresql://user:pass@host/dbname?sslmode=require
 
-# --- Background Jobs (Inngest) ---
-# Get these from https://app.inngest.com
+# --- Background Jobs (Inngest) — https://app.inngest.com ---
 INNGEST_EVENT_KEY=...
 INNGEST_SIGNING_KEY=...
 
-# --- Image Hosting (ImageKit) ---
-# Get these from https://imagekit.io/dashboard
+# --- Image Hosting (ImageKit) — https://imagekit.io/dashboard ---
 IMAGEKIT_PUBLIC_KEY=public_...
 IMAGEKIT_PRIVATE_KEY=private_...
 IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/your-id
 
-# --- AI (Google Gemini via OpenAI-compatible API) ---
-# Get your API key from https://aistudio.google.com
+# --- AI (Google Gemini) — https://aistudio.google.com ---
 OPENAI_API_KEY=AIza...
 OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
 OPENAI_MODEL=gemini-2.0-flash
 
-# --- Email (Resend) ---
-# Get these from https://resend.com
+# --- Email (Resend) — https://resend.com ---
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@yourdomain.com
 ```
