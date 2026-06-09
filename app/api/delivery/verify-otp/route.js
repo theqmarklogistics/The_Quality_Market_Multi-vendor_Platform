@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
+import authAdmin from "@/middlewares/authAdmin";
 import { triggerSplitPayout } from "@/lib/pooledDeliveryPayout";
+import { emitDelivery } from "@/lib/deliveryRealtime";
 
 export async function POST(request) {
     try {
@@ -21,7 +23,8 @@ export async function POST(request) {
         }
 
         const order = await prisma.order.findUnique({
-            where: { id: orderId }
+            where: { id: orderId },
+            include: { corridor: { select: { id: true, assignedRiderId: true } } },
         });
 
         if (!order) {
@@ -30,6 +33,12 @@ export async function POST(request) {
 
         if (order.deliveryType !== 'KIGALI_POOL') {
             return NextResponse.json({ error: "This order does not use Kigali Pooled Delivery" }, { status: 400 });
+        }
+
+        // Only the rider assigned to this order's corridor (or an admin) may confirm delivery.
+        const isAssignedRider = order.corridor?.assignedRiderId === userId;
+        if (!isAssignedRider && !(await authAdmin(userId))) {
+            return NextResponse.json({ error: "Only the assigned rider can confirm this delivery" }, { status: 403 });
         }
 
         if (order.deliveryStatus === 'DELIVERED') {
@@ -46,12 +55,20 @@ export async function POST(request) {
             SET status = 'DELIVERED'::"OrderStatus",
                 "deliveryStatus" = 'DELIVERED'::"PoolDeliveryStatus",
                 "escrowStatus" = 'RELEASED'::"EscrowStatus",
+                "deliveredAt" = NOW(),
                 "updatedAt" = NOW()
             WHERE id = ${orderId} AND "deliveryOtp" = ${order.deliveryOtp}
         `;
 
         // Trigger split payout (mock MoMo disbursements)
         const payout = await triggerSplitPayout(order);
+
+        // Notify the customer's tracking page + logistics board in realtime.
+        emitDelivery(
+            [`track-${orderId}`, order.corridor?.id ? `corridor-${order.corridor.id}` : null, "logistics-room"],
+            "delivery-status-update",
+            { orderId, deliveryStatus: "DELIVERED", escrowStatus: "RELEASED", at: new Date().toISOString() }
+        );
 
         return NextResponse.json({
             success: true,

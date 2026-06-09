@@ -1,5 +1,5 @@
 'use client'
-import { MessageCircleIcon, PackageIcon, Search, ShoppingCart, User } from "lucide-react";
+import { MessageCircleIcon, PackageIcon, Search, ShoppingCart, User, TruckIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -27,6 +27,7 @@ const Navbar = () => {
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const [isSeller, setIsSeller] = useState(false)
+    const [staffRole, setStaffRole] = useState(null) // RIDER | LOGISTICS_MANAGER | ...
     const [loadingAccess, setLoadingAccess] = useState(false)
     const [unreadChats, setUnreadChats] = useState(0)
     const cartCount = useSelector(state => state.cart.total)
@@ -106,6 +107,26 @@ const Navbar = () => {
         return () => {
             mounted = false
         }
+    }, [user, getToken])
+
+    // Detect rider / logistics roles to surface their dashboard shortcuts.
+    useEffect(() => {
+        let mounted = true
+        if (!user) { setStaffRole(null); return }
+        const run = async () => {
+            try {
+                const token = await getToken()
+                const { data } = await axios.get('/api/me/role', {
+                    headers: { Authorization: `Bearer ${token}` },
+                    validateStatus: () => true,
+                })
+                if (mounted) setStaffRole(data?.role ?? null)
+            } catch (_) {
+                if (mounted) setStaffRole(null)
+            }
+        }
+        run()
+        return () => { mounted = false }
     }, [user, getToken])
 
     // Fetch unread message count when user is present; re-fetches whenever pathname
@@ -245,6 +266,16 @@ const Navbar = () => {
                                 Admin Dashboard
                             </Link>
                         )}
+                        {(staffRole === 'RIDER') && (
+                            <Link href="/rider" className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100">
+                                Rider Console
+                            </Link>
+                        )}
+                        {(staffRole === 'LOGISTICS_MANAGER' || isAdmin) && (
+                            <Link href="/logistics" className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100">
+                                Dispatch
+                            </Link>
+                        )}
 
                         { !user ? (
                             <button onClick={openSignIn} className="px-8 py-2 bg-indigo-500 hover:bg-indigo-600 transition text-white rounded-full">
@@ -261,6 +292,12 @@ const Navbar = () => {
                                             <UserButton.Action labelIcon={<User size={16} />} label="Store Dashboard" onClick={() => router.push('/store')} />
                                             <UserButton.Action labelIcon={<MessageCircleIcon size={16} />} label="Contact Admin" onClick={openAdminConversation} />
                                         </>
+                                    )}
+                                    {staffRole === 'RIDER' && (
+                                        <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Rider Console" onClick={() => router.push('/rider')} />
+                                    )}
+                                    {(staffRole === 'LOGISTICS_MANAGER' || isAdmin) && (
+                                        <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Dispatch Board" onClick={() => router.push('/logistics')} />
                                     )}
                                     <UserButton.Action labelIcon = {<PackageIcon size={16}/>} label="My Orders" onClick={()=> router.push('/orders')}/>
                                     <UserButton.Action labelIcon = {<MessageCircleIcon size={16}/>} label="My Chats" onClick={()=> router.push('/chat')}/>

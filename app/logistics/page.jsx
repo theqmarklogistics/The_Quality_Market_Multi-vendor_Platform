@@ -1,11 +1,12 @@
 import prisma from '@/lib/prisma'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import DispatchBoard from '@/components/logistics/DispatchBoard'
 
 export const dynamic = 'force-dynamic'
 
 export default async function LogisticsDashboardPage() {
-  const { userId } = auth()
+  const { userId } = await auth()
   if (!userId) return redirect('/sign-in')
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
@@ -18,10 +19,5 @@ export default async function LogisticsDashboardPage() {
     )
   }
 
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">Logistics Dashboard</h1>
-      <p className="mt-2 text-slate-600">Placeholder dashboard for `LOGISTICS_MANAGER` role.</p>
-    </div>
-  )
+  return <DispatchBoard />
 }

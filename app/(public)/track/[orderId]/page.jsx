@@ -1,10 +1,12 @@
 'use client'
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useRouter, useParams } from "next/navigation";
 import axios from "axios";
 import Loading from "@/components/Loading";
-import { CheckCircleIcon, ClockIcon, PackageIcon, TruckIcon } from "lucide-react";
+import LiveMap from "@/components/delivery/LiveMap";
+import { initializeSocket } from "@/lib/socketClient";
+import { CheckCircleIcon, ClockIcon, PackageIcon, TruckIcon, MapPinIcon, PhoneIcon, NavigationIcon, AlertTriangleIcon } from "lucide-react";
 
 const DELIVERY_STEPS = [
     { key: "PENDING_INTAKE", label: "Pending Intake", icon: ClockIcon, description: "Your package is awaiting vendor drop-off or morning sweep pickup." },
@@ -13,9 +15,14 @@ const DELIVERY_STEPS = [
     { key: "DELIVERED",      label: "Delivered",      icon: CheckCircleIcon, description: "Package delivered and escrow released." },
 ];
 
+// ARRIVING is a sub-state of IN_TRANSIT for the timeline.
 function StepIndex(status) {
+    if (status === "ARRIVING") return DELIVERY_STEPS.findIndex(s => s.key === "IN_TRANSIT");
     return DELIVERY_STEPS.findIndex(s => s.key === status);
 }
+
+const POLL_MS = 20000;       // fallback refresh cadence
+const SHARE_MIN_MS = 15000;  // throttle for customer location posts
 
 export default function TrackOrderPage() {
     const { getToken } = useAuth();
@@ -26,23 +33,30 @@ export default function TrackOrderPage() {
     const [trackData, setTrackData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [sharing, setSharing] = useState(false);
 
-    const fetchTracking = async () => {
-        setLoading(true);
-        setError(null);
+    const watchIdRef = useRef(null);
+    const lastShareRef = useRef(0);
+    const deliveredRef = useRef(false);
+
+    const fetchTracking = useCallback(async ({ silent } = {}) => {
+        if (!silent) setLoading(true);
         try {
             const token = await getToken();
             const { data } = await axios.get(`/api/delivery/track/${orderId}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setTrackData(data);
+            deliveredRef.current = data?.deliveryStatus === 'DELIVERED';
+            setError(null);
         } catch (err) {
-            setError(err?.response?.data?.error || err.message);
+            if (!silent) setError(err?.response?.data?.error || err.message);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
-    };
+    }, [getToken, orderId]);
 
+    // Initial load + auth gate
     useEffect(() => {
         if (!isLoaded) return;
         if (!user) { router.push('/'); return; }
@@ -50,11 +64,94 @@ export default function TrackOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isLoaded, user]);
 
+    // Realtime subscription (Socket.IO) with a polling fallback.
+    useEffect(() => {
+        if (!isLoaded || !user) return;
+        let socket = null;
+        let active = true;
+
+        const start = async () => {
+            try {
+                const token = await getToken();
+                if (!active || !token) return;
+                socket = initializeSocket(token);
+                if (socket) {
+                    socket.emit('join-track-room', orderId);
+                    socket.on('rider-location-update', (p) => {
+                        if (p?.orderId && p.orderId !== orderId) return;
+                        setTrackData(prev => prev ? { ...prev, riderLat: p.lat, riderLng: p.lng, riderLocationAt: p.at } : prev);
+                    });
+                    socket.on('delivery-status-update', (p) => {
+                        if (p?.orderId && p.orderId !== orderId) return;
+                        fetchTracking({ silent: true });
+                    });
+                    socket.on('corridor-update', () => fetchTracking({ silent: true }));
+                }
+            } catch (_) { /* fall back to polling */ }
+        };
+        start();
+
+        // Always poll as a fallback (covers socket-disabled hosts + ETA refresh).
+        const poll = setInterval(() => {
+            if (!deliveredRef.current) fetchTracking({ silent: true });
+        }, POLL_MS);
+
+        return () => {
+            active = false;
+            clearInterval(poll);
+            if (socket) {
+                socket.emit('leave-track-room', orderId);
+                socket.off('rider-location-update');
+                socket.off('delivery-status-update');
+                socket.off('corridor-update');
+            }
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoaded, user, orderId]);
+
+    const postLocation = useCallback(async (lat, lng) => {
+        const now = Date.now();
+        if (now - lastShareRef.current < SHARE_MIN_MS) return;
+        lastShareRef.current = now;
+        try {
+            const token = await getToken();
+            await axios.post(`/api/delivery/track/${orderId}/share-location`, { lat, lng }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+        } catch (_) { /* best effort */ }
+    }, [getToken, orderId]);
+
+    const toggleShare = () => {
+        if (sharing) {
+            if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+            setSharing(false);
+            return;
+        }
+        if (!('geolocation' in navigator)) {
+            setError('Location is not supported on this device.');
+            return;
+        }
+        lastShareRef.current = 0; // allow an immediate first post
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (pos) => postLocation(pos.coords.latitude, pos.coords.longitude),
+            () => { setSharing(false); setError('Could not access your location.'); },
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+        );
+        setSharing(true);
+    };
+
+    useEffect(() => () => {
+        if (watchIdRef.current != null && 'geolocation' in navigator) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+    }, []);
+
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF';
 
     if (!isLoaded || loading) return <div className="min-h-screen flex items-center justify-center"><Loading /></div>;
 
-    if (error) {
+    if (error && !trackData) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center px-4">
                 <p className="text-red-600 font-medium">{error}</p>
@@ -65,6 +162,14 @@ export default function TrackOrderPage() {
 
     const currentStepIndex = StepIndex(trackData?.deliveryStatus);
     const isDelivered = trackData?.deliveryStatus === 'DELIVERED';
+    const isFailed = trackData?.deliveryStatus === 'FAILED';
+    const isArriving = trackData?.deliveryStatus === 'ARRIVING';
+    const enRoute = ['IN_TRANSIT', 'ARRIVING'].includes(trackData?.deliveryStatus);
+
+    const riderPos = (trackData?.riderLat != null && trackData?.riderLng != null)
+        ? { lat: trackData.riderLat, lng: trackData.riderLng } : null;
+    const customerPos = (trackData?.recipientLat != null && trackData?.recipientLng != null)
+        ? { lat: trackData.recipientLat, lng: trackData.recipientLng } : null;
 
     return (
         <div className="min-h-screen bg-slate-50 py-10 px-4">
@@ -78,6 +183,59 @@ export default function TrackOrderPage() {
                         <p className="mt-2 text-sm text-white/80">From <span className="font-semibold text-white">{trackData.store.name}</span></p>
                     )}
                 </div>
+
+                {/* Arriving banner */}
+                {isArriving && (
+                    <div className="rounded-3xl border-2 border-amber-300 bg-amber-50 p-5 flex items-center gap-4">
+                        <NavigationIcon size={28} className="text-amber-600 shrink-0" />
+                        <div>
+                            <p className="font-semibold text-amber-800">Your rider is arriving!</p>
+                            <p className="text-sm text-slate-600">Have your 4-digit code ready to confirm delivery.</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Live map + ETA — once the package is on the road */}
+                {enRoute && (
+                    <div className="rounded-3xl bg-white border border-slate-200 p-3 shadow-sm">
+                        <div className="flex items-center justify-between px-2 pt-1 pb-3">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Live location</p>
+                            {trackData?.etaMinutes != null && (
+                                <span className="text-sm font-semibold text-green-700">ETA ~{trackData.etaMinutes} min</span>
+                            )}
+                        </div>
+                        <LiveMap riderPos={riderPos} customerPos={customerPos} height={260} />
+                        {!riderPos && (
+                            <p className="text-xs text-slate-400 text-center mt-2">Waiting for the rider to start sharing location…</p>
+                        )}
+                        {/* Share my live location */}
+                        <button
+                            onClick={toggleShare}
+                            className={`mt-3 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
+                                sharing ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-600 text-white hover:bg-green-700'
+                            }`}
+                        >
+                            <MapPinIcon size={16} />
+                            {sharing ? 'Stop sharing my location' : 'Share my live location with rider'}
+                        </button>
+                        {sharing && <p className="text-[11px] text-slate-400 text-center mt-1.5">Your location is shared only with your rider while this is on.</p>}
+                    </div>
+                )}
+
+                {/* Rider contact */}
+                {enRoute && trackData?.rider?.name && (
+                    <div className="rounded-3xl bg-white border border-slate-200 p-4 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-xs uppercase tracking-widest text-slate-400">Your rider</p>
+                            <p className="font-semibold text-slate-800">{trackData.rider.name}{trackData.rider.vehicleType ? ` · ${trackData.rider.vehicleType}` : ''}</p>
+                        </div>
+                        {trackData.rider.phone && (
+                            <a href={`tel:${trackData.rider.phone}`} className="flex items-center gap-2 rounded-xl bg-green-600 text-white px-4 py-2 text-sm font-semibold hover:bg-green-700">
+                                <PhoneIcon size={16} /> Call
+                            </a>
+                        )}
+                    </div>
+                )}
 
                 {/* OTP Display — only visible before delivery */}
                 {!isDelivered && trackData?.deliveryOtp && (
@@ -95,6 +253,16 @@ export default function TrackOrderPage() {
                         <div>
                             <p className="font-semibold text-green-800">Delivered!</p>
                             <p className="text-sm text-slate-600">Your package has been delivered and payment released.</p>
+                        </div>
+                    </div>
+                )}
+
+                {isFailed && (
+                    <div className="rounded-3xl border-2 border-red-300 bg-red-50 p-5 flex items-center gap-4">
+                        <AlertTriangleIcon size={32} className="text-red-600 shrink-0" />
+                        <div>
+                            <p className="font-semibold text-red-800">Delivery attempt failed</p>
+                            <p className="text-sm text-slate-600">{trackData?.failureReason || 'We will retry or contact you shortly.'}</p>
                         </div>
                     </div>
                 )}
@@ -158,7 +326,7 @@ export default function TrackOrderPage() {
                                             {step.label}
                                             {isCurrent && <span className="ml-2 text-[10px] bg-green-100 text-green-700 rounded-full px-2 py-0.5 font-semibold">Current</span>}
                                         </p>
-                                        {isCurrent && <p className="text-xs text-slate-500 mt-0.5">{step.description}</p>}
+                                        {isCurrent && <p className="text-xs text-slate-500 mt-0.5">{isArriving && step.key === 'IN_TRANSIT' ? 'Your rider is arriving now.' : step.description}</p>}
                                     </div>
                                 </div>
                             );

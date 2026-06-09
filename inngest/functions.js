@@ -210,7 +210,8 @@ export const kigaliPoolBatchingEngine = inngest.createFunction(
             for (const [corridorKey, groupOrders] of corridorMap.entries()) {
                 const corridorId = "cor_" + randomBytes(8).toString("hex");
 
-                // Create the corridor record
+                // Create the corridor as CLOSED (ready for dispatch). Logistics staff assign a
+                // rider and dispatch it, which flips the corridor + its orders to IN_TRANSIT.
                 await prisma.$executeRaw`
                     INSERT INTO "DeliveryCorridor" (id, name, "runDate", "baseRouteCost", status, "createdAt", "updatedAt")
                     VALUES (
@@ -218,7 +219,7 @@ export const kigaliPoolBatchingEngine = inngest.createFunction(
                         ${"Hub → " + corridorKey},
                         ${runDate},
                         ${BASE_ROUTE_COST},
-                        'IN_TRANSIT'::"CorridorStatus",
+                        'CLOSED'::"CorridorStatus",
                         NOW(),
                         NOW()
                     )
@@ -236,11 +237,14 @@ export const kigaliPoolBatchingEngine = inngest.createFunction(
                     const stopIndex = i + 1;
                     const feeShare = parseFloat(((stopIndex / triangularSum) * BASE_ROUTE_COST).toFixed(2));
 
+                    // Persist the stop position; set status to SORTING (arrived at hub, batched).
+                    // Dispatch by logistics later advances it to IN_TRANSIT.
                     await prisma.$executeRaw`
                         UPDATE "Order"
                         SET "corridorId"       = ${corridorId},
-                            "deliveryStatus"   = 'IN_TRANSIT'::"PoolDeliveryStatus",
+                            "deliveryStatus"   = 'SORTING'::"PoolDeliveryStatus",
                             "deliveryFeeShare" = ${feeShare},
+                            "stopSequence"     = ${stopIndex},
                             "updatedAt"        = NOW()
                         WHERE id = ${order.id}
                     `;

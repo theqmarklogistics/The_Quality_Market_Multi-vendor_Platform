@@ -28,7 +28,7 @@ export async function POST(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { items, addressId, paymentMethod: selectedPaymentMethod, couponCode, deliveryType: rawDeliveryType, landmarkAddress: rawLandmark } = await request.json();
+        const { items, addressId, paymentMethod: selectedPaymentMethod, couponCode, deliveryType: rawDeliveryType, landmarkAddress: rawLandmark, recipientLat: rawLat, recipientLng: rawLng } = await request.json();
 
         if(!items || !addressId || !selectedPaymentMethod || !Array.isArray(items) || items.length === 0){
             return NextResponse.json({ error: "Missing order details" }, { status: 400 });
@@ -36,6 +36,9 @@ export async function POST(request) {
 
         const deliveryType = rawDeliveryType === 'KIGALI_POOL' ? 'KIGALI_POOL' : 'STANDARD_UNPOOLED';
         const landmarkAddress = typeof rawLandmark === 'string' ? rawLandmark.trim() : null;
+        // Optional precise location pin captured at checkout for pooled delivery.
+        const recipientLat = (deliveryType === 'KIGALI_POOL' && typeof rawLat === 'number' && !Number.isNaN(rawLat)) ? rawLat : null;
+        const recipientLng = (deliveryType === 'KIGALI_POOL' && typeof rawLng === 'number' && !Number.isNaN(rawLng)) ? rawLng : null;
 
         if (deliveryType === 'KIGALI_POOL' && !landmarkAddress) {
             return NextResponse.json({ error: "A Kigali landmark / directions field is required for Pooled Delivery." }, { status: 400 });
@@ -273,6 +276,7 @@ export async function POST(request) {
                         "isPaid", "isCouponUsed", coupon,
                         "invoiceRequested", "paymentProofStatus",
                         "deliveryType", "landmarkAddress", "deliveryOtp", "deliveryStatus", "escrowStatus",
+                        "recipientLat", "recipientLng",
                         "createdAt", "updatedAt"
                     ) VALUES (
                         ${orderId}, ${userId}, ${storeId}, ${addressId},
@@ -284,6 +288,7 @@ export async function POST(request) {
                         false, 'NOT_SUBMITTED'::"PaymentProofStatus",
                         ${deliveryType}::"DeliveryType", ${landmarkAddress}, ${deliveryOtp},
                         ${poolDeliveryStatus}::"PoolDeliveryStatus", ${escrowStatus}::"EscrowStatus",
+                        ${recipientLat}, ${recipientLng},
                         ${now}, ${now}
                     )
                 `;

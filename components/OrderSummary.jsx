@@ -1,4 +1,4 @@
-import { InfoIcon, PlusIcon, SquarePenIcon, XIcon } from 'lucide-react';
+import { InfoIcon, PlusIcon, SquarePenIcon, XIcon, MapPinIcon, CheckIcon } from 'lucide-react';
 import React, { useState, useEffect } from 'react'
 import AddressModal from './AddressModal';
 import { useDispatch, useSelector } from 'react-redux';
@@ -31,6 +31,25 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     const [paymentConfig, setPaymentConfig] = useState(null);
     const [deliveryType, setDeliveryType] = useState('STANDARD_UNPOOLED');
     const [landmarkAddress, setLandmarkAddress] = useState('');
+    const [pinnedLocation, setPinnedLocation] = useState(null); // {lat,lng} optional checkout pin
+    const [pinning, setPinning] = useState(false);
+
+    const handlePinLocation = () => {
+        if (!('geolocation' in navigator)) {
+            toast.error('Location is not supported on this device.');
+            return;
+        }
+        setPinning(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setPinnedLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                setPinning(false);
+                toast.success('Location pinned — your rider will find you faster.');
+            },
+            () => { setPinning(false); toast.error('Could not access your location.'); },
+            { enableHighAccuracy: true, timeout: 20000 }
+        );
+    };
 
     useEffect(() => {
         axios.get('/api/payment-config').then(res => setPaymentConfig(res.data)).catch(() => null)
@@ -87,7 +106,8 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                 paymentMethod: selectedPaymentMethod,
                 couponCode: couponCodeInput,
                 deliveryType,
-                ...(deliveryType === 'KIGALI_POOL' && { landmarkAddress: landmarkAddress.trim() })
+                ...(deliveryType === 'KIGALI_POOL' && { landmarkAddress: landmarkAddress.trim() }),
+                ...(deliveryType === 'KIGALI_POOL' && pinnedLocation && { recipientLat: pinnedLocation.lat, recipientLng: pinnedLocation.lng })
             }
 
             if(coupon){
@@ -236,6 +256,20 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 <InfoIcon size={14} className='absolute right-3 top-3 text-slate-400' />
                             </div>
                             <p className='mt-1 text-[11px] text-slate-400'>Help the rider find you — include a nearby landmark or contextual clue.</p>
+
+                            {/* Optional precise GPS pin */}
+                            <button
+                                type='button'
+                                onClick={handlePinLocation}
+                                disabled={pinning}
+                                className={`mt-3 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium transition border ${
+                                    pinnedLocation ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-200 bg-white text-slate-700 hover:border-green-400'
+                                }`}
+                            >
+                                {pinnedLocation ? <CheckIcon size={16} /> : <MapPinIcon size={16} />}
+                                {pinning ? 'Getting location…' : pinnedLocation ? 'Location pinned (tap to update)' : 'Pin my exact location (optional)'}
+                            </button>
+                            <p className='mt-1 text-[11px] text-slate-400'>Shares a one-time precise point so the rider can navigate straight to you.</p>
                         </div>
                     )}
                 </section>

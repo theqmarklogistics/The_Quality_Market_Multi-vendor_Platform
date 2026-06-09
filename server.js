@@ -165,6 +165,129 @@ app.prepare().then(() => {
       console.log(`User ${socket.userId} left conversation ${conversationId}`);
     });
 
+    // ── Kigali Pooled Delivery — realtime tracking rooms ──
+
+    const isAdminUser = async () => {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: socket.userId },
+          select: { email: true, role: true },
+        });
+        if (user?.role === 'ADMIN') return true;
+        const adminEmails = getAdminEmails();
+        return !!user?.email && adminEmails.includes(user.email.toLowerCase());
+      } catch (_) {
+        return false;
+      }
+    };
+
+    // Customer watches their own order's delivery
+    socket.on('join-track-room', async (orderId) => {
+      if (!orderId) return;
+      try {
+        const order = await prisma.order.findUnique({
+          where: { id: String(orderId) },
+          select: { userId: true },
+        });
+        if (!order) {
+          socket.emit('socket-error', { message: 'Order not found' });
+          return;
+        }
+        if (order.userId !== socket.userId && !(await isAdminUser())) {
+          socket.emit('socket-error', { message: 'Forbidden tracking access' });
+          return;
+        }
+        socket.join(`track-${orderId}`);
+      } catch (error) {
+        socket.emit('socket-error', { message: 'Unable to join tracking room' });
+      }
+    });
+
+    socket.on('leave-track-room', (orderId) => {
+      if (orderId) socket.leave(`track-${orderId}`);
+    });
+
+    // Rider joins their personal room + their assigned corridor(s) for today
+    socket.on('join-rider-room', async () => {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: socket.userId },
+          select: { role: true },
+        });
+        if (user?.role !== 'RIDER' && !(await isAdminUser())) {
+          socket.emit('socket-error', { message: 'Forbidden rider access' });
+          return;
+        }
+        socket.join(`rider-${socket.userId}`);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const corridors = await prisma.deliveryCorridor.findMany({
+          where: { assignedRiderId: socket.userId, runDate: { gte: today } },
+          select: { id: true },
+        });
+        corridors.forEach((c) => socket.join(`corridor-${c.id}`));
+      } catch (error) {
+        socket.emit('socket-error', { message: 'Unable to join rider room' });
+      }
+    });
+
+    // Anyone allowed to observe a corridor (assigned rider, logistics, admin)
+    socket.on('join-corridor-room', async (corridorId) => {
+      if (!corridorId) return;
+      try {
+        const corridor = await prisma.deliveryCorridor.findUnique({
+          where: { id: String(corridorId) },
+          select: { assignedRiderId: true },
+        });
+        if (!corridor) {
+          socket.emit('socket-error', { message: 'Corridor not found' });
+          return;
+        }
+        let allowed = corridor.assignedRiderId === socket.userId;
+        if (!allowed) {
+          const user = await prisma.user.findUnique({
+            where: { id: socket.userId },
+            select: { role: true },
+          });
+          allowed = user?.role === 'LOGISTICS_MANAGER' || (await isAdminUser());
+        }
+        if (!allowed) {
+          socket.emit('socket-error', { message: 'Forbidden corridor access' });
+          return;
+        }
+        socket.join(`corridor-${corridorId}`);
+      } catch (error) {
+        socket.emit('socket-error', { message: 'Unable to join corridor room' });
+      }
+    });
+
+    socket.on('leave-corridor-room', (corridorId) => {
+      if (corridorId) socket.leave(`corridor-${corridorId}`);
+    });
+
+    // Logistics dispatch board — sees all riders/corridors live
+    socket.on('join-logistics-room', async () => {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: socket.userId },
+          select: { role: true },
+        });
+        const allowed = user?.role === 'LOGISTICS_MANAGER' || (await isAdminUser());
+        if (!allowed) {
+          socket.emit('socket-error', { message: 'Forbidden logistics access' });
+          return;
+        }
+        socket.join('logistics-room');
+      } catch (error) {
+        socket.emit('socket-error', { message: 'Unable to join logistics room' });
+      }
+    });
+
+    socket.on('leave-logistics-room', () => {
+      socket.leave('logistics-room');
+    });
+
     socket.on('disconnect', () => {
       console.log(`User ${socket.userId} disconnected:`, socket.id);
     });
