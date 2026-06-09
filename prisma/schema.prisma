@@ -78,6 +78,38 @@ enum OrderStatus {
     OTHER
 }
 
+enum DeliveryType {
+    STANDARD_UNPOOLED
+    KIGALI_POOL
+}
+
+enum IntakeMethod {
+    HUB_DROP_OFF
+    DRIVER_SWEEP
+}
+
+enum PoolDeliveryStatus {
+    PENDING_INTAKE
+    SORTING
+    IN_TRANSIT
+    DELIVERED
+    FAILED
+}
+
+enum EscrowStatus {
+    NOT_HELD
+    HELD
+    RELEASED
+    REFUNDED
+}
+
+enum CorridorStatus {
+    OPEN
+    CLOSED
+    IN_TRANSIT
+    COMPLETED
+}
+
 enum PaymentMethod {
     STRIPE
     MTN_MOMO
@@ -155,6 +187,15 @@ model Order {
     invoiceSentAt      DateTime?
     publicStatusNote   String?
     customStatusLabel  String?
+    // Kigali Pooled Delivery fields
+    deliveryType      DeliveryType       @default(STANDARD_UNPOOLED)
+    intakeMethod      IntakeMethod?
+    landmarkAddress   String?
+    deliveryStatus    PoolDeliveryStatus?
+    deliveryOtp       String?
+    escrowStatus      EscrowStatus       @default(NOT_HELD)
+    deliveryFeeShare  Float?
+    corridorId        String?
     orderItems    OrderItem[]
 
     // Relations
@@ -163,6 +204,7 @@ model Order {
     address Address @relation(fields: [addressId], references: [id])
     conversations Conversation[]
     returnRequest Return?
+    corridor      DeliveryCorridor? @relation(fields: [corridorId], references: [id])
 
     @@index([paymentProofStatus, createdAt])
 }
@@ -480,6 +522,19 @@ model NewsletterSubscriber {
     unsubscribedAt   DateTime?
     unsubscribeToken String    @unique @default(cuid())
     resendContactId  String?
+}
+
+model DeliveryCorridor {
+    id            String         @id @default(cuid())
+    name          String
+    runDate       DateTime
+    baseRouteCost Float          @default(10000)
+    status        CorridorStatus @default(OPEN)
+    createdAt     DateTime       @default(now())
+    updatedAt     DateTime       @updatedAt
+    orders        Order[]
+
+    @@index([runDate, status])
 }
 
 // Admin-configurable hero/banner slots ("main" | "card1" | "card2")

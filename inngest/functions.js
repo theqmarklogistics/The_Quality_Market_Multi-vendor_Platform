@@ -1,5 +1,6 @@
 import { inngest } from "./client";
 import prisma from "@/lib/prisma";
+import { randomBytes } from "crypto";
 
 //Inngest function to save data to a database
 export const syncUserCreation = inngest.createFunction(
@@ -169,6 +170,84 @@ export const onPaymentProofReviewed = inngest.createFunction(
         await step.run("record-payment-proof-review-event", async () => {
             const { orderId, status, reviewedBy } = event.data;
             console.log("Payment proof reviewed:", { orderId, status, reviewedBy });
+        });
+    }
+);
+
+// Kigali Pooled Delivery — 11:01 AM daily batching engine
+// Runs at 09:01 UTC = 11:01 AM CAT (UTC+2)
+export const kigaliPoolBatchingEngine = inngest.createFunction(
+    { id: "kigali-pool-batching-engine" },
+    { cron: "1 9 * * *" },
+    async ({ step }) => {
+        await step.run("batch-and-assign-corridors", async () => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Fetch all KIGALI_POOL orders placed today that are still awaiting intake
+            const orders = await prisma.order.findMany({
+                where: {
+                    deliveryType: "KIGALI_POOL",
+                    deliveryStatus: { in: ["PENDING_INTAKE", "SORTING"] },
+                    createdAt: { gte: today }
+                },
+                include: { address: true }
+            });
+
+            if (!orders.length) return { batched: 0, corridors: 0 };
+
+            // Group orders by Kigali sector (or district as fallback)
+            const corridorMap = new Map();
+            for (const order of orders) {
+                const key = order.address?.sector || order.address?.district || "DEFAULT";
+                if (!corridorMap.has(key)) corridorMap.set(key, []);
+                corridorMap.get(key).push(order);
+            }
+
+            const BASE_ROUTE_COST = 10000; // 10,000 RWF per corridor
+            const runDate = new Date();
+
+            for (const [corridorKey, groupOrders] of corridorMap.entries()) {
+                const corridorId = "cor_" + randomBytes(8).toString("hex");
+
+                // Create the corridor record
+                await prisma.$executeRaw`
+                    INSERT INTO "DeliveryCorridor" (id, name, "runDate", "baseRouteCost", status, "createdAt", "updatedAt")
+                    VALUES (
+                        ${corridorId},
+                        ${"Hub → " + corridorKey},
+                        ${runDate},
+                        ${BASE_ROUTE_COST},
+                        'IN_TRANSIT'::"CorridorStatus",
+                        NOW(),
+                        NOW()
+                    )
+                `;
+
+                // Leg-based proportional costing:
+                // Stop index 1 = closest (cheapest), stop N = furthest (most expensive)
+                // Each stop's share = stopIndex / triangularNumber(N) * BASE_ROUTE_COST
+                // triangularNumber(N) = N*(N+1)/2
+                const n = groupOrders.length;
+                const triangularSum = (n * (n + 1)) / 2;
+
+                for (let i = 0; i < groupOrders.length; i++) {
+                    const order = groupOrders[i];
+                    const stopIndex = i + 1;
+                    const feeShare = parseFloat(((stopIndex / triangularSum) * BASE_ROUTE_COST).toFixed(2));
+
+                    await prisma.$executeRaw`
+                        UPDATE "Order"
+                        SET "corridorId"       = ${corridorId},
+                            "deliveryStatus"   = 'IN_TRANSIT'::"PoolDeliveryStatus",
+                            "deliveryFeeShare" = ${feeShare},
+                            "updatedAt"        = NOW()
+                        WHERE id = ${order.id}
+                    `;
+                }
+            }
+
+            return { batched: orders.length, corridors: corridorMap.size };
         });
     }
 );

@@ -5,7 +5,7 @@ import Pagination from "@/components/Pagination"
 import { useAuth } from "@clerk/nextjs"
 import axios from "axios"
 import toast from "react-hot-toast"
-import { SearchIcon, XIcon, ShoppingBagIcon, TruckIcon } from "lucide-react"
+import { PrinterIcon, SearchIcon, XIcon, ShoppingBagIcon, TruckIcon } from "lucide-react"
 
 const ORDER_STATUSES = ['', 'ORDER_PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED']
 
@@ -117,6 +117,26 @@ export default function StoreOrders() {
         await updateOrderStatus(selectedOrder.id, 'SHIPPED', {
             publicStatusNote: shippingNoteInput.trim() || null
         })
+    }
+
+    const [settingIntake, setSettingIntake] = useState(false)
+
+    const handleSetIntakeMethod = async (orderId, method) => {
+        setSettingIntake(true)
+        try {
+            const token = await getToken()
+            const { data } = await axios.patch(`/api/store/orders/${orderId}`, { intakeMethod: method }, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            const updated = { ...selectedOrder, intakeMethod: method, total: data.total, shippingCost: data.shippingCost }
+            setSelectedOrder(updated)
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, intakeMethod: method, total: data.total } : o))
+            toast.success(`Intake method set to ${method === 'HUB_DROP_OFF' ? 'Hub Drop-Off' : 'Driver Sweep'}`)
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        } finally {
+            setSettingIntake(false)
+        }
     }
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF'
@@ -296,6 +316,54 @@ export default function StoreOrders() {
                                         {settingShipping ? 'Saving…' : 'Confirm Fee'}
                                     </button>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* ── Kigali Pooled Delivery Intake ── */}
+                        {selectedOrder.deliveryType === 'KIGALI_POOL' && (
+                            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 mb-1">Pooled Delivery Intake</p>
+                                {selectedOrder.landmarkAddress && (
+                                    <p className="text-xs text-slate-500 mb-3">Customer landmark: <span className="text-slate-700 font-medium">{selectedOrder.landmarkAddress}</span></p>
+                                )}
+                                <div className="space-y-2">
+                                    <label className={`flex gap-3 items-start rounded-xl border px-4 py-3 cursor-pointer transition ${selectedOrder.intakeMethod === 'HUB_DROP_OFF' ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-white'}`}>
+                                        <input
+                                            type="radio"
+                                            name={`intake-${selectedOrder.id}`}
+                                            value="HUB_DROP_OFF"
+                                            checked={selectedOrder.intakeMethod === 'HUB_DROP_OFF'}
+                                            onChange={() => handleSetIntakeMethod(selectedOrder.id, 'HUB_DROP_OFF')}
+                                            disabled={settingIntake}
+                                            className="mt-1 accent-green-600"
+                                        />
+                                        <div>
+                                            <span className="block font-medium text-slate-800 text-sm">Drop off at Central Hub by 11:00 AM</span>
+                                            <span className="block text-xs text-slate-500">0 RWF — Downtown / CHIC Hub</span>
+                                        </div>
+                                    </label>
+                                    <label className={`flex gap-3 items-start rounded-xl border px-4 py-3 cursor-pointer transition ${selectedOrder.intakeMethod === 'DRIVER_SWEEP' ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+                                        <input
+                                            type="radio"
+                                            name={`intake-${selectedOrder.id}`}
+                                            value="DRIVER_SWEEP"
+                                            checked={selectedOrder.intakeMethod === 'DRIVER_SWEEP'}
+                                            onChange={() => handleSetIntakeMethod(selectedOrder.id, 'DRIVER_SWEEP')}
+                                            disabled={settingIntake}
+                                            className="mt-1 accent-amber-600"
+                                        />
+                                        <div>
+                                            <span className="block font-medium text-slate-800 text-sm">Request Morning Driver Sweep Pickup</span>
+                                            <span className="block text-xs text-slate-500">+1,000 RWF — Pickup 8–11 AM from your location</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <button
+                                    onClick={() => window.open(`/store/orders/label/${selectedOrder.id}`, '_blank')}
+                                    className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                                >
+                                    <PrinterIcon size={15} /> Print Package Label
+                                </button>
                             </div>
                         )}
 

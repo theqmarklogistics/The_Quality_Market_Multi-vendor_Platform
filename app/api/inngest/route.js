@@ -3,6 +3,7 @@ import { inngest } from "../../../inngest/client";
 import {
   deleteCouponOnExpiry,
   expirePendingOrders,
+  kigaliPoolBatchingEngine,
   onChatMessageCreated,
   onPaymentProofReviewed,
   onPaymentProofSubmitted,
@@ -12,7 +13,6 @@ import {
   syncUserUpdate
 } from "@/inngest/functions";
 
-// Create an API that serves zero functions
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
@@ -21,6 +21,7 @@ export const { GET, POST, PUT } = serve({
     syncUserDeletion,
     deleteCouponOnExpiry,
     expirePendingOrders,
+    kigaliPoolBatchingEngine,
     onChatMessageCreated,
     onPaymentProofSubmitted,
     onProductModerationUpdated,

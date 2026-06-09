@@ -29,6 +29,40 @@ export async function PATCH(request, { params }) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
         }
 
+        // ── Set pooled delivery intake method ─────────────────────────────────
+        if (body.intakeMethod !== undefined) {
+            const validMethods = ['HUB_DROP_OFF', 'DRIVER_SWEEP'];
+            if (!validMethods.includes(body.intakeMethod)) {
+                return NextResponse.json({ error: "Invalid intake method" }, { status: 400 });
+            }
+            if (order.deliveryType !== 'KIGALI_POOL') {
+                return NextResponse.json({ error: "Intake method only applies to Kigali Pooled Delivery orders" }, { status: 400 });
+            }
+
+            let newTotal = order.total;
+            let newShippingCost = order.shippingCost ?? 0;
+            // Add driver sweep fee only once — if switching to DRIVER_SWEEP and not already set
+            if (body.intakeMethod === 'DRIVER_SWEEP' && order.intakeMethod !== 'DRIVER_SWEEP') {
+                newShippingCost = parseFloat((newShippingCost + 1000).toFixed(2));
+                newTotal = parseFloat((newTotal + 1000).toFixed(2));
+            }
+            // Remove previously-added sweep fee if switching back to hub drop-off
+            if (body.intakeMethod === 'HUB_DROP_OFF' && order.intakeMethod === 'DRIVER_SWEEP') {
+                newShippingCost = parseFloat((newShippingCost - 1000).toFixed(2));
+                newTotal = parseFloat((newTotal - 1000).toFixed(2));
+            }
+
+            await prisma.$executeRaw`
+                UPDATE "Order"
+                SET "intakeMethod" = ${body.intakeMethod}::"IntakeMethod",
+                    "shippingCost" = ${newShippingCost},
+                    total = ${newTotal},
+                    "updatedAt" = NOW()
+                WHERE id = ${orderId} AND "storeId" = ${storeId}
+            `;
+            return NextResponse.json({ message: `Intake method set to ${body.intakeMethod}`, total: newTotal, shippingCost: newShippingCost });
+        }
+
         // ── Set shipping fee (LOCAL_SELLER) ────────────────────────────────────
         if (body.shippingCost !== undefined) {
             const fee = parseFloat(body.shippingCost);

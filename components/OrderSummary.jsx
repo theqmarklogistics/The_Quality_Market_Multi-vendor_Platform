@@ -1,4 +1,4 @@
-import { PlusIcon, SquarePenIcon, XIcon } from 'lucide-react';
+import { InfoIcon, PlusIcon, SquarePenIcon, XIcon } from 'lucide-react';
 import React, { useState, useEffect } from 'react'
 import AddressModal from './AddressModal';
 import { useDispatch, useSelector } from 'react-redux';
@@ -29,6 +29,8 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     const [couponCodeInput, setCouponCodeInput] = useState('');
     const [coupon, setCoupon] = useState('');
     const [paymentConfig, setPaymentConfig] = useState(null);
+    const [deliveryType, setDeliveryType] = useState('STANDARD_UNPOOLED');
+    const [landmarkAddress, setLandmarkAddress] = useState('');
 
     useEffect(() => {
         axios.get('/api/payment-config').then(res => setPaymentConfig(res.data)).catch(() => null)
@@ -72,15 +74,22 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                 return;
             }
 
+            if (deliveryType === 'KIGALI_POOL' && !landmarkAddress.trim()) {
+                toast.error('Please enter a Kigali landmark or directions for Pooled Delivery.');
+                return;
+            }
+
             const token = await getToken();
 
             const orderData = {
                 items,
                 addressId: selectedAddress.id,
                 paymentMethod: selectedPaymentMethod,
-                couponCode: couponCodeInput
+                couponCode: couponCodeInput,
+                deliveryType,
+                ...(deliveryType === 'KIGALI_POOL' && { landmarkAddress: landmarkAddress.trim() })
             }
-            
+
             if(coupon){
                 orderData.couponCode = coupon.code;
             }
@@ -170,6 +179,67 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                     )}
                 </section>
 
+                <section className='border-b border-slate-200 pb-5'>
+                    <p className='text-xs font-semibold uppercase tracking-[0.22em] text-slate-400'>Delivery Method</p>
+                    <div className='mt-3 space-y-2'>
+                        {/* Standard Delivery */}
+                        <label htmlFor="delivery_standard" className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${deliveryType === 'STANDARD_UNPOOLED' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <input
+                                type="radio"
+                                id="delivery_standard"
+                                name="delivery"
+                                onChange={() => setDeliveryType('STANDARD_UNPOOLED')}
+                                checked={deliveryType === 'STANDARD_UNPOOLED'}
+                                className='mt-1 accent-slate-700'
+                            />
+                            <div>
+                                <span className='block font-medium text-slate-800'>Standard Delivery</span>
+                                <span className='block text-xs text-slate-500 mt-0.5'>Your order ships via standard vendor fulfillment.</span>
+                            </div>
+                        </label>
+
+                        {/* Kigali Pooled Delivery */}
+                        <label htmlFor="delivery_pool" className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${deliveryType === 'KIGALI_POOL' ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <input
+                                type="radio"
+                                id="delivery_pool"
+                                name="delivery"
+                                onChange={() => setDeliveryType('KIGALI_POOL')}
+                                checked={deliveryType === 'KIGALI_POOL'}
+                                className='mt-1 accent-green-600'
+                            />
+                            <div className='flex-1'>
+                                <div className='flex items-center gap-2'>
+                                    <span className='block font-medium text-slate-800'>Kigali Pooled Delivery</span>
+                                    <span className='rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700'>Save up to 60%</span>
+                                </div>
+                                <span className='block text-xs text-slate-500 mt-0.5'>Packages are batched daily at 11:00 AM and delivered along shared routes in the afternoon to cut your delivery costs by up to 60%.</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    {/* Landmark / Directions field — only shown for Kigali Pool */}
+                    {deliveryType === 'KIGALI_POOL' && (
+                        <div className='mt-3'>
+                            <label className='block text-xs font-semibold text-slate-700 mb-1'>
+                                Kigali Landmark / Directions <span className='text-red-500'>*</span>
+                            </label>
+                            <div className='relative'>
+                                <input
+                                    type="text"
+                                    value={landmarkAddress}
+                                    onChange={e => setLandmarkAddress(e.target.value)}
+                                    placeholder='e.g. Near Kisimenti Simba Supermarket, Remera'
+                                    className='w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-8 text-sm outline-none focus:border-green-500'
+                                    required
+                                />
+                                <InfoIcon size={14} className='absolute right-3 top-3 text-slate-400' />
+                            </div>
+                            <p className='mt-1 text-[11px] text-slate-400'>Help the rider find you — include a nearby landmark or contextual clue.</p>
+                        </div>
+                    )}
+                </section>
+
                 <section className='space-y-4'>
                     <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
                         <div className='flex justify-between gap-4'>
@@ -180,7 +250,10 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                             </div>
                             <div className='flex flex-col gap-1 font-medium text-right text-slate-800'>
                                 <p>{formatAmount(totalPrice)}</p>
-                                <p>Free in Kigali</p>
+                                {deliveryType === 'KIGALI_POOL'
+                                    ? <p className='text-green-700 text-xs'>Pooled (set at 11 AM)</p>
+                                    : <p>Free in Kigali</p>}
+
                                 {coupon && <p>{`-${formatAmount((coupon.discount / 100) * totalPrice)}`}</p>}
                             </div>
                         </div>

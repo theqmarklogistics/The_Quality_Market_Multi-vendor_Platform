@@ -28,10 +28,17 @@ export async function POST(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { items, addressId, paymentMethod: selectedPaymentMethod, couponCode } = await request.json();
+        const { items, addressId, paymentMethod: selectedPaymentMethod, couponCode, deliveryType: rawDeliveryType, landmarkAddress: rawLandmark } = await request.json();
 
         if(!items || !addressId || !selectedPaymentMethod || !Array.isArray(items) || items.length === 0){
             return NextResponse.json({ error: "Missing order details" }, { status: 400 });
+        }
+
+        const deliveryType = rawDeliveryType === 'KIGALI_POOL' ? 'KIGALI_POOL' : 'STANDARD_UNPOOLED';
+        const landmarkAddress = typeof rawLandmark === 'string' ? rawLandmark.trim() : null;
+
+        if (deliveryType === 'KIGALI_POOL' && !landmarkAddress) {
+            return NextResponse.json({ error: "A Kigali landmark / directions field is required for Pooled Delivery." }, { status: 400 });
         }
 
         const allowedPaymentMethods = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
@@ -251,6 +258,11 @@ export async function POST(request) {
                 const commissionJson = JSON.stringify(commissionBreakdown.length ? commissionBreakdown : {});
                 const couponJson = JSON.stringify(couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {});
 
+                const isPooled = deliveryType === 'KIGALI_POOL';
+                const deliveryOtp = isPooled ? String(Math.floor(1000 + Math.random() * 9000)) : null;
+                const poolDeliveryStatus = isPooled ? 'PENDING_INTAKE' : null;
+                const escrowStatus = isPooled ? 'HELD' : 'NOT_HELD';
+
                 await prisma.$executeRaw`
                     INSERT INTO "Order" (
                         id, "userId", "storeId", "addressId",
@@ -260,6 +272,7 @@ export async function POST(request) {
                         "paymentMethod", "paymentStatus", "paymentExpiresAt",
                         "isPaid", "isCouponUsed", coupon,
                         "invoiceRequested", "paymentProofStatus",
+                        "deliveryType", "landmarkAddress", "deliveryOtp", "deliveryStatus", "escrowStatus",
                         "createdAt", "updatedAt"
                     ) VALUES (
                         ${orderId}, ${userId}, ${storeId}, ${addressId},
@@ -269,6 +282,8 @@ export async function POST(request) {
                         ${selectedPaymentMethod}::"PaymentMethod", 'PENDING'::"PaymentStatus", ${paymentExpiresAt},
                         false, ${!!couponCode}, ${couponJson}::jsonb,
                         false, 'NOT_SUBMITTED'::"PaymentProofStatus",
+                        ${deliveryType}::"DeliveryType", ${landmarkAddress}, ${deliveryOtp},
+                        ${poolDeliveryStatus}::"PoolDeliveryStatus", ${escrowStatus}::"EscrowStatus",
                         ${now}, ${now}
                     )
                 `;
