@@ -207,6 +207,11 @@ model Order {
     stopSequence      Int?
     deliveredAt       DateTime?
     failureReason     String?
+    // Number of completed (failed) delivery attempts for this pooled order
+    deliveryAttempts  Int                @default(0)
+    // OTP verification hardening — throttles brute-force on the 4-digit code
+    otpAttempts       Int                @default(0)
+    otpLockedUntil    DateTime?
     orderItems    OrderItem[]
 
     // Relations

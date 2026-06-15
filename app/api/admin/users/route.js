@@ -8,6 +8,7 @@ const ALLOWED_ROLES = [
     'LOGISTICS_MANAGER',
     'FINANCIAL_OPERATIONAL',
     'WAREHOUSE_KEEPER',
+    'RIDER',
 ]
 
 export async function GET(request) {
@@ -50,7 +51,13 @@ export async function POST(request) {
         if (existing) {
             await prisma.user.update({
                 where: { id: existing.id },
-                data: { role: normalizedRole },
+                data: {
+                    role: normalizedRole,
+                    // Ensure a rider always has a profile dispatch can manage.
+                    ...(normalizedRole === 'RIDER'
+                        ? { riderProfile: { upsert: { create: {}, update: {} } } }
+                        : {}),
+                },
             });
 
             return NextResponse.json({ message: 'User role updated successfully' });

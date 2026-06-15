@@ -4,6 +4,11 @@ import prisma from "@/lib/prisma";
 import authAdmin from "@/middlewares/authAdmin";
 import { triggerSplitPayout } from "@/lib/pooledDeliveryPayout";
 import { emitDelivery } from "@/lib/deliveryRealtime";
+import { notifyDeliveryEvent } from "@/lib/deliveryNotifications";
+
+// Brute-force throttle on the 4-digit code.
+const MAX_OTP_ATTEMPTS = 5;
+const OTP_LOCK_MINUTES = 15;
 
 export async function POST(request) {
     try {
@@ -24,7 +29,10 @@ export async function POST(request) {
 
         const order = await prisma.order.findUnique({
             where: { id: orderId },
-            include: { corridor: { select: { id: true, assignedRiderId: true } } },
+            include: {
+                corridor: { select: { id: true, assignedRiderId: true } },
+                address: { select: { email: true, phone: true } },
+            },
         });
 
         if (!order) {
@@ -45,17 +53,46 @@ export async function POST(request) {
             return NextResponse.json({ error: "This order has already been delivered" }, { status: 409 });
         }
 
-        if (String(inputOtp) !== order.deliveryOtp) {
-            return NextResponse.json({ error: "Invalid OTP. Please verify the code with the customer." }, { status: 401 });
+        // Reject while locked out from too many wrong attempts.
+        if (order.otpLockedUntil && new Date(order.otpLockedUntil) > new Date()) {
+            const mins = Math.ceil((new Date(order.otpLockedUntil) - new Date()) / 60000);
+            return NextResponse.json(
+                { error: `Too many incorrect attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.` },
+                { status: 429 }
+            );
         }
 
-        // Atomically mark as delivered and release escrow
+        if (String(inputOtp) !== order.deliveryOtp) {
+            // Count the failed attempt and lock the code after the threshold.
+            const attempts = (order.otpAttempts ?? 0) + 1;
+            const lock = attempts >= MAX_OTP_ATTEMPTS;
+            await prisma.order.update({
+                where: { id: orderId },
+                data: {
+                    otpAttempts: lock ? 0 : attempts,
+                    otpLockedUntil: lock ? new Date(Date.now() + OTP_LOCK_MINUTES * 60000) : null,
+                },
+            });
+            const remaining = MAX_OTP_ATTEMPTS - attempts;
+            return NextResponse.json(
+                {
+                    error: lock
+                        ? `Invalid OTP. Too many attempts — locked for ${OTP_LOCK_MINUTES} minutes.`
+                        : `Invalid OTP. Please verify the code with the customer. ${remaining} attempt${remaining === 1 ? "" : "s"} left.`,
+                },
+                { status: 401 }
+            );
+        }
+
+        // Atomically mark as delivered, release escrow, and clear OTP throttle state.
         await prisma.$executeRaw`
             UPDATE "Order"
             SET status = 'DELIVERED'::"OrderStatus",
                 "deliveryStatus" = 'DELIVERED'::"PoolDeliveryStatus",
                 "escrowStatus" = 'RELEASED'::"EscrowStatus",
                 "deliveredAt" = NOW(),
+                "otpAttempts" = 0,
+                "otpLockedUntil" = NULL,
                 "updatedAt" = NOW()
             WHERE id = ${orderId} AND "deliveryOtp" = ${order.deliveryOtp}
         `;
@@ -69,6 +106,9 @@ export async function POST(request) {
             "delivery-status-update",
             { orderId, deliveryStatus: "DELIVERED", escrowStatus: "RELEASED", at: new Date().toISOString() }
         );
+
+        // Email + SMS the customer that the package was delivered (best-effort).
+        await notifyDeliveryEvent(order, "DELIVERED");
 
         return NextResponse.json({
             success: true,

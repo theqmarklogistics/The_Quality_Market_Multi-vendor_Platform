@@ -204,7 +204,7 @@ export default function TrackOrderPage() {
                                 <span className="text-sm font-semibold text-green-700">ETA ~{trackData.etaMinutes} min</span>
                             )}
                         </div>
-                        <LiveMap riderPos={riderPos} customerPos={customerPos} height={260} />
+                        <LiveMap riderPos={riderPos} customerPos={customerPos} routeGeometry={trackData?.routeGeometry} height={260} />
                         {!riderPos && (
                             <p className="text-xs text-slate-400 text-center mt-2">Waiting for the rider to start sharing location…</p>
                         )}

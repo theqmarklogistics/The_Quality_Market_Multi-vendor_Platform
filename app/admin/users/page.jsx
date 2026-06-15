@@ -9,6 +9,7 @@ const ROLE_OPTIONS = [
     { value: 'LOGISTICS_MANAGER', label: 'Logistics manager' },
     { value: 'FINANCIAL_OPERATIONAL', label: 'Financial operational' },
     { value: 'WAREHOUSE_KEEPER', label: 'Warehouse keeper' },
+    { value: 'RIDER', label: 'Rider' },
 ]
 
 export default function AdminUsersPage() {

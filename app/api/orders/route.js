@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 import prisma from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
 import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
@@ -262,7 +262,8 @@ export async function POST(request) {
                 const couponJson = JSON.stringify(couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {});
 
                 const isPooled = deliveryType === 'KIGALI_POOL';
-                const deliveryOtp = isPooled ? String(Math.floor(1000 + Math.random() * 9000)) : null;
+                // Cryptographically-random 4-digit code (1000–9999) to resist guessing.
+                const deliveryOtp = isPooled ? String(randomInt(1000, 10000)) : null;
                 const poolDeliveryStatus = isPooled ? 'PENDING_INTAKE' : null;
                 const escrowStatus = isPooled ? 'HELD' : 'NOT_HELD';
 

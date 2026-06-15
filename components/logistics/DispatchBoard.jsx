@@ -5,7 +5,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import LiveMap from "@/components/delivery/LiveMap";
 import { initializeSocket } from "@/lib/socketClient";
-import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon } from "lucide-react";
+import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon } from "lucide-react";
 
 const CORRIDOR_BADGE = {
     OPEN: "bg-slate-100 text-slate-600",
@@ -95,15 +95,35 @@ export default function DispatchBoard() {
         } catch (err) { toast.error(err?.response?.data?.error || err.message); } finally { setBusy(false); }
     };
 
+    const resolveFailed = async (orderId, action) => {
+        setBusy(true);
+        try {
+            await axios.post(`/api/logistics/orders/${orderId}/resolve`, { action }, { headers: await authHeaders() });
+            toast.success(action === "repool" ? "Order sent back to the batching queue" : "Order refunded");
+            load({ silent: true });
+        } catch (err) { toast.error(err?.response?.data?.error || err.message); } finally { setBusy(false); }
+    };
+
+    const runBatching = async () => {
+        setBusy(true);
+        try {
+            const { data } = await axios.post(`/api/logistics/batch`, {}, { headers: await authHeaders() });
+            toast.success(data.batched ? `Batched ${data.batched} order(s) into ${data.corridors} corridor(s)` : "No pending orders to batch");
+            load({ silent: true });
+        } catch (err) { toast.error(err?.response?.data?.error || err.message); } finally { setBusy(false); }
+    };
+
     // Aggregate map: every dispatched rider pin + every stop across corridors
-    const { mapRider, mapStops } = useMemo(() => {
+    const { mapRiders, mapStops } = useMemo(() => {
         const allStops = [];
-        let firstRider = null;
+        const allRiders = [];
         corridors.forEach(c => {
-            if (c.riderLat != null && c.riderLng != null && !firstRider) firstRider = { lat: c.riderLat, lng: c.riderLng };
+            if (c.riderLat != null && c.riderLng != null) {
+                allRiders.push({ id: c.id, lat: c.riderLat, lng: c.riderLng, label: `${c.rider?.name || "Rider"} · ${c.name}` });
+            }
             c.stops.forEach(s => { if (s.lat != null && s.lng != null) allStops.push({ id: s.orderId, lat: s.lat, lng: s.lng, stopSequence: s.stopSequence, label: `${c.name} · #${s.stopSequence}` }); });
         });
-        return { mapRider: firstRider, mapStops: allStops };
+        return { mapRiders: allRiders, mapStops: allStops };
     }, [corridors]);
 
     return (
@@ -115,13 +135,14 @@ export default function DispatchBoard() {
                 </div>
                 <div className="flex items-center gap-2">
                     <input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                    <button onClick={runBatching} disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-slate-800 text-white px-3 py-2 text-sm font-medium hover:bg-slate-900 disabled:opacity-50"><LayersIcon size={14} /> Batch now</button>
                     <button onClick={() => load()} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:border-green-400"><RefreshCwIcon size={14} /> Refresh</button>
                 </div>
             </div>
 
             {/* Live overview map */}
             <div className="rounded-3xl bg-white border border-slate-200 p-3 shadow-sm mb-6">
-                <LiveMap riderPos={mapRider} stops={mapStops} showRoute height={300} />
+                <LiveMap riders={mapRiders} stops={mapStops} showRoute height={300} />
             </div>
 
             {loading ? (
@@ -179,6 +200,12 @@ export default function DispatchBoard() {
                                                 <span className="text-[10px] font-semibold text-slate-500">{s.deliveryStatus}</span>
                                                 {s.deliveryStatus === "PENDING_INTAKE" && (
                                                     <button disabled={busy} onClick={() => markIntake(s.orderId)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400">Mark sorted</button>
+                                                )}
+                                                {s.deliveryStatus === "FAILED" && (
+                                                    <>
+                                                        <button disabled={busy} onClick={() => resolveFailed(s.orderId, "repool")} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-blue-400 text-blue-600"><RotateCcwIcon size={12} /> Re-pool</button>
+                                                        <button disabled={busy} onClick={() => resolveFailed(s.orderId, "refund")} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-red-400 text-red-600"><BanknoteIcon size={12} /> Refund</button>
+                                                    </>
                                                 )}
                                                 {s.deliveryStatus === "DELIVERED" && <CheckCircleIcon size={16} className="text-green-600" />}
                                             </div>

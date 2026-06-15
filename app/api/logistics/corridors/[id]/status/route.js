@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authLogistics from "@/middlewares/authLogistics";
 import { emitDelivery } from "@/lib/deliveryRealtime";
+import { notifyCorridorDispatched } from "@/lib/deliveryNotifications";
 
 // POST { action } — drive a corridor through its dispatch lifecycle.
 //   dispatch → IN_TRANSIT (requires assigned rider; flips its orders to IN_TRANSIT)
@@ -22,7 +23,9 @@ export async function POST(request, { params }) {
 
         const corridor = await prisma.deliveryCorridor.findUnique({
             where: { id },
-            include: { orders: { select: { id: true } } },
+            include: {
+                orders: { select: { id: true, deliveryStatus: true, address: { select: { email: true, phone: true } } } },
+            },
         });
         if (!corridor) return NextResponse.json({ error: "Corridor not found" }, { status: 404 });
 
@@ -66,6 +69,14 @@ export async function POST(request, { params }) {
             corridor.orders.forEach((o) =>
                 emitDelivery([`track-${o.id}`], "delivery-status-update", { orderId: o.id, deliveryStatus: newOrderStatus })
             );
+        }
+
+        // On dispatch, email + SMS every customer whose order just went in transit.
+        if (action === "dispatch") {
+            const advanced = corridor.orders.filter((o) =>
+                ["PENDING_INTAKE", "SORTING"].includes(o.deliveryStatus)
+            );
+            await notifyCorridorDispatched(advanced);
         }
 
         return NextResponse.json({ success: true, corridorId: id, status: corridorData.status });

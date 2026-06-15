@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import { estimateEtaForStop } from "@/lib/deliveryEta";
+import { estimateEtaForStop, fetchOsrmRoute } from "@/lib/deliveryEta";
 
 export async function GET(request, { params }) {
     try {
@@ -52,15 +52,30 @@ export async function GET(request, { params }) {
         const recipientLat = order.recipientLat ?? order.address?.latitude ?? null;
         const recipientLng = order.recipientLng ?? order.address?.longitude ?? null;
 
-        // ETA: only meaningful once the rider is moving (IN_TRANSIT/ARRIVING) and we have a position.
+        // ETA + route geometry: only meaningful once the rider is moving and located.
         let etaMinutes = null;
+        let routeGeometry = null;
         if (riderPos && corridor && ["IN_TRANSIT", "ARRIVING"].includes(order.deliveryStatus)) {
             const stops = corridor.orders.map((o) => ({
                 stopSequence: o.stopSequence,
                 lat: o.recipientLat ?? o.address?.latitude ?? null,
                 lng: o.recipientLng ?? o.address?.longitude ?? null,
             }));
+            // Haversine estimate as the guaranteed fallback.
             etaMinutes = estimateEtaForStop(riderPos, stops, order.stopSequence ?? 0);
+
+            // Try a real road route from the rider through the stops up to this one.
+            const legStops = stops
+                .filter((s) => s.lat != null && s.lng != null && s.stopSequence != null && s.stopSequence <= (order.stopSequence ?? 0))
+                .sort((a, b) => a.stopSequence - b.stopSequence)
+                .map((s) => ({ lat: s.lat, lng: s.lng }));
+            if (legStops.length) {
+                const osrm = await fetchOsrmRoute([riderPos, ...legStops]);
+                if (osrm) {
+                    etaMinutes = osrm.durationMin;
+                    routeGeometry = osrm.geometry;
+                }
+            }
         }
 
         return NextResponse.json({
@@ -83,6 +98,7 @@ export async function GET(request, { params }) {
             recipientLat,
             recipientLng,
             etaMinutes,
+            routeGeometry,
             rider: corridor?.assignedRider
                 ? {
                     name: corridor.assignedRider.name,

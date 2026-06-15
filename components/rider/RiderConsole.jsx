@@ -9,6 +9,16 @@ import { PhoneIcon, NavigationIcon, CheckCircleIcon, XCircleIcon, MapPinIcon, Pl
 
 const LOCATION_MIN_MS = 10000;
 
+// Preset reasons keep failure data clean and consistent across riders.
+const FAILURE_REASONS = [
+    "Customer unreachable",
+    "Wrong / incomplete address",
+    "Customer not available",
+    "Customer refused delivery",
+    "Access blocked / gated",
+    "Other",
+];
+
 const STATUS_BADGE = {
     SORTING: "bg-slate-100 text-slate-600",
     IN_TRANSIT: "bg-blue-100 text-blue-700",
@@ -26,10 +36,16 @@ export default function RiderConsole() {
     const [tracking, setTracking] = useState(false);
     const [otpModal, setOtpModal] = useState(null); // { orderId }
     const [otpInput, setOtpInput] = useState("");
+    const [failModal, setFailModal] = useState(null); // { orderId }
+    const [failReason, setFailReason] = useState(FAILURE_REASONS[0]);
+    const [failNote, setFailNote] = useState("");
     const [busy, setBusy] = useState(false);
 
     const watchIdRef = useRef(null);
     const lastPostRef = useRef(0);
+    const pendingPosRef = useRef(null); // last position not yet confirmed sent
+    const wakeLockRef = useRef(null);
+    const flushTimerRef = useRef(null);
 
     const authHeaders = useCallback(async () => ({ Authorization: `Bearer ${await getToken()}` }), [getToken]);
 
@@ -76,23 +92,65 @@ export default function RiderConsole() {
         };
     }, [getToken, load]);
 
-    const postLocation = useCallback(async (lat, lng) => {
+    // Try to flush the latest unsent position. Throttled to LOCATION_MIN_MS; on
+    // failure the position stays queued and a timer retries it (covers signal drops
+    // and a stationary rider whose watchPosition won't fire again).
+    const flushLocation = useCallback(async () => {
+        const pending = pendingPosRef.current;
+        if (!pending) return;
         const now = Date.now();
-        if (now - lastPostRef.current < LOCATION_MIN_MS) { setRiderPos({ lat, lng }); return; }
+        if (now - lastPostRef.current < LOCATION_MIN_MS) return;
         lastPostRef.current = now;
-        setRiderPos({ lat, lng });
         try {
-            await axios.post("/api/delivery/rider/location", { lat, lng }, { headers: await authHeaders() });
-        } catch (_) { /* keep moving; will retry next tick */ }
+            await axios.post("/api/delivery/rider/location", pending, { headers: await authHeaders() });
+            // Only clear if a newer position hasn't replaced it meanwhile.
+            if (pendingPosRef.current === pending) pendingPosRef.current = null;
+        } catch (_) {
+            // Leave queued; allow a quicker retry than the normal cadence.
+            lastPostRef.current = now - LOCATION_MIN_MS / 2;
+        }
     }, [authHeaders]);
 
+    const postLocation = useCallback((lat, lng) => {
+        setRiderPos({ lat, lng });
+        pendingPosRef.current = { lat, lng };
+        flushLocation();
+    }, [flushLocation]);
+
+    // Keep the screen awake while a rider is actively on a route.
+    const acquireWakeLock = useCallback(async () => {
+        try {
+            if ("wakeLock" in navigator && !wakeLockRef.current) {
+                wakeLockRef.current = await navigator.wakeLock.request("screen");
+                wakeLockRef.current.addEventListener?.("release", () => { wakeLockRef.current = null; });
+            }
+        } catch (_) { /* non-fatal: device may deny or not support it */ }
+    }, []);
+
+    const releaseWakeLock = useCallback(async () => {
+        try { await wakeLockRef.current?.release?.(); } catch (_) {}
+        wakeLockRef.current = null;
+    }, []);
+
+    // Re-acquire the wake lock when returning to the tab (the OS drops it on hide).
+    useEffect(() => {
+        const onVisible = () => { if (document.visibilityState === "visible" && tracking) acquireWakeLock(); };
+        document.addEventListener("visibilitychange", onVisible);
+        return () => document.removeEventListener("visibilitychange", onVisible);
+    }, [tracking, acquireWakeLock]);
+
+    const stopTracking = useCallback(() => {
+        if (watchIdRef.current != null && "geolocation" in navigator) navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+        if (flushTimerRef.current) clearInterval(flushTimerRef.current);
+        flushTimerRef.current = null;
+        pendingPosRef.current = null;
+        releaseWakeLock();
+        setTracking(false);
+    }, [releaseWakeLock]);
+
     const toggleTracking = () => {
-        if (tracking) {
-            if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-            setTracking(false);
-            return;
-        }
+        if (tracking) { stopTracking(); return; }
         if (corridor?.status !== "IN_TRANSIT") {
             toast.error("Your corridor hasn't been dispatched yet.");
             return;
@@ -101,14 +159,21 @@ export default function RiderConsole() {
         lastPostRef.current = 0;
         watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => postLocation(pos.coords.latitude, pos.coords.longitude),
-            () => { toast.error("Location access denied."); setTracking(false); },
+            () => { toast.error("Location access denied."); stopTracking(); },
             { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
         );
+        // Retry timer flushes queued positions even when the rider isn't moving.
+        flushTimerRef.current = setInterval(() => flushLocation(), LOCATION_MIN_MS);
+        acquireWakeLock();
         setTracking(true);
         toast.success("Live tracking on — customers can see you now.");
     };
 
-    useEffect(() => () => { if (watchIdRef.current != null && "geolocation" in navigator) navigator.geolocation.clearWatch(watchIdRef.current); }, []);
+    useEffect(() => () => {
+        if (watchIdRef.current != null && "geolocation" in navigator) navigator.geolocation.clearWatch(watchIdRef.current);
+        if (flushTimerRef.current) clearInterval(flushTimerRef.current);
+        releaseWakeLock();
+    }, [releaseWakeLock]);
 
     const setStopStatus = async (orderId, status, failureReason) => {
         setBusy(true);
@@ -119,6 +184,20 @@ export default function RiderConsole() {
         } catch (err) {
             toast.error(err?.response?.data?.error || err.message);
         } finally { setBusy(false); }
+    };
+
+    const openFailModal = (orderId) => {
+        setFailModal({ orderId });
+        setFailReason(FAILURE_REASONS[0]);
+        setFailNote("");
+    };
+
+    const confirmFail = async () => {
+        const reason = failReason === "Other"
+            ? (failNote.trim() || "Other")
+            : (failNote.trim() ? `${failReason} — ${failNote.trim()}` : failReason);
+        await setStopStatus(failModal.orderId, "FAILED", reason);
+        setFailModal(null);
     };
 
     const confirmDelivery = async () => {
@@ -209,7 +288,7 @@ export default function RiderConsole() {
                                         <button disabled={busy} onClick={() => { setOtpModal({ orderId: s.orderId }); setOtpInput(""); }} className="flex items-center justify-center gap-1.5 rounded-xl bg-green-600 text-white py-2 text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
                                             <CheckCircleIcon size={14} /> Deliver
                                         </button>
-                                        <button disabled={busy} onClick={() => { const r = prompt("Reason for failed delivery?"); if (r != null) setStopStatus(s.orderId, "FAILED", r); }} className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 text-red-600 py-2 text-xs font-medium hover:bg-red-50">
+                                        <button disabled={busy} onClick={() => openFailModal(s.orderId)} className="col-span-2 flex items-center justify-center gap-1.5 rounded-xl border border-red-200 text-red-600 py-2 text-xs font-medium hover:bg-red-50">
                                             <XCircleIcon size={14} /> Mark failed
                                         </button>
                                     </div>
@@ -251,6 +330,34 @@ export default function RiderConsole() {
                         <div className="mt-5 flex gap-3">
                             <button onClick={() => setOtpModal(null)} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600">Cancel</button>
                             <button disabled={busy} onClick={confirmDelivery} className="flex-1 rounded-xl bg-green-600 text-white py-2.5 text-sm font-semibold hover:bg-green-700 disabled:opacity-50">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Failed-delivery modal */}
+            {failModal && (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4" onClick={() => setFailModal(null)}>
+                    <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-slate-800">Mark delivery failed</h3>
+                        <p className="text-sm text-slate-500 mt-1">Pick a reason so dispatch can re-pool or follow up.</p>
+                        <div className="mt-4 space-y-2">
+                            {FAILURE_REASONS.map((r) => (
+                                <label key={r} className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer text-sm transition ${failReason === r ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 text-slate-600"}`}>
+                                    <input type="radio" name="fail-reason" value={r} checked={failReason === r} onChange={() => setFailReason(r)} className="accent-red-600" />
+                                    {r}
+                                </label>
+                            ))}
+                        </div>
+                        <input
+                            value={failNote}
+                            onChange={e => setFailNote(e.target.value)}
+                            placeholder={failReason === "Other" ? "Describe the reason…" : "Add a note (optional)"}
+                            className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-red-400"
+                        />
+                        <div className="mt-5 flex gap-3">
+                            <button onClick={() => setFailModal(null)} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600">Cancel</button>
+                            <button disabled={busy} onClick={confirmFail} className="flex-1 rounded-xl bg-red-600 text-white py-2.5 text-sm font-semibold hover:bg-red-700 disabled:opacity-50">Mark failed</button>
                         </div>
                     </div>
                 </div>

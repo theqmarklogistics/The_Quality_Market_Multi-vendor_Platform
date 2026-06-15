@@ -1,6 +1,6 @@
 import { inngest } from "./client";
 import prisma from "@/lib/prisma";
-import { randomBytes } from "crypto";
+import { runPoolBatching } from "@/lib/poolBatching";
 
 //Inngest function to save data to a database
 export const syncUserCreation = inngest.createFunction(
@@ -10,7 +10,7 @@ export const syncUserCreation = inngest.createFunction(
         
         const { data } = event;
         const roleFromMetadata = data?.public_metadata?.role;
-        const allowedRoles = ['LOGISTICS_MANAGER', 'FINANCIAL_OPERATIONAL', 'WAREHOUSE_KEEPER'];
+        const allowedRoles = ['LOGISTICS_MANAGER', 'FINANCIAL_OPERATIONAL', 'WAREHOUSE_KEEPER', 'RIDER'];
         const role = allowedRoles.includes(roleFromMetadata) ? roleFromMetadata : undefined;
         await prisma.user.create({
             data: {
@@ -18,7 +18,9 @@ export const syncUserCreation = inngest.createFunction(
                 email: data.email_addresses[0].email_address,
                 name: `${data.first_name} ${data.last_name}`,
                 image: data.image_url,
-                ...(role ? { role } : {})
+                ...(role ? { role } : {}),
+                // Riders get a profile row up-front so dispatch can manage them immediately.
+                ...(role === 'RIDER' ? { riderProfile: { create: {} } } : {})
             }
     })
 }
@@ -174,84 +176,15 @@ export const onPaymentProofReviewed = inngest.createFunction(
     }
 );
 
-// Kigali Pooled Delivery — 11:01 AM daily batching engine
-// Runs at 09:01 UTC = 11:01 AM CAT (UTC+2)
+// Kigali Pooled Delivery — automatic batching waves.
+// Two daily runs in Africa/Kigali (UTC+2): 11:00 AM (09:00 UTC) and 3:00 PM (13:00 UTC).
+// Orders sorted after the morning wave are swept by the afternoon wave; any order
+// still un-corridored on a later day is picked up too (the engine sweeps by
+// corridorId IS NULL, not by date). Logistics can also trigger a run on demand.
 export const kigaliPoolBatchingEngine = inngest.createFunction(
     { id: "kigali-pool-batching-engine" },
-    { cron: "1 9 * * *" },
+    [{ cron: "0 9 * * *" }, { cron: "0 13 * * *" }],
     async ({ step }) => {
-        await step.run("batch-and-assign-corridors", async () => {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            // Fetch all KIGALI_POOL orders placed today that are still awaiting intake
-            const orders = await prisma.order.findMany({
-                where: {
-                    deliveryType: "KIGALI_POOL",
-                    deliveryStatus: { in: ["PENDING_INTAKE", "SORTING"] },
-                    createdAt: { gte: today }
-                },
-                include: { address: true }
-            });
-
-            if (!orders.length) return { batched: 0, corridors: 0 };
-
-            // Group orders by Kigali sector (or district as fallback)
-            const corridorMap = new Map();
-            for (const order of orders) {
-                const key = order.address?.sector || order.address?.district || "DEFAULT";
-                if (!corridorMap.has(key)) corridorMap.set(key, []);
-                corridorMap.get(key).push(order);
-            }
-
-            const BASE_ROUTE_COST = 10000; // 10,000 RWF per corridor
-            const runDate = new Date();
-
-            for (const [corridorKey, groupOrders] of corridorMap.entries()) {
-                const corridorId = "cor_" + randomBytes(8).toString("hex");
-
-                // Create the corridor as CLOSED (ready for dispatch). Logistics staff assign a
-                // rider and dispatch it, which flips the corridor + its orders to IN_TRANSIT.
-                await prisma.$executeRaw`
-                    INSERT INTO "DeliveryCorridor" (id, name, "runDate", "baseRouteCost", status, "createdAt", "updatedAt")
-                    VALUES (
-                        ${corridorId},
-                        ${"Hub → " + corridorKey},
-                        ${runDate},
-                        ${BASE_ROUTE_COST},
-                        'CLOSED'::"CorridorStatus",
-                        NOW(),
-                        NOW()
-                    )
-                `;
-
-                // Leg-based proportional costing:
-                // Stop index 1 = closest (cheapest), stop N = furthest (most expensive)
-                // Each stop's share = stopIndex / triangularNumber(N) * BASE_ROUTE_COST
-                // triangularNumber(N) = N*(N+1)/2
-                const n = groupOrders.length;
-                const triangularSum = (n * (n + 1)) / 2;
-
-                for (let i = 0; i < groupOrders.length; i++) {
-                    const order = groupOrders[i];
-                    const stopIndex = i + 1;
-                    const feeShare = parseFloat(((stopIndex / triangularSum) * BASE_ROUTE_COST).toFixed(2));
-
-                    // Persist the stop position; set status to SORTING (arrived at hub, batched).
-                    // Dispatch by logistics later advances it to IN_TRANSIT.
-                    await prisma.$executeRaw`
-                        UPDATE "Order"
-                        SET "corridorId"       = ${corridorId},
-                            "deliveryStatus"   = 'SORTING'::"PoolDeliveryStatus",
-                            "deliveryFeeShare" = ${feeShare},
-                            "stopSequence"     = ${stopIndex},
-                            "updatedAt"        = NOW()
-                        WHERE id = ${order.id}
-                    `;
-                }
-            }
-
-            return { batched: orders.length, corridors: corridorMap.size };
-        });
+        return await step.run("batch-and-assign-corridors", () => runPoolBatching());
     }
 );

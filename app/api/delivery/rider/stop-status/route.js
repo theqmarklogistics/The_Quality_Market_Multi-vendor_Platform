@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import authRider from "@/middlewares/authRider";
 import authAdmin from "@/middlewares/authAdmin";
 import { emitDelivery } from "@/lib/deliveryRealtime";
+import { notifyDeliveryEvent } from "@/lib/deliveryNotifications";
 
 // Statuses a rider may set per stop (DELIVERED is handled by /verify-otp).
 const ALLOWED = new Set(["ARRIVING", "FAILED"]);
@@ -27,7 +28,10 @@ export async function POST(request) {
 
         const order = await prisma.order.findUnique({
             where: { id: orderId },
-            include: { corridor: { select: { id: true, assignedRiderId: true } } },
+            include: {
+                corridor: { select: { id: true, assignedRiderId: true } },
+                address: { select: { email: true, phone: true } },
+            },
         });
         if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
         if (order.deliveryType !== "KIGALI_POOL") {
@@ -43,18 +47,21 @@ export async function POST(request) {
             return NextResponse.json({ error: "Order already delivered" }, { status: 409 });
         }
 
+        const resolvedReason = failureReason || "Delivery attempt failed";
         await prisma.order.update({
             where: { id: orderId },
             data: {
                 deliveryStatus: status,
-                ...(status === "FAILED" ? { failureReason: failureReason || "Delivery attempt failed" } : {}),
+                ...(status === "FAILED"
+                    ? { failureReason: resolvedReason, deliveryAttempts: { increment: 1 } }
+                    : {}),
             },
         });
 
         const payload = {
             orderId,
             deliveryStatus: status,
-            failureReason: status === "FAILED" ? (failureReason || "Delivery attempt failed") : null,
+            failureReason: status === "FAILED" ? resolvedReason : null,
             at: new Date().toISOString(),
         };
         emitDelivery(
@@ -62,6 +69,9 @@ export async function POST(request) {
             "delivery-status-update",
             payload
         );
+
+        // Notify the customer (best-effort): "arriving" and "failed" are both high-signal.
+        await notifyDeliveryEvent({ ...order, failureReason: resolvedReason }, status);
 
         return NextResponse.json({ success: true, ...payload });
     } catch (error) {

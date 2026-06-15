@@ -49,27 +49,44 @@ function FitBounds({ points }) {
  */
 export default function LiveMapInner({
     riderPos = null,
+    riders = [],
     customerPos = null,
     hub = KIGALI_HUB,
     stops = [],
     showRoute = false,
+    routeGeometry = null,
     height = 320,
 }) {
+    // Normalise to a single list of rider pins (supports both single + multi-rider callers).
+    const riderPins = useMemo(() => {
+        const list = Array.isArray(riders) ? riders.filter((r) => r && r.lat != null && r.lng != null) : [];
+        if (riderPos && riderPos.lat != null && riderPos.lng != null) {
+            list.push({ lat: riderPos.lat, lng: riderPos.lng, label: "Your rider" });
+        }
+        return list;
+    }, [riders, riderPos]);
+
     const fitPoints = useMemo(
-        () => [hub, riderPos, customerPos, ...stops].filter(Boolean),
-        [hub, riderPos, customerPos, stops]
+        () => [hub, customerPos, ...riderPins, ...stops].filter(Boolean),
+        [hub, customerPos, riderPins, stops]
+    );
+
+    // A real road route (from OSRM) takes precedence over the straight-line corridor sketch.
+    const roadLine = useMemo(
+        () => (Array.isArray(routeGeometry) && routeGeometry.length > 1 ? routeGeometry : null),
+        [routeGeometry]
     );
 
     const routeLine = useMemo(() => {
-        if (!showRoute) return null;
+        if (!showRoute || roadLine) return null;
         const ordered = [...stops]
             .filter((s) => s.lat != null && s.lng != null)
             .sort((a, b) => (a.stopSequence ?? 0) - (b.stopSequence ?? 0));
         const pts = [hub, ...ordered].filter(Boolean).map((p) => [p.lat, p.lng]);
         return pts.length > 1 ? pts : null;
-    }, [showRoute, stops, hub]);
+    }, [showRoute, stops, hub, roadLine]);
 
-    const center = riderPos || customerPos || hub;
+    const center = riderPins[0] || customerPos || hub;
 
     return (
         <div style={{ height, width: "100%", borderRadius: 16, overflow: "hidden" }}>
@@ -84,6 +101,9 @@ export default function LiveMapInner({
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
+                {roadLine && (
+                    <Polyline positions={roadLine} pathOptions={{ color: "#16a34a", weight: 4, opacity: 0.8 }} />
+                )}
                 {routeLine && (
                     <Polyline positions={routeLine} pathOptions={{ color: "#16a34a", weight: 3, dashArray: "6 8", opacity: 0.7 }} />
                 )}
@@ -104,11 +124,11 @@ export default function LiveMapInner({
                         <Popup>Delivery location</Popup>
                     </Marker>
                 )}
-                {riderPos && (
-                    <Marker position={[riderPos.lat, riderPos.lng]} icon={RIDER_ICON}>
-                        <Popup>Your rider</Popup>
+                {riderPins.map((r, i) => (
+                    <Marker key={r.id || `rider-${i}`} position={[r.lat, r.lng]} icon={RIDER_ICON}>
+                        <Popup>{r.label || "Rider"}</Popup>
                     </Marker>
-                )}
+                ))}
                 <FitBounds points={fitPoints} />
             </MapContainer>
         </div>

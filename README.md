@@ -28,6 +28,7 @@ Built with Next.js 15, Tailwind CSS 4, Clerk, Prisma, and real-time Socket.IO �
 - [Database Setup](#database-setup)
 - [Project Structure](#project-structure)
 - [Key Workflows](#key-workflows)
+- [Kigali Pooled Delivery](#kigali-pooled-delivery)
 - [API Overview](#api-overview)
 - [Deployment](#deployment)
 
@@ -88,6 +89,19 @@ The platform is localized to the Rwandan market (RWF currency) but is architecte
 - **Financial Operations:** Payment oversight and financial reporting
 - **Logistics Manager:** Shipping and fulfillment tracking
 - **Warehouse Keeper:** Inventory and stock management
+
+### Kigali Pooled Delivery
+- Same-city pooled logistics: orders going to the same Kigali sector are batched into a shared **route corridor** and delivered by one company rider
+- Customer chooses **Pooled Delivery** at checkout and adds a landmark + optional pinned location
+- **Batching engine** that runs twice daily (11:00 AM & 3:00 PM CAT) and on demand, orders stops by a **nearest-neighbour route** from the hub, and splits the route cost by **real distance** (closest stop pays least)
+- **Rider onboarding & management** from the admin panel (`/admin/riders`)
+- **Dispatch board** for logistics staff: assign riders, drive corridors through their lifecycle, batch on demand, resolve failed stops, and watch **every active rider live** on one map
+- **Rider console** (mobile-first): ordered stop list, turn-by-turn hand-off to Google Maps, call-customer, live GPS broadcast (with screen wake-lock + offline retry), and OTP delivery confirmation
+- **Live customer tracking page** with a real-time map, **road-based ETA and route line (OSRM)**, rider contact, delivery code, and a status timeline
+- **Proactive notifications** — email to the customer on dispatch, arrival, delivery, and failed attempts (optional SMS, off by default)
+- **OTP-verified handover** with brute-force lockout: the order completes only with the 4-digit code the customer shows the rider; confirmation releases escrow
+- **Failed-delivery handling**: structured reason capture, plus re-pool (back to the queue) or refund from the dispatch board
+- **Escrow status tracking** per order (HELD → RELEASED / REFUNDED); payment settlement is handled off-platform
 
 ### Platform Features
 - Real-time messaging with Socket.IO (customer ↔ seller ↔ admin)
@@ -162,7 +176,7 @@ The platform is localized to the Rwandan market (RWF currency) but is architecte
 
 ## User Roles
 
-The platform supports six distinct roles, each with dedicated access:
+The platform supports seven distinct roles, each with dedicated access:
 
 | Role | Access |
 |---|---|
@@ -170,10 +184,13 @@ The platform supports six distinct roles, each with dedicated access:
 | `SELLER` | All of the above + seller dashboard (`/store`) |
 | `ADMIN` | All dashboards + admin panel (`/admin`) |
 | `FINANCIAL_OPERATIONAL` | Financial dashboard (`/financial`) |
-| `LOGISTICS_MANAGER` | Logistics dashboard (`/logistics`) |
+| `LOGISTICS_MANAGER` | Logistics dashboard + dispatch board (`/logistics`) |
 | `WAREHOUSE_KEEPER` | Warehouse dashboard (`/warehouse`) |
+| `RIDER` | Rider console (`/rider`) — company delivery riders |
 
 Role assignment is managed by admins via the Users page. Invitations are sent by email using Resend. Sellers are promoted from CUSTOMER after their store is approved.
+
+> **Riders** are company staff. Onboard them from the admin **Riders** page (`/admin/riders`) — invite by email and manage their phone, vehicle type, and active status. A `RiderProfile` is created automatically on invite. Riders then sign in to the `/rider` console.
 
 ---
 
@@ -277,6 +294,16 @@ OPENAI_MODEL=gemini-2.0-flash
 # --- Email (Resend) — https://resend.com ---
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=noreply@yourdomain.com
+
+# --- Kigali Pooled Delivery (all optional) ---
+# OSRM routing server for road-based ETA/route lines (defaults to the public demo server)
+OSRM_URL=https://router.project-osrm.org
+# SMS for delivery updates — OFF by default (email only). Set to true to enable.
+DELIVERY_SMS_ENABLED=false
+# Only used when DELIVERY_SMS_ENABLED=true; omit a provider to run SMS in mock mode (logs to console)
+SMS_PROVIDER=pindo
+SMS_SENDER_ID=QMarket
+PINDO_API_TOKEN=...
 ```
 
 ---
@@ -303,6 +330,8 @@ The platform uses Prisma with a Neon PostgreSQL database. The schema is located 
 | `Conversation` | Chat threads between buyers, sellers, and admins |
 | `Message` | Individual chat messages with read receipts |
 | `Payout` | Seller earnings records |
+| `DeliveryCorridor` | A pooled route grouping same-area orders, with rider assignment + live location |
+| `RiderProfile` | Company rider details (phone, vehicle type, active flag) for dispatch |
 | `Return` | Product return requests with approval workflow |
 | `AuditLog` | Admin action history |
 | `PaymentConfig` | Admin-managed payment method availability |
@@ -361,7 +390,8 @@ npx prisma migrate deploy
 │   │   ├── orders/             # Seller orders
 │   │   └── payouts/            # Payout history
 │   ├── financial/              # Financial operations dashboard
-│   ├── logistics/              # Logistics manager dashboard
+│   ├── logistics/              # Logistics dispatch board (pooled delivery)
+│   ├── rider/                  # Rider console (pooled delivery)
 │   ├── warehouse/              # Warehouse keeper dashboard
 │   └── api/                    # API route handlers (69 routes)
 │       ├── admin/              # Admin-only API endpoints
@@ -375,7 +405,10 @@ npx prisma migrate deploy
 ├── components/                 # Shared React components
 │   ├── admin/                  # Admin-specific components
 │   ├── store/                  # Seller-specific components
-│   └── chat/                   # Messaging components
+│   ├── chat/                   # Messaging components
+│   ├── delivery/               # Live map components (pooled delivery)
+│   ├── logistics/              # Dispatch board
+│   └── rider/                  # Rider console
 │
 ├── lib/                        # Shared utilities
 │   ├── prisma.js               # Prisma client singleton
@@ -385,7 +418,9 @@ npx prisma migrate deploy
 │
 ├── middlewares/                # Role-check middleware
 │   ├── authAdmin.js            # Admin role verification
-│   └── authSeller.js           # Seller store verification
+│   ├── authSeller.js           # Seller store verification
+│   ├── authLogistics.js        # Logistics-manager role verification
+│   └── authRider.js            # Rider role verification
 │
 ├── inngest/                    # Background job definitions
 ├── configs/                    # External service configuration
@@ -421,10 +456,85 @@ npx prisma migrate deploy
 4. Order fulfilled; seller earnings calculated after commission deduction
 5. Seller requests payout; admin processes payout
 
+### Kigali Pooled Delivery
+1. At checkout the customer selects **Pooled Delivery** and provides a landmark (and optional pinned location)
+2. The order is created with `deliveryType = KIGALI_POOL`, a 4-digit delivery OTP, escrow `HELD`, and status `PENDING_INTAKE`
+3. Packages arrive at the hub; logistics marks each **sorted** (`PENDING_INTAKE → SORTING`)
+4. The daily batching engine (11:00 AM CAT) groups same-day pooled orders by sector into **corridors** and assigns each stop a sequence + proportional fee share
+5. Logistics assigns a **rider** to each corridor and **dispatches** it (`corridor + orders → IN_TRANSIT`)
+6. The rider starts the route and shares live GPS; the customer watches the rider on a live map with ETA
+7. At the door the rider marks **Arriving**, then enters the customer's **4-digit code** to confirm delivery
+8. On OTP confirmation the order is marked `DELIVERED`, escrow is `RELEASED`, and an internal split-payout record is written (settlement happens off-platform)
+
+See the dedicated [Kigali Pooled Delivery](#kigali-pooled-delivery) section for the full architecture and a hands-on walkthrough.
+
 ### Real-time Messaging
 - Socket.IO server runs alongside Next.js via `server.js`
 - Users authenticate to the socket server using their Clerk session token
 - Conversations are persisted to the database; unread counts tracked per participant
+
+---
+
+## Kigali Pooled Delivery
+
+A same-city logistics module that batches Kigali orders heading to the same area into one shared **route corridor**, assigns them to a company rider, and gives the customer live map tracking with an OTP-verified handover. It runs entirely inside the platform; only the final money settlement is handled off-platform.
+
+### Concept
+
+Rather than dispatching one rider per order, orders going to the same Kigali sector are pooled into a single corridor run. Stops are sequenced by a **greedy nearest-neighbour route** from the hub, and a fixed route cost (default **10,000 RWF**) is split across them weighted by each stop's **cumulative road distance** — the closest stop pays the least, the furthest pays the most. When coordinates are missing the cost falls back to an even split.
+
+### Delivery lifecycle
+
+`PoolDeliveryStatus`: **PENDING_INTAKE → SORTING → IN_TRANSIT → ARRIVING → DELIVERED** (or **FAILED**)
+
+`EscrowStatus`: **HELD** (at order creation) → **RELEASED** (on OTP confirmation) — `REFUNDED` reserved for failed/cancelled flows.
+
+`CorridorStatus`: **OPEN → CLOSED → IN_TRANSIT → COMPLETED** (corridors are created `CLOSED`, i.e. batched and ready to dispatch).
+
+### Who does what
+
+| Actor | Surface | Responsibilities |
+|---|---|---|
+| Customer | `/track/[orderId]` | Picks pooled delivery, watches live map + ETA, shows the rider the OTP |
+| Logistics Manager | `/logistics` | Marks intake, assigns riders, dispatches/completes corridors, monitors all riders live |
+| Rider (company staff) | `/rider` | Works the ordered stop list, navigates, broadcasts GPS, confirms delivery via OTP |
+
+### Batching engine
+
+An Inngest cron function (`kigaliPoolBatchingEngine`) runs twice daily — **09:00 & 13:00 UTC (11:00 AM & 3:00 PM CAT)** — and logistics can trigger an extra run anytime with **Batch now** on the dispatch board (`POST /api/logistics/batch`). Each run sweeps **every** sorted-but-un-corridored pooled order (`corridorId IS NULL`, not just today's), so an order missed by an earlier wave is never orphaned. Orders are grouped by `address.sector` (district fallback), routed by nearest-neighbour from the hub, costed by distance, and written into one `DeliveryCorridor` per group (`Hub → <sector> (date)`). Corridors land in `CLOSED` status ready for a dispatcher to assign a rider. The day boundary used for naming is computed in `Africa/Kigali` so late-night orders are never mis-dated.
+
+### Notifications, ETA & resilience
+
+- **Customer notifications** fire on dispatch, arrival, delivery, and failed attempts — **email via Resend** by default. SMS is opt-in: set `DELIVERY_SMS_ENABLED=true` and configure a provider in `lib/sms.js` (a provider-agnostic sender, mock by default; `SMS_PROVIDER`/`PINDO_API_TOKEN` to go live).
+- **ETA & route line** on the customer map come from **OSRM** road routing (`OSRM_URL`, public demo server by default), with the haversine estimate as a guaranteed fallback.
+- **OTP** codes are cryptographically random and locked for 15 minutes after 5 wrong attempts.
+- **Failed deliveries** capture a structured reason from the rider and can be **re-pooled** (returned to the batching queue) or **refunded** (escrow → REFUNDED) from the dispatch board.
+- The **rider console** holds a screen wake-lock while on a route and queues GPS pings for retry when the signal drops.
+
+### Real-time tracking
+
+Live updates flow over the existing Socket.IO server (`server.js`) with per-purpose rooms, each guarded by a role/ownership check:
+
+- `track-<orderId>` — the customer's own order
+- `rider-<userId>` + `corridor-<id>` — the rider and their assigned corridor(s)
+- `logistics-room` — the dispatch board (all riders/corridors live)
+
+Riders broadcast GPS (throttled to ~10s) → fanned out to the corridor, each customer's track room, and the dispatch board. Customers can optionally share their own live location with the rider during the final approach. Every surface also polls (~20–25s) as a fallback for socket-disabled hosts, and a last-known rider position is persisted on the corridor to seed late-joiners.
+
+### Trying it locally
+
+> Prerequisites: the app running (`npm run dev`), at least one approved product, and an admin account.
+
+1. **Provision a rider.** On the admin **Riders** page (`/admin/riders`), invite a rider by email and set their phone + vehicle. (Or invite as `RIDER` from the Users page.) The rider accepts the email invite and signs in.
+2. **Provision a dispatcher.** From the admin Users page, invite a user as `LOGISTICS_MANAGER` (or use your admin account — admins can access every surface).
+3. **Place a pooled order.** As a customer, add an approved product to the cart, go to checkout, choose **Pooled Delivery**, and enter a Kigali landmark (and pin a location if prompted). Complete the order.
+4. **View the tracking page.** Open `/track/<orderId>` (or follow the link from your order). You'll see the 4-digit delivery code and a `PENDING_INTAKE` timeline.
+5. **Sort + batch.** On `/logistics`, click **Mark sorted** for the order, then click **Batch now** to create the corridor immediately (no need to wait for a scheduled wave).
+6. **Assign + dispatch.** On the dispatch board, pick your rider from the corridor's dropdown and click **Dispatch**. The corridor and its orders flip to `IN_TRANSIT`, and the customer is notified.
+7. **Run the route.** Sign in as the rider, open `/rider`, tap **Start route & share location** (allow geolocation). The customer's track page now shows your live position and ETA.
+8. **Deliver.** Tap **Arriving** (the customer sees an "arriving" banner), then **Deliver**, and enter the 4-digit code from the customer's track page. The order becomes `DELIVERED`, escrow `RELEASED`, and a payout record is written.
+
+> **Tip:** Use two browser profiles (or a phone + desktop) so you can watch the customer track page update live while you act as the rider.
 
 ---
 
@@ -436,6 +546,8 @@ All API routes live under `/api`. Admin routes require `ADMIN` role; store route
 |---|---|---|
 | Products | `/api/product` | CRUD, search, filtering |
 | Orders | `/api/orders` | Order creation and management |
+| Delivery | `/api/delivery` | Pooled-delivery tracking, rider assignment/location/stop-status, OTP confirmation |
+| Logistics | `/api/logistics` | Dispatch board: corridors, rider roster, intake, assign/dispatch (logistics role) |
 | Cart | `/api/cart` | Persistent cart sync |
 | Store | `/api/store` | Store creation, dashboard data, AI features |
 | Admin | `/api/admin` | Full admin control surface |
