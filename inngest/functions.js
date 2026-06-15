@@ -18,11 +18,15 @@ export const syncUserCreation = inngest.createFunction(
                 email: data.email_addresses[0].email_address,
                 name: `${data.first_name} ${data.last_name}`,
                 image: data.image_url,
-                ...(role ? { role } : {}),
-                // Riders get a profile row up-front so dispatch can manage them immediately.
-                ...(role === 'RIDER' ? { riderProfile: { create: {} } } : {})
+                ...(role ? { role } : {})
             }
     })
+
+        // Riders get a profile row up-front so dispatch can manage them immediately.
+        // Separate statement — nested writes run in a transaction, unsupported on the Neon HTTP client.
+        if (role === 'RIDER') {
+            await prisma.riderProfile.create({ data: { userId: data.id } });
+        }
 }
 )
 

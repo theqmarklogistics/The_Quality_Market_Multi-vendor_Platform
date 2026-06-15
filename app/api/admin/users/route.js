@@ -51,14 +51,19 @@ export async function POST(request) {
         if (existing) {
             await prisma.user.update({
                 where: { id: existing.id },
-                data: {
-                    role: normalizedRole,
-                    // Ensure a rider always has a profile dispatch can manage.
-                    ...(normalizedRole === 'RIDER'
-                        ? { riderProfile: { upsert: { create: {}, update: {} } } }
-                        : {}),
-                },
+                data: { role: normalizedRole },
             });
+
+            // Ensure a rider always has a profile dispatch can manage. Done as a
+            // separate statement: nested writes run in a transaction, which the
+            // Neon HTTP client does not support.
+            if (normalizedRole === 'RIDER') {
+                await prisma.riderProfile.upsert({
+                    where: { userId: existing.id },
+                    create: { userId: existing.id },
+                    update: {},
+                });
+            }
 
             return NextResponse.json({ message: 'User role updated successfully' });
         }
