@@ -54,15 +54,15 @@ export async function POST(request) {
                 data: { role: normalizedRole },
             });
 
-            // Ensure a rider always has a profile dispatch can manage. Done as a
-            // separate statement: nested writes run in a transaction, which the
-            // Neon HTTP client does not support.
+            // Ensure a rider always has a profile dispatch can manage. Done as
+            // plain single statements (find then create): nested writes and
+            // secondary-unique upserts go through a transaction, which the Neon
+            // HTTP client does not support.
             if (normalizedRole === 'RIDER') {
-                await prisma.riderProfile.upsert({
-                    where: { userId: existing.id },
-                    create: { userId: existing.id },
-                    update: {},
-                });
+                const profile = await prisma.riderProfile.findUnique({ where: { userId: existing.id } });
+                if (!profile) {
+                    await prisma.riderProfile.create({ data: { userId: existing.id } });
+                }
             }
 
             return NextResponse.json({ message: 'User role updated successfully' });
@@ -86,7 +86,15 @@ export async function POST(request) {
 
         return NextResponse.json({ message: 'Invite sent successfully' });
     } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: error.message || error.code }, { status: 400 });
+        console.error('Invite/role update failed:', error);
+        // Surface the real cause — Clerk wraps details in error.errors[], and a
+        // bare error.message can be just the HTTP status text ("Bad Request").
+        const detail =
+            error?.errors?.[0]?.longMessage ||
+            error?.errors?.[0]?.message ||
+            error?.message ||
+            error?.code ||
+            'Unknown error';
+        return NextResponse.json({ error: detail }, { status: 400 });
     }
 }

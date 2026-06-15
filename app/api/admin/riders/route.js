@@ -62,18 +62,20 @@ export async function PATCH(request) {
         if (vehicleType !== undefined) data.vehicleType = String(vehicleType).trim() || null;
         if (isActive !== undefined) data.isActive = !!isActive;
 
-        const profile = await prisma.riderProfile.upsert({
-            where: { userId: riderId },
-            create: { userId: riderId, ...data },
-            update: data,
-        });
+        // Find-then-write with plain single statements. A secondary-unique upsert
+        // (on userId rather than the @id) routes through a transaction, which the
+        // Neon HTTP client does not support.
+        const existingProfile = await prisma.riderProfile.findUnique({ where: { userId: riderId } });
+        const profile = existingProfile
+            ? await prisma.riderProfile.update({ where: { userId: riderId }, data })
+            : await prisma.riderProfile.create({ data: { userId: riderId, ...data } });
 
         return NextResponse.json({
             success: true,
             profile: { phone: profile.phone, vehicleType: profile.vehicleType, isActive: profile.isActive },
         });
     } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: error.message || error.code }, { status: 400 });
+        console.error('Rider profile update failed:', error);
+        return NextResponse.json({ error: error?.message || error?.code || 'Unknown error' }, { status: 400 });
     }
 }
