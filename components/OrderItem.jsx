@@ -1,6 +1,7 @@
 'use client'
 import Image from "next/image";
-import { DotIcon, MessageCircleIcon, RotateCcwIcon, FileTextIcon, CheckIcon } from "lucide-react";
+import Link from "next/link";
+import { DotIcon, MessageCircleIcon, RotateCcwIcon, FileTextIcon, CheckIcon, TruckIcon } from "lucide-react";
 import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
@@ -119,6 +120,9 @@ const OrderItem = ({ order, onProofUploaded }) => {
     const showInvoiceAction = order.paymentStatus === 'PENDING'
     const invoiceSent = order.invoiceStatus === 'SENT' || invoiceSentNow
 
+    // Pooled-delivery orders have a live rider-tracking portal at /track/[orderId].
+    const canTrack = order.deliveryType === 'KIGALI_POOL'
+
     return (
         <>
             <tr className="text-sm">
@@ -221,6 +225,11 @@ const OrderItem = ({ order, onProofUploaded }) => {
                         <DotIcon size={10} className="scale-250" />
                         {order.status.split('_').join(' ').toLowerCase()}
                     </div>
+                    {canTrack && (
+                        <Link href={`/track/${order.id}`} className="flex items-center justify-center gap-1.5 rounded-full bg-green-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-green-700 transition">
+                            <TruckIcon size={14} /> Track Delivery
+                        </Link>
+                    )}
                     <button onClick={() => toast.promise(startConversation('ADMIN'), { loading: 'Opening admin chat...' })} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
                         <MessageCircleIcon size={14} /> Chat Admin
                     </button>
@@ -255,6 +264,11 @@ const OrderItem = ({ order, onProofUploaded }) => {
                         </span>
                     </div>
                     <div className="flex gap-4 justify-center mt-3 flex-wrap">
+                        {canTrack && (
+                            <Link href={`/track/${order.id}`} className="text-xs text-green-600 hover:underline inline-flex items-center gap-1 font-semibold">
+                                <TruckIcon size={14} /> Track
+                            </Link>
+                        )}
                         <button onClick={() => toast.promise(startConversation('ADMIN'), { loading: 'Opening admin chat...' })} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
                             <MessageCircleIcon size={14} /> Admin
                         </button>
