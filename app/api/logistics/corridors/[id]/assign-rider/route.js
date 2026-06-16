@@ -16,11 +16,14 @@ export async function POST(request, { params }) {
         const { id } = await params;
         const { riderId } = await request.json();
 
+        // Validate the rider up front, and keep id+name for the realtime payload below.
+        let assignedRider = null;
         if (riderId) {
-            const rider = await prisma.user.findUnique({ where: { id: riderId }, select: { role: true } });
+            const rider = await prisma.user.findUnique({ where: { id: riderId }, select: { id: true, name: true, role: true } });
             if (!rider || rider.role !== "RIDER") {
                 return NextResponse.json({ error: "Selected user is not a rider" }, { status: 400 });
             }
+            assignedRider = { id: rider.id, name: rider.name };
         }
 
         // Capture the prior rider so we can notify them if they're being unassigned.
@@ -29,10 +32,12 @@ export async function POST(request, { params }) {
             select: { assignedRiderId: true },
         });
 
-        const corridor = await prisma.deliveryCorridor.update({
+        // Plain update — no `include`. An update with a relation include emits a
+        // write + relation-read wrapped in an implicit transaction, which the Neon
+        // HTTP adapter rejects ("Transactions are not supported in HTTP mode").
+        await prisma.deliveryCorridor.update({
             where: { id },
             data: { assignedRiderId: riderId || null },
-            include: { assignedRider: { select: { id: true, name: true } } },
         });
 
         // Refresh the dispatch board, the corridor watchers, and the affected
@@ -42,10 +47,10 @@ export async function POST(request, { params }) {
         if (previous?.assignedRiderId && previous.assignedRiderId !== riderId) rooms.push(`rider-${previous.assignedRiderId}`);
         emitDelivery(rooms, "corridor-update", {
             corridorId: id,
-            rider: corridor.assignedRider ? { id: corridor.assignedRider.id, name: corridor.assignedRider.name } : null,
+            rider: assignedRider,
         });
 
-        return NextResponse.json({ success: true, corridorId: id, riderId: corridor.assignedRiderId });
+        return NextResponse.json({ success: true, corridorId: id, riderId: riderId || null });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

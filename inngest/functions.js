@@ -1,5 +1,5 @@
 import { inngest } from "./client";
-import prisma from "@/lib/prisma";
+import prisma, { prismaWs } from "@/lib/prisma";
 
 //Inngest function to save data to a database
 export const syncUserCreation = inngest.createFunction(
@@ -107,7 +107,10 @@ export const expirePendingOrders = inngest.createFunction(
 
             if (expiredOrders.length === 0) return 0;
 
-            await prisma.$transaction(async (tx) => {
+            // Restoring stock and expiring the orders must be atomic. Interactive
+            // transactions aren't supported on the HTTP adapter, so use the WebSocket
+            // client (prismaWs) — the default HTTP `prisma` would throw here.
+            await prismaWs.$transaction(async (tx) => {
                 for (const order of expiredOrders) {
                     for (const item of order.orderItems) {
                         await tx.product.update({
