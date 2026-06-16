@@ -28,6 +28,7 @@ const Footer = () => {
                 { text: "Home", path: '/', icon: null },
                 { text: "Shop", path: '/shop', icon: null },
                 { text: "Create Your Store", path: '/create-store', icon: null },
+                { text: "Deliver With Us", path: '/external', icon: null },
                 { text: "Privacy Policy", path: '/policy', icon: null },
                 { text: "Terms & Conditions", path: '/terms', icon: null },
             ]

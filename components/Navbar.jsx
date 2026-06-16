@@ -255,6 +255,14 @@ const Navbar = () => {
                             </Link>
                         )}
 
+                        {/* Public invite for off-platform sellers to use our delivery service.
+                            Hidden once they already hold the role (they get "My Deliveries"). */}
+                        {staffRole !== 'EXTERNAL_SELLER' && (
+                            <Link href="/external" className="flex items-center gap-1.5 px-3 py-1 bg-green-600 text-white rounded-full text-sm hover:bg-green-700 transition">
+                                <TruckIcon size={14} /> Deliver with us
+                            </Link>
+                        )}
+
                         {/* Visible dashboard shortcuts for quick access */}
                         {canShowAccessActions && isSeller && (
                             <Link href="/store" className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm hover:bg-emerald-100">
