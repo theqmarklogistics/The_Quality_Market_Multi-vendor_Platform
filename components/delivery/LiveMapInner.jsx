@@ -88,9 +88,9 @@ export default function LiveMapInner({
 
     const center = riderPins[0] || customerPos || hub;
 
+    // position+z-index:0 traps Leaflet's internal z-indexes (panes/controls go up to
+    // 1000) in their own stacking context, so they never paint over modals/overlays.
     return (
-        {/* position+z-index:0 traps Leaflet's internal z-indexes (panes/controls go up to
-            1000) in their own stacking context, so they never paint over modals/overlays. */}
         <div style={{ height, width: "100%", borderRadius: 16, overflow: "hidden", position: "relative", zIndex: 0 }}>
             <style>{`@keyframes tqmPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.5)}70%{box-shadow:0 0 0 12px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}`}</style>
             <MapContainer
