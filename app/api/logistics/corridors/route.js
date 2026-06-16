@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authLogistics from "@/middlewares/authLogistics";
+import { emitDelivery } from "@/lib/deliveryRealtime";
+import { KIGALI_HUB, nearestNeighborRoute, proportionalFeeShares } from "@/lib/deliveryEta";
+
+const BASE_ROUTE_COST = 10000; // 10,000 RWF per corridor route (matches the batching engine)
 
 // GET ?date=YYYY-MM-DD — all corridors running that day, with stops + assigned rider.
 export async function GET(request) {
@@ -61,6 +65,124 @@ export async function GET(request) {
         }));
 
         return NextResponse.json({ corridors: result });
+    } catch (error) {
+        console.error(error);
+        return NextResponse.json({ error: error.message || error.code }, { status: 400 });
+    }
+}
+
+// Parse a date input that may be date-only ("YYYY-MM-DD") or a full ISO string.
+// Date-only values are pinned to local noon so they land squarely inside the
+// dispatch board's day window regardless of timezone.
+function parseRunDate(value) {
+    if (!value) return null;
+    const str = String(value);
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(str) ? new Date(`${str}T12:00:00`) : new Date(str);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// POST { name, runDate, baseRouteCost?, riderId?, orderIds? }
+// Schedule a delivery route (corridor) for a chosen date, optionally pre-assigning
+// a rider and loading specific un-corridored pooled orders onto it. Stops are
+// ordered by a greedy nearest-neighbour route from the hub and the fixed route
+// cost is split by each stop's cumulative distance — identical to the auto-batcher.
+export async function POST(request) {
+    try {
+        const { userId } = getAuth(request);
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        if (!(await authLogistics(userId))) {
+            return NextResponse.json({ error: "Forbidden — logistics only" }, { status: 403 });
+        }
+
+        const body = await request.json();
+        const name = (body?.name || "").trim();
+        const runDate = parseRunDate(body?.runDate);
+        const riderId = body?.riderId || null;
+        const orderIds = Array.isArray(body?.orderIds) ? body.orderIds.filter(Boolean) : [];
+        const baseRouteCost =
+            Number.isFinite(body?.baseRouteCost) && body.baseRouteCost > 0
+                ? body.baseRouteCost
+                : BASE_ROUTE_COST;
+
+        if (!name) return NextResponse.json({ error: "Route name is required" }, { status: 400 });
+        if (!runDate) return NextResponse.json({ error: "A valid run date is required" }, { status: 400 });
+
+        // Validate the rider (if pre-assigning).
+        if (riderId) {
+            const rider = await prisma.user.findUnique({ where: { id: riderId }, select: { role: true } });
+            if (!rider || rider.role !== "RIDER") {
+                return NextResponse.json({ error: "Selected user is not a rider" }, { status: 400 });
+            }
+        }
+
+        // Pull and validate the orders being loaded onto the route. Only pooled
+        // orders not already on another corridor are eligible.
+        let orders = [];
+        if (orderIds.length) {
+            orders = await prisma.order.findMany({
+                where: {
+                    id: { in: orderIds },
+                    deliveryType: "KIGALI_POOL",
+                    corridorId: null,
+                    deliveryStatus: { in: ["PENDING_INTAKE", "SORTING"] },
+                    // External (off-platform) deliveries are prepaid — never route an unpaid one.
+                    OR: [{ isExternalDelivery: false }, { isPaid: true }],
+                },
+                include: { address: true },
+            });
+            if (orders.length !== orderIds.length) {
+                return NextResponse.json(
+                    { error: "Some selected orders are no longer available to schedule" },
+                    { status: 409 }
+                );
+            }
+        }
+
+        // A route loaded with stops is dispatch-ready (CLOSED); an empty placeholder
+        // route stays OPEN until orders are batched/added into it.
+        const corridor = await prisma.deliveryCorridor.create({
+            data: {
+                name,
+                runDate,
+                baseRouteCost,
+                status: orders.length ? "CLOSED" : "OPEN",
+                assignedRiderId: riderId,
+            },
+        });
+
+        // Order the stops and split the route cost, then attach each order.
+        if (orders.length) {
+            const points = orders.map((o) => ({
+                ...o,
+                lat: o.recipientLat ?? o.address?.latitude ?? null,
+                lng: o.recipientLng ?? o.address?.longitude ?? null,
+            }));
+            const ordered = nearestNeighborRoute(KIGALI_HUB, points);
+            const shares = proportionalFeeShares(KIGALI_HUB, ordered, baseRouteCost);
+
+            for (let i = 0; i < ordered.length; i++) {
+                const feeShare = shares[i] ?? parseFloat((baseRouteCost / ordered.length).toFixed(2));
+                await prisma.order.update({
+                    where: { id: ordered[i].id },
+                    data: {
+                        corridorId: corridor.id,
+                        deliveryStatus: "SORTING",
+                        deliveryFeeShare: feeShare,
+                        stopSequence: i + 1,
+                    },
+                });
+            }
+        }
+
+        const rooms = ["logistics-room", `corridor-${corridor.id}`];
+        if (riderId) rooms.push(`rider-${riderId}`);
+        emitDelivery(rooms, "corridor-update", { corridorId: corridor.id, scheduled: true });
+
+        return NextResponse.json({
+            success: true,
+            corridor: { id: corridor.id, name: corridor.name, runDate: corridor.runDate, status: corridor.status },
+            stops: orders.length,
+        });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

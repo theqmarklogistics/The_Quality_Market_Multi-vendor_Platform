@@ -93,9 +93,9 @@ The platform is localized to the Rwandan market (RWF currency) but is architecte
 ### Kigali Pooled Delivery
 - Same-city pooled logistics: orders going to the same Kigali sector are batched into a shared **route corridor** and delivered by one company rider
 - Customer chooses **Pooled Delivery** at checkout and adds a landmark + optional pinned location
-- **Batching engine** that runs twice daily (11:00 AM & 3:00 PM CAT) and on demand, orders stops by a **nearest-neighbour route** from the hub, and splits the route cost by **real distance** (closest stop pays least)
+- **On-demand batching** (no automatic schedule): logistics staff build routes manually from the dispatch board — **Batch now** sweeps sorted orders into per-sector corridors, or **Schedule route** hand-builds a corridor for a chosen date. Stops are ordered by a **nearest-neighbour route** from the hub and the route cost is split by **real distance** (closest stop pays least)
 - **Rider onboarding & management** from the admin panel (`/admin/riders`)
-- **Dispatch board** for logistics staff: assign riders, drive corridors through their lifecycle, batch on demand, resolve failed stops, and watch **every active rider live** on one map
+- **Dispatch board** for logistics staff: schedule routes for a chosen date, batch on demand, assign riders, drive corridors through their lifecycle, resolve failed stops, and watch **every active rider live** on one map
 - **Rider console** (mobile-first): ordered stop list, turn-by-turn hand-off to Google Maps, call-customer, live GPS broadcast (with screen wake-lock + offline retry), and OTP delivery confirmation
 - **Live customer tracking page** with a real-time map, **road-based ETA and route line (OSRM)**, rider contact, delivery code, and a status timeline
 - **Proactive notifications** — email to the customer on dispatch, arrival, delivery, and failed attempts (optional SMS, off by default)
@@ -460,7 +460,7 @@ npx prisma migrate deploy
 1. At checkout the customer selects **Pooled Delivery** and provides a landmark (and optional pinned location)
 2. The order is created with `deliveryType = KIGALI_POOL`, a 4-digit delivery OTP, escrow `HELD`, and status `PENDING_INTAKE`
 3. Packages arrive at the hub; logistics marks each **sorted** (`PENDING_INTAKE → SORTING`)
-4. The daily batching engine (11:00 AM CAT) groups same-day pooled orders by sector into **corridors** and assigns each stop a sequence + proportional fee share
+4. Logistics batches the sorted orders into **corridors** — **Batch now** (groups un-routed pooled orders by sector) or **Schedule route** (hand-built for a chosen date) — assigning each stop a sequence + proportional fee share
 5. Logistics assigns a **rider** to each corridor and **dispatches** it (`corridor + orders → IN_TRANSIT`)
 6. The rider starts the route and shares live GPS; the customer watches the rider on a live map with ETA
 7. At the door the rider marks **Arriving**, then enters the customer's **4-digit code** to confirm delivery
@@ -501,7 +501,10 @@ Rather than dispatching one rider per order, orders going to the same Kigali sec
 
 ### Batching engine
 
-An Inngest cron function (`kigaliPoolBatchingEngine`) runs twice daily — **09:00 & 13:00 UTC (11:00 AM & 3:00 PM CAT)** — and logistics can trigger an extra run anytime with **Batch now** on the dispatch board (`POST /api/logistics/batch`). Each run sweeps **every** sorted-but-un-corridored pooled order (`corridorId IS NULL`, not just today's), so an order missed by an earlier wave is never orphaned. Orders are grouped by `address.sector` (district fallback), routed by nearest-neighbour from the hub, costed by distance, and written into one `DeliveryCorridor` per group (`Hub → <sector> (date)`). Corridors land in `CLOSED` status ready for a dispatcher to assign a rider. The day boundary used for naming is computed in `Africa/Kigali` so late-night orders are never mis-dated.
+Batching is **manual** — there is no automatic cron. Logistics staff create routes on demand from the dispatch board:
+
+- **Batch now** (`POST /api/logistics/batch`) sweeps **every** sorted-but-un-corridored pooled order (`corridorId IS NULL`, not just today's), so an order is never orphaned. Orders are grouped by `address.sector` (district fallback), routed by nearest-neighbour from the hub, costed by distance, and written into one `DeliveryCorridor` per group (`Hub → <sector> (date)`), landing in `CLOSED` status ready to assign a rider. The day boundary used for naming is computed in `Africa/Kigali` so late-night orders are never mis-dated.
+- **Schedule route** (`POST /api/logistics/corridors`) hand-builds a single corridor for a chosen run date: name it, optionally pre-assign a rider, and select specific un-routed pooled orders to load onto it (same nearest-neighbour ordering and distance-based cost split). A route loaded with stops is created `CLOSED`; an empty placeholder route stays `OPEN` until orders are added.
 
 ### Notifications, ETA & resilience
 
@@ -529,7 +532,7 @@ Riders broadcast GPS (throttled to ~10s) → fanned out to the corridor, each cu
 2. **Provision a dispatcher.** From the admin Users page, invite a user as `LOGISTICS_MANAGER` (or use your admin account — admins can access every surface).
 3. **Place a pooled order.** As a customer, add an approved product to the cart, go to checkout, choose **Pooled Delivery**, and enter a Kigali landmark (and pin a location if prompted). Complete the order.
 4. **View the tracking page.** Open `/track/<orderId>` (or follow the link from your order). You'll see the 4-digit delivery code and a `PENDING_INTAKE` timeline.
-5. **Sort + batch.** On `/logistics`, click **Mark sorted** for the order, then click **Batch now** to create the corridor immediately (no need to wait for a scheduled wave).
+5. **Sort + batch.** On `/logistics`, click **Mark sorted** for the order, then click **Batch now** to create the corridor (or use **Schedule route** to hand-build one for a chosen date). Batching is manual — there is no automatic schedule.
 6. **Assign + dispatch.** On the dispatch board, pick your rider from the corridor's dropdown and click **Dispatch**. The corridor and its orders flip to `IN_TRANSIT`, and the customer is notified.
 7. **Run the route.** Sign in as the rider, open `/rider`, tap **Start route & share location** (allow geolocation). The customer's track page now shows your live position and ETA.
 8. **Deliver.** Tap **Arriving** (the customer sees an "arriving" banner), then **Deliver**, and enter the 4-digit code from the customer's track page. The order becomes `DELIVERED`, escrow `RELEASED`, and a payout record is written.

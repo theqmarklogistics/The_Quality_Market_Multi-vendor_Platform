@@ -338,7 +338,7 @@ export default function StoreOrders() {
                                             className="mt-1 accent-green-600"
                                         />
                                         <div>
-                                            <span className="block font-medium text-slate-800 text-sm">Drop off at Central Hub by 11:00 AM</span>
+                                            <span className="block font-medium text-slate-800 text-sm">Drop off at Central Hub</span>
                                             <span className="block text-xs text-slate-500">0 RWF — Downtown / CHIC Hub</span>
                                         </div>
                                     </label>
@@ -353,8 +353,8 @@ export default function StoreOrders() {
                                             className="mt-1 accent-amber-600"
                                         />
                                         <div>
-                                            <span className="block font-medium text-slate-800 text-sm">Request Morning Driver Sweep Pickup</span>
-                                            <span className="block text-xs text-slate-500">+1,000 RWF — Pickup 8–11 AM from your location</span>
+                                            <span className="block font-medium text-slate-800 text-sm">Request Driver Sweep Pickup</span>
+                                            <span className="block text-xs text-slate-500">+1,000 RWF — We collect from your location</span>
                                         </div>
                                     </label>
                                 </div>

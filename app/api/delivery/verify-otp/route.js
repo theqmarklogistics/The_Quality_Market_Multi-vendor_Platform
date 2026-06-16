@@ -84,12 +84,14 @@ export async function POST(request) {
             );
         }
 
-        // Atomically mark as delivered, release escrow, and clear OTP throttle state.
+        // Atomically mark as delivered, settle escrow, and clear OTP throttle state.
+        // External (off-platform) deliveries hold no goods escrow — it stays NOT_HELD.
+        const escrowVal = order.isExternalDelivery ? "NOT_HELD" : "RELEASED";
         await prisma.$executeRaw`
             UPDATE "Order"
             SET status = 'DELIVERED'::"OrderStatus",
                 "deliveryStatus" = 'DELIVERED'::"PoolDeliveryStatus",
-                "escrowStatus" = 'RELEASED'::"EscrowStatus",
+                "escrowStatus" = ${escrowVal}::"EscrowStatus",
                 "deliveredAt" = NOW(),
                 "otpAttempts" = 0,
                 "otpLockedUntil" = NULL,
@@ -104,7 +106,7 @@ export async function POST(request) {
         emitDelivery(
             [`track-${orderId}`, order.corridor?.id ? `corridor-${order.corridor.id}` : null, "logistics-room"],
             "delivery-status-update",
-            { orderId, deliveryStatus: "DELIVERED", escrowStatus: "RELEASED", at: new Date().toISOString() }
+            { orderId, deliveryStatus: "DELIVERED", escrowStatus: escrowVal, at: new Date().toISOString() }
         );
 
         // Email + SMS the customer that the package was delivered (best-effort).

@@ -4,8 +4,10 @@ import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
 import LiveMap from "@/components/delivery/LiveMap";
+import ScheduleRouteModal from "@/components/logistics/ScheduleRouteModal";
+import ExternalDeliveryModal from "@/components/logistics/ExternalDeliveryModal";
 import { initializeSocket } from "@/lib/socketClient";
-import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon } from "lucide-react";
+import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon } from "lucide-react";
 
 const CORRIDOR_BADGE = {
     OPEN: "bg-slate-100 text-slate-600",
@@ -23,6 +25,8 @@ export default function DispatchBoard() {
     const [riders, setRiders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
+    const [scheduleOpen, setScheduleOpen] = useState(false);
+    const [externalOpen, setExternalOpen] = useState(false);
 
     const authHeaders = useCallback(async () => ({ Authorization: `Bearer ${await getToken()}` }), [getToken]);
 
@@ -135,6 +139,8 @@ export default function DispatchBoard() {
                 </div>
                 <div className="flex items-center gap-2">
                     <input type="date" value={date} onChange={e => setDate(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                    <button onClick={() => setScheduleOpen(true)} disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-green-600 text-white px-3 py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"><CalendarPlusIcon size={14} /> Schedule route</button>
+                    <button onClick={() => setExternalOpen(true)} disabled={busy} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium hover:border-green-400"><PackagePlusIcon size={14} /> External delivery</button>
                     <button onClick={runBatching} disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-slate-800 text-white px-3 py-2 text-sm font-medium hover:bg-slate-900 disabled:opacity-50"><LayersIcon size={14} /> Batch now</button>
                     <button onClick={() => load()} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:border-green-400"><RefreshCwIcon size={14} /> Refresh</button>
                 </div>
@@ -150,7 +156,7 @@ export default function DispatchBoard() {
             ) : corridors.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
                     <PackageIcon size={36} className="mx-auto mb-2 text-slate-300" />
-                    <p>No corridors for this date. Pooled orders are batched daily at 11:00 AM.</p>
+                    <p>No corridors for this date. Use <span className="font-medium text-slate-500">Schedule route</span> or <span className="font-medium text-slate-500">Batch now</span> to create one.</p>
                 </div>
             ) : (
                 <div className="space-y-5">
@@ -217,6 +223,20 @@ export default function DispatchBoard() {
                     })}
                 </div>
             )}
+
+            <ScheduleRouteModal
+                open={scheduleOpen}
+                onClose={() => setScheduleOpen(false)}
+                onCreated={() => load({ silent: true })}
+                riders={riders}
+                defaultDate={date}
+            />
+
+            <ExternalDeliveryModal
+                open={externalOpen}
+                onClose={() => setExternalOpen(false)}
+                onCreated={() => load({ silent: true })}
+            />
         </div>
     );
 }

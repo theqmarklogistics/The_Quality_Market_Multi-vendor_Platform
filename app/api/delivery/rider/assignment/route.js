@@ -13,14 +13,22 @@ export async function GET(request) {
             return NextResponse.json({ error: "Forbidden — riders only" }, { status: 403 });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const dayStart = new Date();
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setHours(23, 59, 59, 999);
 
+        // The rider's active route: one scheduled to run today, plus any corridor
+        // already in transit (covers a run that spills past midnight). Routes
+        // scheduled for a future date stay hidden until their run date arrives.
         const corridor = await prisma.deliveryCorridor.findFirst({
             where: {
                 assignedRiderId: userId,
-                runDate: { gte: today },
                 status: { in: ["CLOSED", "IN_TRANSIT"] },
+                OR: [
+                    { runDate: { gte: dayStart, lte: dayEnd } },
+                    { status: "IN_TRANSIT" },
+                ],
             },
             orderBy: { runDate: "desc" },
             include: {

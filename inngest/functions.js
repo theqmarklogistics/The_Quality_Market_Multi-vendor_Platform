@@ -1,6 +1,5 @@
 import { inngest } from "./client";
 import prisma from "@/lib/prisma";
-import { runPoolBatching } from "@/lib/poolBatching";
 
 //Inngest function to save data to a database
 export const syncUserCreation = inngest.createFunction(
@@ -180,15 +179,7 @@ export const onPaymentProofReviewed = inngest.createFunction(
     }
 );
 
-// Kigali Pooled Delivery — automatic batching waves.
-// Two daily runs in Africa/Kigali (UTC+2): 11:00 AM (09:00 UTC) and 3:00 PM (13:00 UTC).
-// Orders sorted after the morning wave are swept by the afternoon wave; any order
-// still un-corridored on a later day is picked up too (the engine sweeps by
-// corridorId IS NULL, not by date). Logistics can also trigger a run on demand.
-export const kigaliPoolBatchingEngine = inngest.createFunction(
-    { id: "kigali-pool-batching-engine" },
-    [{ cron: "0 9 * * *" }, { cron: "0 13 * * *" }],
-    async ({ step }) => {
-        return await step.run("batch-and-assign-corridors", () => runPoolBatching());
-    }
-);
+// Kigali Pooled Delivery — batching is manual only.
+// Logistics staff create routes on demand from the dispatch board, either with
+// "Batch now" (sweep all sorted orders into per-sector corridors) or "Schedule
+// route" (hand-build a corridor for a chosen date). There is no automatic cron.

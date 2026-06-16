@@ -9,7 +9,8 @@ import { emitDelivery } from "@/lib/deliveryRealtime";
 export async function POST(request, { params }) {
     try {
         const { userId } = getAuth(request);
-        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const { searchParams } = new URL(request.url);
+        const token = searchParams.get("t");
 
         const { orderId } = await params;
         if (!orderId) return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
@@ -21,10 +22,15 @@ export async function POST(request, { params }) {
 
         const order = await prisma.order.findUnique({
             where: { id: orderId },
-            select: { userId: true, deliveryType: true, corridorId: true },
+            select: { userId: true, deliveryType: true, corridorId: true, trackingToken: true },
         });
         if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-        if (order.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        // Access: logged-in owner, or anyone holding the public tracking token.
+        const hasValidToken = !!token && !!order.trackingToken && token === order.trackingToken;
+        if (!hasValidToken) {
+            if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            if (order.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
         if (order.deliveryType !== "KIGALI_POOL") {
             return NextResponse.json({ error: "Not a pooled-delivery order" }, { status: 400 });
         }

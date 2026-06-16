@@ -6,9 +6,8 @@ import { estimateEtaForStop, fetchOsrmRoute } from "@/lib/deliveryEta";
 export async function GET(request, { params }) {
     try {
         const { userId } = getAuth(request);
-        if (!userId) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
+        const { searchParams } = new URL(request.url);
+        const token = searchParams.get("t");
 
         const { orderId } = await params;
 
@@ -21,6 +20,7 @@ export async function GET(request, { params }) {
             include: {
                 address: true,
                 store: { select: { name: true, logo: true } },
+                user: { select: { name: true } },
                 corridor: {
                     include: {
                         assignedRider: { select: { name: true, riderProfile: { select: { phone: true, vehicleType: true } } } },
@@ -34,9 +34,12 @@ export async function GET(request, { params }) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
         }
 
-        // Only the customer who placed the order can see the OTP
-        if (order.userId !== userId) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        // Access: either the logged-in owner, or anyone holding the order's public
+        // tracking token (the recipient's link — they have no platform account).
+        const hasValidToken = !!token && !!order.trackingToken && token === order.trackingToken;
+        if (!hasValidToken) {
+            if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+            if (order.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
         if (order.deliveryType !== 'KIGALI_POOL') {
@@ -107,6 +110,10 @@ export async function GET(request, { params }) {
                 }
                 : null,
             store: order.store,
+            // External (off-platform) delivery context for the recipient view.
+            isExternalDelivery: order.isExternalDelivery,
+            packageDescription: order.packageDescription,
+            senderName: order.isExternalDelivery ? (order.user?.name ?? null) : null,
             address: {
                 name: order.address?.name,
                 street: order.address?.street,

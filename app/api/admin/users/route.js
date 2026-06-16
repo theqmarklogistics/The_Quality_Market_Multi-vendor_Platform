@@ -9,6 +9,7 @@ const ALLOWED_ROLES = [
     'FINANCIAL_OPERATIONAL',
     'WAREHOUSE_KEEPER',
     'RIDER',
+    'EXTERNAL_SELLER',
 ]
 
 export async function GET(request) {

@@ -233,7 +233,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                     <span className='block font-medium text-slate-800'>Kigali Pooled Delivery</span>
                                     <span className='rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700'>Save up to 60%</span>
                                 </div>
-                                <span className='block text-xs text-slate-500 mt-0.5'>Packages are batched daily at 11:00 AM and delivered along shared routes in the afternoon to cut your delivery costs by up to 60%.</span>
+                                <span className='block text-xs text-slate-500 mt-0.5'>Orders heading to the same Kigali area are grouped into shared delivery routes and dropped off together — cutting your delivery cost by up to 60%.</span>
                             </div>
                         </label>
                     </div>
@@ -285,7 +285,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                             <div className='flex flex-col gap-1 font-medium text-right text-slate-800'>
                                 <p>{formatAmount(totalPrice)}</p>
                                 {deliveryType === 'KIGALI_POOL'
-                                    ? <p className='text-green-700 text-xs'>Pooled (set at 11 AM)</p>
+                                    ? <p className='text-green-700 text-xs'>Pooled (shared route)</p>
                                     : <p>Free in Kigali</p>}
 
                                 {coupon && <p>{`-${formatAmount((coupon.discount / 100) * totalPrice)}`}</p>}

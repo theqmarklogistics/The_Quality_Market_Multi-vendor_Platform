@@ -186,6 +186,9 @@ export async function POST(request) {
                 if (!order) {
                     return NextResponse.json({ error: "Order not found" }, { status: 404 });
                 }
+                if (!order.store) {
+                    return NextResponse.json({ error: "This order has no store to message" }, { status: 400 });
+                }
 
                 targetStoreId = order.store.id;
                 targetUserId = order.store.userId;

@@ -1,7 +1,7 @@
 'use client'
-import { useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import axios from "axios";
 import Loading from "@/components/Loading";
 import LiveMap from "@/components/delivery/LiveMap";
@@ -24,11 +24,14 @@ function StepIndex(status) {
 const POLL_MS = 20000;       // fallback refresh cadence
 const SHARE_MIN_MS = 15000;  // throttle for customer location posts
 
-export default function TrackOrderPage() {
+function TrackOrderPageInner() {
     const { getToken } = useAuth();
     const { user, isLoaded } = useUser();
     const router = useRouter();
     const { orderId } = useParams();
+    const searchParams = useSearchParams();
+    // Public recipient link carries ?t=<trackingToken> — no platform login needed.
+    const trackToken = searchParams.get('t');
 
     const [trackData, setTrackData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -42,10 +45,11 @@ export default function TrackOrderPage() {
     const fetchTracking = useCallback(async ({ silent } = {}) => {
         if (!silent) setLoading(true);
         try {
-            const token = await getToken();
-            const { data } = await axios.get(`/api/delivery/track/${orderId}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            // Token link → public access (no bearer). Otherwise authenticate as the owner.
+            const config = trackToken
+                ? { params: { t: trackToken } }
+                : { headers: { Authorization: `Bearer ${await getToken()}` } };
+            const { data } = await axios.get(`/api/delivery/track/${orderId}`, config);
             setTrackData(data);
             deliveredRef.current = data?.deliveryStatus === 'DELIVERED';
             setError(null);
@@ -54,19 +58,22 @@ export default function TrackOrderPage() {
         } finally {
             if (!silent) setLoading(false);
         }
-    }, [getToken, orderId]);
+    }, [getToken, orderId, trackToken]);
 
-    // Initial load + auth gate
+    // Initial load + auth gate. A valid token link bypasses the login requirement.
     useEffect(() => {
+        if (trackToken) { fetchTracking(); return; }
         if (!isLoaded) return;
         if (!user) { router.push('/'); return; }
         fetchTracking();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoaded, user]);
+    }, [isLoaded, user, trackToken]);
 
     // Realtime subscription (Socket.IO) with a polling fallback.
+    // Token recipients (no login) still get polling; the socket simply no-ops
+    // for them since getToken() returns null.
     useEffect(() => {
-        if (!isLoaded || !user) return;
+        if (!trackToken && (!isLoaded || !user)) return;
         let socket = null;
         let active = true;
 
@@ -107,19 +114,19 @@ export default function TrackOrderPage() {
             }
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoaded, user, orderId]);
+    }, [isLoaded, user, orderId, trackToken]);
 
     const postLocation = useCallback(async (lat, lng) => {
         const now = Date.now();
         if (now - lastShareRef.current < SHARE_MIN_MS) return;
         lastShareRef.current = now;
         try {
-            const token = await getToken();
-            await axios.post(`/api/delivery/track/${orderId}/share-location`, { lat, lng }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const config = trackToken
+                ? { params: { t: trackToken } }
+                : { headers: { Authorization: `Bearer ${await getToken()}` } };
+            await axios.post(`/api/delivery/track/${orderId}/share-location`, { lat, lng }, config);
         } catch (_) { /* best effort */ }
-    }, [getToken, orderId]);
+    }, [getToken, orderId, trackToken]);
 
     const toggleShare = () => {
         if (sharing) {
@@ -181,6 +188,9 @@ export default function TrackOrderPage() {
                     <p className="mt-1 text-sm text-white/70 font-mono">{trackData?.orderId}</p>
                     {trackData?.store?.name && (
                         <p className="mt-2 text-sm text-white/80">From <span className="font-semibold text-white">{trackData.store.name}</span></p>
+                    )}
+                    {trackData?.isExternalDelivery && trackData?.senderName && (
+                        <p className="mt-2 text-sm text-white/80">From <span className="font-semibold text-white">{trackData.senderName}</span></p>
                     )}
                 </div>
 
@@ -339,5 +349,13 @@ export default function TrackOrderPage() {
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function TrackOrderPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loading /></div>}>
+            <TrackOrderPageInner />
+        </Suspense>
     );
 }

@@ -3,7 +3,6 @@ import { inngest } from "../../../inngest/client";
 import {
   deleteCouponOnExpiry,
   expirePendingOrders,
-  kigaliPoolBatchingEngine,
   onChatMessageCreated,
   onPaymentProofReviewed,
   onPaymentProofSubmitted,
@@ -21,7 +20,6 @@ export const { GET, POST, PUT } = serve({
     syncUserDeletion,
     deleteCouponOnExpiry,
     expirePendingOrders,
-    kigaliPoolBatchingEngine,
     onChatMessageCreated,
     onPaymentProofSubmitted,
     onProductModerationUpdated,

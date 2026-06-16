@@ -23,13 +23,24 @@ export async function POST(request, { params }) {
             }
         }
 
+        // Capture the prior rider so we can notify them if they're being unassigned.
+        const previous = await prisma.deliveryCorridor.findUnique({
+            where: { id },
+            select: { assignedRiderId: true },
+        });
+
         const corridor = await prisma.deliveryCorridor.update({
             where: { id },
             data: { assignedRiderId: riderId || null },
             include: { assignedRider: { select: { id: true, name: true } } },
         });
 
-        emitDelivery([`corridor-${id}`, "logistics-room"], "corridor-update", {
+        // Refresh the dispatch board, the corridor watchers, and the affected
+        // rider consoles (both the newly-assigned and any replaced rider).
+        const rooms = [`corridor-${id}`, "logistics-room"];
+        if (riderId) rooms.push(`rider-${riderId}`);
+        if (previous?.assignedRiderId && previous.assignedRiderId !== riderId) rooms.push(`rider-${previous.assignedRiderId}`);
+        emitDelivery(rooms, "corridor-update", {
             corridorId: id,
             rider: corridor.assignedRider ? { id: corridor.assignedRider.id, name: corridor.assignedRider.name } : null,
         });

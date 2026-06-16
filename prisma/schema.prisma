@@ -158,7 +158,8 @@ model Order {
     total         Float
     status        OrderStatus   @default(ORDER_PLACED)
     userId        String
-    storeId       String
+    // Nullable: external (off-platform) delivery-only orders have no platform store.
+    storeId       String?
     addressId     String
     isPaid        Boolean       @default(false)
     paymentMethod PaymentMethod
@@ -212,11 +213,24 @@ model Order {
     // OTP verification hardening — throttles brute-force on the 4-digit code
     otpAttempts       Int                @default(0)
     otpLockedUntil    DateTime?
+    // ── External-seller delivery (off-platform merchant uses our delivery only) ──
+    // True when this is a delivery-only order with no platform store/products.
+    isExternalDelivery Boolean           @default(false)
+    // Pickup/sender details — where the rider (or sweep) collects the package.
+    pickupContactName  String?
+    pickupPhone        String?
+    pickupLandmark     String?
+    pickupLat          Float?
+    pickupLng          Float?
+    packageDescription String?
+    declaredValue      Float?
+    // Unguessable token for the public (no-login) recipient tracking link.
+    trackingToken      String?           @unique
     orderItems    OrderItem[]
 
     // Relations
     user    User    @relation("BuyerRelation", fields: [userId], references: [id])
-    store   Store   @relation(fields: [storeId], references: [id])
+    store   Store?  @relation(fields: [storeId], references: [id])
     address Address @relation(fields: [addressId], references: [id])
     conversations Conversation[]
     returnRequest Return?
@@ -385,6 +399,7 @@ enum UserRole {
     FINANCIAL_OPERATIONAL
     WAREHOUSE_KEEPER
     RIDER
+    EXTERNAL_SELLER
 }
 
 enum ShippingRuleType {
@@ -509,6 +524,18 @@ model PaymentConfig {
     bankAccountName   String?
     bankBranch        String?
     updatedAt         DateTime @updatedAt
+}
+
+// Admin-configurable pricing for external-seller (off-platform) deliveries.
+// Single row (id = "default"). `basePrice` is the published flat fee charged to
+// the partner at booking; `perSector` optionally overrides it per Kigali sector
+// ({ "Kimironko": 2500, ... }). This is the CUSTOMER price and is independent of
+// the internal proportional `deliveryFeeShare` used to pay the rider.
+model ExternalDeliveryConfig {
+    id        String   @id @default("default")
+    basePrice Float    @default(2000)
+    perSector Json     @default("{}")
+    updatedAt DateTime @updatedAt
 }
 
 // Admin-configurable announcement banner (single row, id = "default")

@@ -276,6 +276,11 @@ const Navbar = () => {
                                 Dispatch
                             </Link>
                         )}
+                        {(staffRole === 'EXTERNAL_SELLER') && (
+                            <Link href="/external" className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100">
+                                My Deliveries
+                            </Link>
+                        )}
 
                         { !user ? (
                             <button onClick={openSignIn} className="px-8 py-2 bg-indigo-500 hover:bg-indigo-600 transition text-white rounded-full">
@@ -298,6 +303,9 @@ const Navbar = () => {
                                     )}
                                     {(staffRole === 'LOGISTICS_MANAGER' || isAdmin) && (
                                         <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Dispatch Board" onClick={() => router.push('/logistics')} />
+                                    )}
+                                    {staffRole === 'EXTERNAL_SELLER' && (
+                                        <UserButton.Action labelIcon={<PackageIcon size={16} />} label="My Deliveries" onClick={() => router.push('/external')} />
                                     )}
                                     <UserButton.Action labelIcon = {<PackageIcon size={16}/>} label="My Orders" onClick={()=> router.push('/orders')}/>
                                     <UserButton.Action labelIcon = {<MessageCircleIcon size={16}/>} label="My Chats" onClick={()=> router.push('/chat')}/>
