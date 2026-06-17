@@ -12,7 +12,7 @@ export default async function ExternalNewDeliveryPage() {
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
   if (!user || (user.role !== 'EXTERNAL_SELLER' && user.role !== 'ADMIN')) {
-    return <DeliveryAccessInvite />
+    return <DeliveryAccessInvite redirectTo="/external/new" />
   }
 
   return <ExternalBookingForm />
