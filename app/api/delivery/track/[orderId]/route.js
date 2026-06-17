@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import { estimateEtaForStop, fetchOsrmRoute } from "@/lib/deliveryEta";
+import { estimateEtaForStop, fetchOsrmRoute, haversineKm, KIGALI_HUB } from "@/lib/deliveryEta";
 
 export async function GET(request, { params }) {
     try {
@@ -55,6 +55,11 @@ export async function GET(request, { params }) {
         const recipientLat = order.recipientLat ?? order.address?.latitude ?? null;
         const recipientLng = order.recipientLng ?? order.address?.longitude ?? null;
 
+        // Straight-line distance from our hub to the delivery point (km).
+        const hubDistanceKm = (recipientLat != null && recipientLng != null)
+            ? haversineKm(KIGALI_HUB, { lat: recipientLat, lng: recipientLng })
+            : null;
+
         // ETA + route geometry: only meaningful once the rider is moving and located.
         let etaMinutes = null;
         let routeGeometry = null;
@@ -100,6 +105,7 @@ export async function GET(request, { params }) {
             riderLocationAt: corridor?.riderLocationAt ?? null,
             recipientLat,
             recipientLng,
+            hubDistanceKm,
             etaMinutes,
             routeGeometry,
             rider: corridor?.assignedRider

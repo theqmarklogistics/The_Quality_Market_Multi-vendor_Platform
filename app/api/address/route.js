@@ -17,7 +17,19 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const data = { ...(body.address ?? body), userId };
+        const input = body.address ?? body;
+
+        // Geolocation is mandatory — it powers hub-distance and rider routing.
+        const latitude = Number(input.latitude);
+        const longitude = Number(input.longitude);
+        if (
+            !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+            latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180
+        ) {
+            return NextResponse.json({ error: "A pinned location is required to save an address." }, { status: 400 });
+        }
+
+        const data = { ...input, userId, latitude, longitude };
         const newAddress = await prisma.address.create({
             data
         });

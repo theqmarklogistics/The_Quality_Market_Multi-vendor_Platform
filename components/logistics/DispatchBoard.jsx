@@ -7,6 +7,7 @@ import LiveMap from "@/components/delivery/LiveMap";
 import ScheduleRouteModal from "@/components/logistics/ScheduleRouteModal";
 import ExternalDeliveryModal from "@/components/logistics/ExternalDeliveryModal";
 import { initializeSocket } from "@/lib/socketClient";
+import { haversineKm, KIGALI_HUB } from "@/lib/deliveryEta";
 import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon } from "lucide-react";
 
 const CORRIDOR_BADGE = {
@@ -193,12 +194,17 @@ export default function DispatchBoard() {
                                 </div>
 
                                 <div className="divide-y divide-slate-100">
-                                    {c.stops.map(s => (
+                                    {c.stops.map(s => {
+                                    const hubKm = (s.lat != null && s.lng != null) ? haversineKm(KIGALI_HUB, { lat: s.lat, lng: s.lng }) : null;
+                                    return (
                                         <div key={s.orderId} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-white text-xs font-bold">{s.stopSequence}</span>
                                                 <div className="min-w-0">
-                                                    <p className="font-medium text-slate-800 truncate">{s.recipientName || "Customer"} · <span className="text-slate-400">{s.sector || "—"}</span></p>
+                                                    <p className="font-medium text-slate-800 truncate">
+                                                        {s.recipientName || "Customer"} · <span className="text-slate-400">{s.sector || "—"}</span>
+                                                        {hubKm != null && <span className="ml-2 text-[10px] font-semibold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5">{hubKm.toFixed(1)} km from hub</span>}
+                                                    </p>
                                                     {s.landmarkAddress && <p className="text-xs text-slate-400 truncate">{s.landmarkAddress}</p>}
                                                 </div>
                                             </div>
@@ -216,7 +222,8 @@ export default function DispatchBoard() {
                                                 {s.deliveryStatus === "DELIVERED" && <CheckCircleIcon size={16} className="text-green-600" />}
                                             </div>
                                         </div>
-                                    ))}
+                                    );
+                                    })}
                                 </div>
                             </div>
                         );

@@ -292,6 +292,12 @@ function TrackOrderPageInner() {
                             <span className="font-medium text-slate-800 text-right">{trackData.landmarkAddress}</span>
                         </div>
                     )}
+                    {trackData?.hubDistanceKm != null && (
+                        <div className="flex justify-between">
+                            <span className="text-slate-500">Distance from hub</span>
+                            <span className="font-medium text-slate-800">{Number(trackData.hubDistanceKm).toFixed(1)} km</span>
+                        </div>
+                    )}
                     {trackData?.intakeMethod && (
                         <div className="flex justify-between">
                             <span className="text-slate-500">Intake</span>

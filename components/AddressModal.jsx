@@ -1,5 +1,5 @@
 'use client'
-import { XIcon } from "lucide-react"
+import { XIcon, MapPinIcon, CheckCircleIcon, LoaderIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "react-hot-toast"
 import { useAuth } from "@clerk/nextjs"
@@ -23,8 +23,11 @@ const AddressModal = ({ setShowAddressModal }) => {
         state: '',
         zip: '',
         country: '',
-        phone: ''
+        phone: '',
+        latitude: null,
+        longitude: null,
     })
+    const [locating, setLocating] = useState(false);
 
     const handleAddressChange = (e) => {
         setAddress({
@@ -33,8 +36,41 @@ const AddressModal = ({ setShowAddressModal }) => {
         })
     }
 
+    // Capture the customer's exact coordinates. These are required so we can
+    // measure the distance from our hub to the delivery point and route riders.
+    const captureLocation = () => {
+        if (!('geolocation' in navigator)) {
+            toast.error('Location is not supported on this device.');
+            return;
+        }
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setAddress((prev) => ({
+                    ...prev,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                }));
+                setLocating(false);
+                toast.success('Location pinned');
+            },
+            () => {
+                setLocating(false);
+                toast.error('Could not access your location. Please allow location access to continue.');
+            },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    };
+
+    const hasLocation = address.latitude != null && address.longitude != null;
+
     const handleSubmit = async (e) => {
         e.preventDefault()
+
+        if (!hasLocation) {
+            toast.error('Please pin your location before saving.');
+            return;
+        }
 
         try {
             const token = await getToken();
@@ -77,7 +113,31 @@ const AddressModal = ({ setShowAddressModal }) => {
                     <input name="country" onChange={handleAddressChange} value={address.country} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Country" required />
                 </div>
                 <input name="phone" onChange={handleAddressChange} value={address.phone} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Phone" required />
-                <button className="bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md hover:bg-slate-900 active:scale-95 transition-all">SAVE ADDRESS</button>
+
+                {/* Geolocation — mandatory: powers hub-distance and rider routing */}
+                <div className="flex flex-col gap-1.5">
+                    <button
+                        type="button"
+                        onClick={captureLocation}
+                        disabled={locating}
+                        className={`flex items-center justify-center gap-2 text-sm font-medium py-2.5 rounded-md border transition-all active:scale-95 disabled:opacity-60 ${
+                            hasLocation
+                                ? 'border-green-300 bg-green-50 text-green-700'
+                                : 'border-slate-300 text-slate-700 hover:border-green-400'
+                        }`}
+                    >
+                        {locating
+                            ? <><LoaderIcon size={16} className="animate-spin" /> Getting your location…</>
+                            : hasLocation
+                                ? <><CheckCircleIcon size={16} /> Location pinned — tap to update</>
+                                : <><MapPinIcon size={16} /> Pin my exact location</>}
+                    </button>
+                    {hasLocation
+                        ? <p className="text-[11px] text-slate-400">{address.latitude.toFixed(5)}, {address.longitude.toFixed(5)}</p>
+                        : <p className="text-[11px] text-slate-400">Required — lets us measure delivery distance and route your rider.</p>}
+                </div>
+
+                <button disabled={!hasLocation} className="bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">SAVE ADDRESS</button>
             </div>
             <XIcon size={30} className="absolute top-5 right-5 text-slate-500 hover:text-slate-700 cursor-pointer" onClick={() => setShowAddressModal(false)} />
         </form>
