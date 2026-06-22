@@ -17,7 +17,8 @@ export async function GET(request) {
     }
 }
 
-// POST { basePrice, perSector } — update external-delivery pricing (admin).
+// POST { basePrice?, perSector?, baseRatePerKgKm?, minimumFloor?, volumetricFactor?,
+//        distanceTiers? } — update external-delivery pricing (admin).
 export async function POST(request) {
     try {
         const { userId } = getAuth(request);
@@ -27,6 +28,16 @@ export async function POST(request) {
         const data = {};
         if (Number.isFinite(body?.basePrice) && body.basePrice >= 0) data.basePrice = body.basePrice;
         if (body?.perSector && typeof body.perSector === "object" && !Array.isArray(body.perSector)) data.perSector = body.perSector;
+        if (Number.isFinite(body?.baseRatePerKgKm) && body.baseRatePerKgKm > 0) data.baseRatePerKgKm = body.baseRatePerKgKm;
+        if (Number.isFinite(body?.minimumFloor) && body.minimumFloor >= 0) data.minimumFloor = body.minimumFloor;
+        if (Number.isFinite(body?.volumetricFactor) && body.volumetricFactor > 0) data.volumetricFactor = body.volumetricFactor;
+        if (Array.isArray(body?.distanceTiers)) {
+            // Keep only well-formed tiers: { maxKm: number|null, multiplier: number>0 }.
+            const tiers = body.distanceTiers
+                .filter((t) => t && (t.maxKm == null || Number.isFinite(t.maxKm)) && Number.isFinite(t.multiplier) && t.multiplier > 0)
+                .map((t) => ({ maxKm: t.maxKm == null ? null : Number(t.maxKm), multiplier: Number(t.multiplier) }));
+            data.distanceTiers = tiers;
+        }
 
         if (!Object.keys(data).length) {
             return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

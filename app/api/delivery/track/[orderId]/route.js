@@ -99,6 +99,7 @@ export async function GET(request, { params }) {
             stopSequence: order.stopSequence,
             failureReason: order.failureReason,
             deliveredAt: order.deliveredAt,
+            podPhotoUrl: order.podPhotoUrl,
             // Realtime tracking fields
             riderLat: corridor?.riderLat ?? null,
             riderLng: corridor?.riderLng ?? null,

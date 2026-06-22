@@ -3,9 +3,10 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authLogistics from "@/middlewares/authLogistics";
 import { emitDelivery } from "@/lib/deliveryRealtime";
-import { KIGALI_HUB, nearestNeighborRoute, proportionalFeeShares } from "@/lib/deliveryEta";
-
-const BASE_ROUTE_COST = 10000; // 10,000 RWF per corridor route (matches the batching engine)
+import { KIGALI_HUB, nearestNeighborRoute, resolveRouteDistances } from "@/lib/deliveryEta";
+import { computeRouteShares, splitByRatio } from "@/lib/deliveryPricing";
+import { orderChargeableKg } from "@/lib/poolBatching"; // shared with the auto-batcher
+import { getExternalDeliveryConfig } from "@/lib/externalDelivery";
 
 // GET ?date=YYYY-MM-DD — all corridors running that day, with stops + assigned rider.
 export async function GET(request) {
@@ -84,8 +85,10 @@ function parseRunDate(value) {
 // POST { name, runDate, baseRouteCost?, riderId?, orderIds? }
 // Schedule a delivery route (corridor) for a chosen date, optionally pre-assigning
 // a rider and loading specific un-corridored pooled orders onto it. Stops are
-// ordered by a greedy nearest-neighbour route from the hub and the fixed route
-// cost is split by each stop's cumulative distance — identical to the auto-batcher.
+// ordered by a greedy nearest-neighbour route from the hub, then priced with the
+// distance × weight formula and split by each stop's (chargeableKg × distance) —
+// identical to the auto-batcher. An explicit baseRouteCost overrides the formula
+// total (still split by the same ratio).
 export async function POST(request) {
     try {
         const { userId } = getAuth(request);
@@ -99,10 +102,11 @@ export async function POST(request) {
         const runDate = parseRunDate(body?.runDate);
         const riderId = body?.riderId || null;
         const orderIds = Array.isArray(body?.orderIds) ? body.orderIds.filter(Boolean) : [];
-        const baseRouteCost =
-            Number.isFinite(body?.baseRouteCost) && body.baseRouteCost > 0
-                ? body.baseRouteCost
-                : BASE_ROUTE_COST;
+        // Optional explicit route cost. When omitted, the distance × weight formula
+        // prices the route; when set, staff override the total and we just split it.
+        const costOverride = Number.isFinite(body?.baseRouteCost) && body.baseRouteCost > 0
+            ? Math.round(body.baseRouteCost)
+            : null;
 
         if (!name) return NextResponse.json({ error: "Route name is required" }, { status: 400 });
         if (!runDate) return NextResponse.json({ error: "A valid run date is required" }, { status: 400 });
@@ -128,7 +132,10 @@ export async function POST(request) {
                     // External (off-platform) deliveries are prepaid — never route an unpaid one.
                     OR: [{ isExternalDelivery: false }, { isPaid: true }],
                 },
-                include: { address: true },
+                include: {
+                    address: true,
+                    orderItems: { include: { product: { select: { weightKg: true, lengthCm: true, widthCm: true, heightCm: true } } } },
+                },
             });
             if (orders.length !== orderIds.length) {
                 return NextResponse.json(
@@ -138,40 +145,58 @@ export async function POST(request) {
             }
         }
 
-        // A route loaded with stops is dispatch-ready (CLOSED); an empty placeholder
-        // route stays OPEN until orders are batched/added into it.
-        const corridor = await prisma.deliveryCorridor.create({
-            data: {
-                name,
-                runDate,
-                baseRouteCost,
-                status: orders.length ? "CLOSED" : "OPEN",
-                assignedRiderId: riderId,
-            },
-        });
+        // Price the route with the distance × weight formula (unless staff set an
+        // explicit cost), then split it across stops by (chargeableKg × distance).
+        const config = await getExternalDeliveryConfig();
+        const volumetricFactor = config.volumetricFactor ?? 200;
 
-        // Order the stops and split the route cost, then attach each order.
+        let ordered = [];
+        let shares = [];
+        let routePrice = costOverride ?? Math.round(config.minimumFloor ?? 2000);
+
         if (orders.length) {
             const points = orders.map((o) => ({
                 ...o,
                 lat: o.recipientLat ?? o.address?.latitude ?? null,
                 lng: o.recipientLng ?? o.address?.longitude ?? null,
+                chargeableKg: orderChargeableKg(o, volumetricFactor),
             }));
-            const ordered = nearestNeighborRoute(KIGALI_HUB, points);
-            const shares = proportionalFeeShares(KIGALI_HUB, ordered, baseRouteCost);
-
-            for (let i = 0; i < ordered.length; i++) {
-                const feeShare = shares[i] ?? parseFloat((baseRouteCost / ordered.length).toFixed(2));
-                await prisma.order.update({
-                    where: { id: ordered[i].id },
-                    data: {
-                        corridorId: corridor.id,
-                        deliveryStatus: "SORTING",
-                        deliveryFeeShare: feeShare,
-                        stopSequence: i + 1,
-                    },
-                });
+            ordered = nearestNeighborRoute(KIGALI_HUB, points);
+            const distOpts = await resolveRouteDistances(ordered, KIGALI_HUB);
+            const res = computeRouteShares(ordered, config, KIGALI_HUB, distOpts);
+            if (costOverride != null) {
+                routePrice = costOverride;
+                shares = splitByRatio(routePrice, res.loads.some((l) => l > 0) ? res.loads : ordered.map(() => 1));
+            } else {
+                routePrice = res.routePrice;
+                shares = res.shares;
             }
+        }
+
+        // A route loaded with stops is dispatch-ready (CLOSED); an empty placeholder
+        // route stays OPEN until orders are added into it.
+        const corridor = await prisma.deliveryCorridor.create({
+            data: {
+                name,
+                runDate,
+                baseRouteCost: routePrice,
+                status: orders.length ? "CLOSED" : "OPEN",
+                assignedRiderId: riderId,
+            },
+        });
+
+        // Attach each ordered stop with its computed fee share.
+        for (let i = 0; i < ordered.length; i++) {
+            const feeShare = shares[i] ?? Math.round(routePrice / ordered.length);
+            await prisma.order.update({
+                where: { id: ordered[i].id },
+                data: {
+                    corridorId: corridor.id,
+                    deliveryStatus: "SORTING",
+                    deliveryFeeShare: feeShare,
+                    stopSequence: i + 1,
+                },
+            });
         }
 
         const rooms = ["logistics-room", `corridor-${corridor.id}`];

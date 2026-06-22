@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { GlobeIcon, SaveIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ExternalDeliveryPricingForm from '@/components/admin/ExternalDeliveryPricingForm'
 
 const ZONES = ['A', 'B', 'C', 'CHINA_RWANDA']
 const ZONE_LABELS = { A: 'Zone A — Central Kigali', B: 'Zone B — Intermediate Kigali', C: 'Zone C — Periphery', CHINA_RWANDA: 'China → Rwanda (International Freight)' }
@@ -58,6 +59,10 @@ export default function ShippingPage() {
     <div className="text-slate-700 mb-28">
       <h1 className="text-2xl text-slate-500 mb-1">Shipping <span className="text-slate-800 font-medium">Configuration</span></h1>
       <p className="text-sm text-slate-400 mb-6">Weight-based delivery tariff for Full Managed stores. Local sellers set their own shipping fee per order.</p>
+
+      <div className="mb-8">
+        <ExternalDeliveryPricingForm />
+      </div>
 
       <div className="flex items-center justify-between mb-4 max-w-5xl">
         <p className="text-sm text-slate-500">Edit costs inline and click Save Changes.</p>

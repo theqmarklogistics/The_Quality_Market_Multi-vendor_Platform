@@ -5,7 +5,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import LiveMap from "@/components/delivery/LiveMap";
 import { initializeSocket } from "@/lib/socketClient";
-import { PhoneIcon, NavigationIcon, CheckCircleIcon, XCircleIcon, MapPinIcon, PlayIcon, SquareIcon, PackageIcon } from "lucide-react";
+import { PhoneIcon, NavigationIcon, CheckCircleIcon, XCircleIcon, MapPinIcon, PlayIcon, SquareIcon, PackageIcon, CameraIcon, Loader2Icon } from "lucide-react";
 
 const LOCATION_MIN_MS = 10000;
 
@@ -213,6 +213,24 @@ export default function RiderConsole() {
         } finally { setBusy(false); }
     };
 
+    // Fallback: confirm delivery with a captured photo when the customer can't
+    // produce the OTP (e.g. left at reception/gate, recipient absent).
+    const confirmWithPhoto = async (file) => {
+        if (!file) return;
+        setBusy(true);
+        try {
+            const fd = new FormData();
+            fd.append("orderId", otpModal.orderId);
+            fd.append("photoFile", file);
+            await axios.post("/api/delivery/rider/confirm-photo", fd, { headers: await authHeaders() });
+            toast.success("Delivery confirmed with photo!");
+            setOtpModal(null); setOtpInput("");
+            load({ silent: true });
+        } catch (err) {
+            toast.error(err?.response?.data?.error || err.message);
+        } finally { setBusy(false); }
+    };
+
     const mapStops = stops.filter(s => s.lat != null && s.lng != null).map(s => ({
         id: s.orderId, lat: s.lat, lng: s.lng, stopSequence: s.stopSequence, label: `#${s.stopSequence} ${s.recipientName || ""}`,
     }));
@@ -330,6 +348,14 @@ export default function RiderConsole() {
                         <div className="mt-5 flex gap-3">
                             <button onClick={() => setOtpModal(null)} className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600">Cancel</button>
                             <button disabled={busy} onClick={confirmDelivery} className="flex-1 rounded-xl bg-green-600 text-white py-2.5 text-sm font-semibold hover:bg-green-700 disabled:opacity-50">Confirm</button>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <p className="text-xs text-slate-500 mb-2">Customer can&apos;t provide the code?</p>
+                            <label className={`flex items-center justify-center gap-2 rounded-xl border border-slate-300 py-2.5 text-sm font-medium text-slate-700 ${busy ? "opacity-50" : "hover:border-green-400 cursor-pointer"}`}>
+                                {busy ? <Loader2Icon size={16} className="animate-spin" /> : <CameraIcon size={16} />} Confirm with delivery photo
+                                <input type="file" accept="image/*" capture="environment" className="hidden" disabled={busy} onChange={(e) => confirmWithPhoto(e.target.files?.[0])} />
+                            </label>
+                            <p className="mt-1.5 text-[11px] text-slate-400">Use this only if the recipient can&apos;t give the code. The photo is logged as proof of delivery.</p>
                         </div>
                     </div>
                 </div>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { PackagePlusIcon, RefreshCwIcon, CopyIcon, CheckIcon, MapPinIcon, FileTextIcon, UploadIcon, Loader2Icon } from "lucide-react";
+import { PackagePlusIcon, RefreshCwIcon, CopyIcon, CheckIcon, MapPinIcon, FileTextIcon, UploadIcon, Loader2Icon, WalletIcon } from "lucide-react";
 
 const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "RWF";
@@ -23,6 +23,7 @@ export default function ExternalDashboard() {
     const authHeaders = useCallback(async () => ({ Authorization: `Bearer ${await getToken()}` }), [getToken]);
 
     const [deliveries, setDeliveries] = useState([]);
+    const [creditBalance, setCreditBalance] = useState(0);
     const [momo, setMomo] = useState(null);
     const [loading, setLoading] = useState(true);
     const [copiedId, setCopiedId] = useState(null);
@@ -36,6 +37,7 @@ export default function ExternalDashboard() {
                 axios.get(`/api/payment-config`),
             ]);
             setDeliveries(d.data.deliveries || []);
+            setCreditBalance(d.data.creditBalance || 0);
             setMomo(p.data || null);
         } catch (err) {
             toast.error(err?.response?.data?.error || err.message);
@@ -71,6 +73,7 @@ export default function ExternalDashboard() {
 
     const paymentState = (d) => {
         if (d.isPaid) return { label: "Paid", cls: "bg-green-100 text-green-700" };
+        if (d.paymentStatus === "EXPIRED") return { label: "Expired — not paid in time", cls: "bg-red-100 text-red-700" };
         if (d.paymentProofStatus === "SUBMITTED") return { label: "Payment under review", cls: "bg-amber-100 text-amber-700" };
         if (d.paymentProofStatus === "REJECTED") return { label: "Payment rejected — re-upload", cls: "bg-red-100 text-red-700" };
         return { label: "Awaiting payment", cls: "bg-slate-100 text-slate-600" };
@@ -89,6 +92,12 @@ export default function ExternalDashboard() {
                 </div>
             </div>
 
+            {creditBalance > 0 && (
+                <div className="mb-3 flex items-center gap-2 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+                    <WalletIcon size={16} className="shrink-0" /> You have <b>{currency} {Number(creditBalance).toLocaleString()}</b> in delivery credit from pooling savings — applied automatically to new bookings.
+                </div>
+            )}
+
             {momo?.momoConfigured && (
                 <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                     Pay the delivery fee to MoMo <b>{momo.momoPayCode}</b> ({momo.momoAccountName}), then upload your proof on the delivery below. We route it once payment is confirmed.
@@ -106,7 +115,7 @@ export default function ExternalDashboard() {
                 <div className="space-y-3">
                     {deliveries.map((d) => {
                         const pay = paymentState(d);
-                        const needsProof = !d.isPaid && d.paymentProofStatus !== "SUBMITTED";
+                        const needsProof = !d.isPaid && d.paymentStatus !== "EXPIRED" && d.paymentProofStatus !== "SUBMITTED";
                         return (
                             <div key={d.orderId} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -120,6 +129,15 @@ export default function ExternalDashboard() {
                                         <p className="text-xs text-slate-400 mt-0.5 font-mono">{d.orderId}</p>
                                         {d.packageDescription && <p className="text-xs text-slate-500 mt-1">{d.packageDescription}</p>}
                                         <p className="text-sm text-slate-600 mt-1">Fee: <b>{currency} {d.total}</b> · Code: <b className="tracking-widest">{d.deliveryOtp}</b></p>
+                                        {(d.creditApplied > 0 || d.poolingSavings) && (
+                                            <p className="text-xs mt-0.5">
+                                                {d.creditApplied > 0 && (
+                                                    <span className="text-indigo-600">Credit applied −{currency} {Number(d.creditApplied).toLocaleString()}{d.amountDue > 0 ? ` · pay ${currency} ${Number(d.amountDue).toLocaleString()}` : " · fully covered"}</span>
+                                                )}
+                                                {d.creditApplied > 0 && d.poolingSavings ? <span className="text-slate-300"> · </span> : null}
+                                                {d.poolingSavings ? <span className="text-green-600">Saved {currency} {Number(d.poolingSavings).toLocaleString()} by pooling</span> : null}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="flex flex-col items-end gap-2 shrink-0">
                                         <div className="flex items-center gap-2">

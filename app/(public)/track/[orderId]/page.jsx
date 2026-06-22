@@ -6,7 +6,7 @@ import axios from "axios";
 import Loading from "@/components/Loading";
 import LiveMap from "@/components/delivery/LiveMap";
 import { initializeSocket } from "@/lib/socketClient";
-import { CheckCircleIcon, ClockIcon, PackageIcon, TruckIcon, MapPinIcon, PhoneIcon, NavigationIcon, AlertTriangleIcon } from "lucide-react";
+import { CheckCircleIcon, ClockIcon, PackageIcon, TruckIcon, MapPinIcon, PhoneIcon, NavigationIcon, AlertTriangleIcon, CameraIcon } from "lucide-react";
 
 const DELIVERY_STEPS = [
     { key: "PENDING_INTAKE", label: "Pending Intake", icon: ClockIcon, description: "Your package is awaiting vendor drop-off or morning sweep pickup." },
@@ -263,6 +263,11 @@ function TrackOrderPageInner() {
                         <div>
                             <p className="font-semibold text-green-800">Delivered!</p>
                             <p className="text-sm text-slate-600">Your package has been delivered and payment released.</p>
+                            {trackData?.podPhotoUrl && (
+                                <a href={trackData.podPhotoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-green-700 underline">
+                                    <CameraIcon size={14} /> View delivery photo
+                                </a>
+                            )}
                         </div>
                     </div>
                 )}

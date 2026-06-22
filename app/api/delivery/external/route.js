@@ -20,17 +20,24 @@ export async function GET(request) {
             return NextResponse.json({ error: "Forbidden — delivery partners only" }, { status: 403 });
         }
 
-        const orders = await prisma.order.findMany({
-            where: { userId, isExternalDelivery: true },
-            orderBy: { createdAt: "desc" },
-            include: { address: { select: { name: true, phone: true, sector: true } } },
-        });
+        const [orders, partner] = await Promise.all([
+            prisma.order.findMany({
+                where: { userId, isExternalDelivery: true },
+                orderBy: { createdAt: "desc" },
+                include: { address: { select: { name: true, phone: true, sector: true } } },
+            }),
+            prisma.user.findUnique({ where: { id: userId }, select: { deliveryCreditBalance: true } }),
+        ]);
 
         return NextResponse.json({
+            creditBalance: partner?.deliveryCreditBalance ?? 0,
             deliveries: orders.map((o) => ({
                 orderId: o.id,
                 createdAt: o.createdAt,
                 total: o.total,
+                creditApplied: o.creditApplied ?? 0,
+                amountDue: Math.max(0, parseFloat((Number(o.total ?? 0) - Number(o.creditApplied ?? 0)).toFixed(2))),
+                poolingSavings: o.poolingSavings ?? null,
                 paymentStatus: o.paymentStatus,
                 paymentProofStatus: o.paymentProofStatus,
                 isPaid: o.isPaid,
@@ -97,6 +104,14 @@ export async function POST(request) {
         const declaredValue = Number.isFinite(body?.declaredValue) && body.declaredValue > 0 ? body.declaredValue : null;
         const selectedPaymentMethod = body?.paymentMethod;
 
+        // Package weight + dimensions drive the distance×weight pricing. All optional;
+        // the quote falls back to the flat sector price when weight/distance are absent.
+        const pos = (v) => (Number.isFinite(v) && v > 0 ? v : null);
+        const packageWeightKg = pos(body?.packageWeightKg);
+        const packageLengthCm = pos(body?.packageLengthCm);
+        const packageWidthCm = pos(body?.packageWidthCm);
+        const packageHeightCm = pos(body?.packageHeightCm);
+
         if (!recipientName || !recipientPhone || !recipientSector || !recipientLandmark) {
             return NextResponse.json(
                 { error: "Recipient name, phone, sector and landmark/directions are required" },
@@ -131,30 +146,60 @@ export async function POST(request) {
             },
         });
 
-        // ── Quote the published delivery fee (partner-paid) ──────────────────
-        const fee = await quoteExternalDeliveryFee(recipientSector);
+        // ── Quote the published delivery fee (partner-paid, batch of one) ────
+        const quote = await quoteExternalDeliveryFee({
+            sector: recipientSector,
+            weightKg: packageWeightKg,
+            lengthCm: packageLengthCm,
+            widthCm: packageWidthCm,
+            heightCm: packageHeightCm,
+            dropLat: recipientLat,
+            dropLng: recipientLng,
+        });
+        const fee = quote.fee;
+
+        // Redeem the partner's accrued pooling credit (opt-in, default on) against
+        // this booking's fee. A fully-covered booking needs no cash payment.
+        let creditApplied = 0;
+        if (body?.applyCredit !== false) {
+            const partner = await prisma.user.findUnique({ where: { id: ownerId }, select: { deliveryCreditBalance: true } });
+            creditApplied = Math.min(partner?.deliveryCreditBalance ?? 0, fee);
+        }
+        const amountDue = Math.max(0, parseFloat((fee - creditApplied).toFixed(2)));
+        const fullyCovered = creditApplied > 0 && amountDue <= 0;
 
         const orderId = "ord_" + randomBytes(8).toString("hex");
         const deliveryOtp = String(randomInt(1000, 10000));
         const trackingToken = "trk_" + randomBytes(16).toString("hex");
         const now = new Date();
+        // Abandoned-booking cleanup: the partner has 24h to pay (or submit proof)
+        // before the expiry cron cancels an untouched booking. Submitting proof
+        // pauses this (the cron only expires bookings still NOT_SUBMITTED).
+        const paymentExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-        // Delivery-only order: no storeId, no OrderItems, escrow NOT_HELD, unpaid.
+        // Credit-covered bookings are paid up-front; otherwise unpaid + a 24h window.
+        const paymentStatusVal = fullyCovered ? "PAID" : "PENDING";
+        const proofStatusVal = fullyCovered ? "APPROVED" : "NOT_SUBMITTED";
+        const expiresVal = fullyCovered ? null : paymentExpiresAt;
+
+        // Delivery-only order: no storeId, no OrderItems, escrow NOT_HELD.
         // Raw insert mirrors app/api/orders/route.js (no implicit transaction on the
-        // Neon HTTP adapter). No paymentExpiresAt → the expiry cron leaves it alone.
+        // Neon HTTP adapter).
         await prisma.$executeRaw`
             INSERT INTO "Order" (
                 id, "userId", "storeId", "addressId",
                 total, status,
                 "shippingCost", "shippingQuoted",
                 commission,
-                "paymentMethod", "paymentStatus",
+                "paymentMethod", "paymentStatus", "paymentExpiresAt",
                 "isPaid", "isCouponUsed", coupon,
                 "invoiceRequested", "paymentProofStatus",
                 "deliveryType", "intakeMethod", "landmarkAddress", "deliveryOtp",
                 "deliveryStatus", "escrowStatus",
                 "isExternalDelivery", "pickupContactName", "pickupPhone", "pickupLandmark",
-                "pickupLat", "pickupLng", "packageDescription", "declaredValue", "trackingToken",
+                "pickupLat", "pickupLng", "packageDescription", "declaredValue",
+                "packageWeightKg", "packageLengthCm", "packageWidthCm", "packageHeightCm", "creditApplied",
+                "trackingToken",
                 "recipientLat", "recipientLng",
                 "createdAt", "updatedAt"
             ) VALUES (
@@ -162,17 +207,31 @@ export async function POST(request) {
                 ${fee}, 'ORDER_PLACED'::"OrderStatus",
                 ${0}, ${true},
                 '{}'::jsonb,
-                ${selectedPaymentMethod}::"PaymentMethod", 'PENDING'::"PaymentStatus",
-                false, false, '{}'::jsonb,
-                false, 'NOT_SUBMITTED'::"PaymentProofStatus",
+                ${selectedPaymentMethod}::"PaymentMethod", ${paymentStatusVal}::"PaymentStatus", ${expiresVal},
+                ${fullyCovered}, false, '{}'::jsonb,
+                false, ${proofStatusVal}::"PaymentProofStatus",
                 'KIGALI_POOL'::"DeliveryType", ${intakeMethod}::"IntakeMethod", ${recipientLandmark}, ${deliveryOtp},
                 'PENDING_INTAKE'::"PoolDeliveryStatus", 'NOT_HELD'::"EscrowStatus",
                 true, ${pickupContactName}, ${pickupPhone}, ${pickupLandmark},
-                ${pickupLat}, ${pickupLng}, ${packageDescription}, ${declaredValue}, ${trackingToken},
+                ${pickupLat}, ${pickupLng}, ${packageDescription}, ${declaredValue},
+                ${packageWeightKg}, ${packageLengthCm}, ${packageWidthCm}, ${packageHeightCm}, ${creditApplied},
+                ${trackingToken},
                 ${recipientLat}, ${recipientLng},
                 ${now}, ${now}
             )
         `;
+
+        // Deduct the redeemed credit from the partner's balance (after the order
+        // is safely written) and log it for audit.
+        if (creditApplied > 0) {
+            await prisma.user.update({
+                where: { id: ownerId },
+                data: { deliveryCreditBalance: { decrement: creditApplied } },
+            });
+            prisma.event
+                .create({ data: { name: "delivery.credit_applied", userId: ownerId, payload: { orderId, creditApplied, fee, amountDue } } })
+                .catch((e) => console.error("Event write error:", e.message));
+        }
 
         try {
             const io = getSocketServer();
@@ -182,7 +241,7 @@ export async function POST(request) {
             });
         } catch (_) { /* socket optional */ }
 
-        return NextResponse.json({ success: true, orderId, fee, trackingToken, deliveryOtp });
+        return NextResponse.json({ success: true, orderId, fee, creditApplied, amountDue, fullyCovered, trackingToken, deliveryOtp });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

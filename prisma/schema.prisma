@@ -17,6 +17,9 @@ model User {
     image String
     role  UserRole @default(CUSTOMER)
     cart  Json   @default("{}")
+    // Account credit earned from pooled-delivery savings (external partners),
+    // redeemable against future delivery bookings.
+    deliveryCreditBalance Float @default(0)
 
     // Relations
     ratings     Rating[]
@@ -224,8 +227,22 @@ model Order {
     pickupLng          Float?
     packageDescription String?
     declaredValue      Float?
+    // Package weight/dimensions for distance+weight pricing (external delivery-only
+    // orders; platform orders derive weight from their products instead).
+    packageWeightKg    Float?
+    packageLengthCm    Float?
+    packageWidthCm     Float?
+    packageHeightCm    Float?
+    // Pooling credit: `poolingSavings` (total − deliveryFeeShare) is returned to the
+    // partner as account credit on delivery; `creditApplied` is credit redeemed at
+    // booking to reduce the cash due.
+    poolingSavings     Float?
+    creditApplied      Float?            @default(0)
     // Unguessable token for the public (no-login) recipient tracking link.
     trackingToken      String?           @unique
+    // Proof-of-delivery photo — fallback confirmation when the recipient can't
+    // provide the OTP (rider captures a photo at the door instead).
+    podPhotoUrl        String?
     orderItems    OrderItem[]
 
     // Relations
@@ -535,6 +552,14 @@ model ExternalDeliveryConfig {
     id        String   @id @default("default")
     basePrice Float    @default(2000)
     perSector Json     @default("{}")
+    // Distance + weight pricing knobs (admin-tunable).
+    // Fee = max(minimumFloor, round(baseRatePerKgKm × chargeableKg × distanceKm × tierMultiplier)).
+    baseRatePerKgKm  Float  @default(8)      // RWF per kg·km
+    minimumFloor     Float  @default(2000)   // RWF floor for short/light trips
+    volumetricFactor Float  @default(200)    // kg per 1 m³ (1 CBM = 200 kg)
+    // Sliding-scale tiers: [{ maxKm, multiplier }, …], open final tier has maxKm:null.
+    // Empty → code falls back to DEFAULT_TIERS in lib/deliveryPricing.js.
+    distanceTiers    Json   @default("[]")
     updatedAt DateTime @updatedAt
 }
 

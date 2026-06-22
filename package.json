@@ -8,6 +8,7 @@
     "start": "cross-env WS_NO_BUFFER_UTIL=1 WS_NO_UTF_8_VALIDATE=1 node server.js",
     "lint": "eslint .",
     "test:pricing": "node scripts/check-pricing.mjs",
+    "test:delivery-pricing": "node scripts/check-delivery-pricing.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

@@ -96,40 +96,67 @@ export const expirePendingOrders = inngest.createFunction(
         await step.run("mark-expired-orders", async () => {
             const now = new Date();
 
+            // ── Platform orders: restore stock, then expire. ─────────────────
             const expiredOrders = await prisma.order.findMany({
                 where: {
                     paymentStatus: "PENDING",
                     isPaid: false,
-                    paymentExpiresAt: { lte: now }
+                    paymentExpiresAt: { lte: now },
+                    isExternalDelivery: false
                 },
                 include: { orderItems: true }
             });
 
-            if (expiredOrders.length === 0) return 0;
-
-            // Restoring stock and expiring the orders must be atomic. Interactive
-            // transactions aren't supported on the HTTP adapter, so use the WebSocket
-            // client (prismaWs) — the default HTTP `prisma` would throw here.
-            await prismaWs.$transaction(async (tx) => {
-                for (const order of expiredOrders) {
-                    for (const item of order.orderItems) {
-                        await tx.product.update({
-                            where: { id: item.productId },
-                            data: {
-                                warehouseQuantity: { increment: item.quantity },
-                                inStock: true
-                            }
-                        });
+            if (expiredOrders.length > 0) {
+                // Restoring stock and expiring the orders must be atomic. Interactive
+                // transactions aren't supported on the HTTP adapter, so use the WebSocket
+                // client (prismaWs) — the default HTTP `prisma` would throw here.
+                await prismaWs.$transaction(async (tx) => {
+                    for (const order of expiredOrders) {
+                        for (const item of order.orderItems) {
+                            await tx.product.update({
+                                where: { id: item.productId },
+                                data: {
+                                    warehouseQuantity: { increment: item.quantity },
+                                    inStock: true
+                                }
+                            });
+                        }
                     }
-                }
 
-                await tx.order.updateMany({
-                    where: { id: { in: expiredOrders.map(o => o.id) } },
-                    data: { paymentStatus: "EXPIRED" }
+                    await tx.order.updateMany({
+                        where: { id: { in: expiredOrders.map(o => o.id) } },
+                        data: { paymentStatus: "EXPIRED" }
+                    });
                 });
+            }
+
+            // ── External delivery-only bookings: no stock to restore. Cancel only
+            // the truly abandoned ones — the partner never submitted payment proof.
+            // Submitted/under-review (or rejected) bookings are left for staff.
+            const abandonedExternal = await prisma.order.findMany({
+                where: {
+                    isExternalDelivery: true,
+                    isPaid: false,
+                    paymentStatus: "PENDING",
+                    paymentProofStatus: "NOT_SUBMITTED",
+                    paymentExpiresAt: { lte: now }
+                },
+                select: { id: true }
             });
 
-            return expiredOrders.length;
+            if (abandonedExternal.length > 0) {
+                await prisma.order.updateMany({
+                    where: { id: { in: abandonedExternal.map(o => o.id) } },
+                    data: {
+                        paymentStatus: "EXPIRED",
+                        deliveryStatus: "FAILED",
+                        failureReason: "Booking expired — payment not received within 24 hours"
+                    }
+                });
+            }
+
+            return expiredOrders.length + abandonedExternal.length;
         });
     }
 );
