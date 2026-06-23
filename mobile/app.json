@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "The Quality Market",
+    "slug": "the-quality-market",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "thequalitymarket",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "rw.thequalitymarket.app"
+    },
+    "android": {
+      "package": "rw.thequalitymarket.app",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "CAMERA",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "The Quality Market uses your location to pin delivery addresses and, for riders, to share live delivery tracking.",
+          "locationWhenInUsePermission": "The Quality Market uses your location to pin delivery addresses and track deliveries.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The Quality Market needs photo access so you can upload payment proof and product photos.",
+          "cameraPermission": "The Quality Market needs camera access so riders can capture proof-of-delivery photos and sellers can photograph products."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}

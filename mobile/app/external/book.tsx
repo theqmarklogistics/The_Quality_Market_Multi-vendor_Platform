@@ -1,0 +1,404 @@
+// External-seller → Book a delivery. Mirrors the web's ExternalBookingForm: collect
+// the recipient + pinned drop location, pickup method, package weight/dims, and
+// payment method, show a live fee quote (distance×weight, with pooling-credit redemption),
+// then POST /api/delivery/external. On success the booking enters the Kigali pooled
+// pipeline; the partner pays the fee (or it's covered by credit) to start it.
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  bookExternalDelivery,
+  getExternalDeliveries,
+  quoteExternalDelivery,
+  type DeliveryQuote,
+} from '@/api/externalDelivery';
+import { Button, Field } from '@/components/ui';
+import { KIGALI_SECTORS, PaymentMethod, formatPrice } from '@/constants';
+import { colors, radius, spacing } from '@/theme';
+
+const num = (v: string): number | undefined => {
+  if (v === '' || v == null) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+export default function ExternalBookScreen() {
+  const router = useRouter();
+
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [sector, setSector] = useState('');
+  const [landmark, setLandmark] = useState('');
+
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [pinning, setPinning] = useState(false);
+
+  const [intakeMethod, setIntakeMethod] = useState<'HUB_DROP_OFF' | 'DRIVER_SWEEP'>('HUB_DROP_OFF');
+  const [pickupContactName, setPickupContactName] = useState('');
+  const [pickupPhone, setPickupPhone] = useState('');
+  const [pickupLandmark, setPickupLandmark] = useState('');
+
+  const [packageDescription, setPackageDescription] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+  const [declaredValue, setDeclaredValue] = useState('');
+  const [lengthCm, setLengthCm] = useState('');
+  const [widthCm, setWidthCm] = useState('');
+  const [heightCm, setHeightCm] = useState('');
+
+  const [paymentMethod, setPaymentMethod] = useState<typeof PaymentMethod.MTN_MOMO | typeof PaymentMethod.BANK_TRANSFER>(
+    PaymentMethod.MTN_MOMO,
+  );
+
+  const [quote, setQuote] = useState<DeliveryQuote | null>(null);
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [applyCredit, setApplyCredit] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const hasPin = !!coords;
+
+  // Load redeemable pooling credit once.
+  useEffect(() => {
+    let active = true;
+    getExternalDeliveries()
+      .then((d) => active && setCreditBalance(d.creditBalance || 0))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Live quote whenever a pricing input changes (debounced).
+  useEffect(() => {
+    const lat = coords?.latitude;
+    const w = num(weightKg);
+    if (!sector && !(w && lat != null)) {
+      setQuote(null);
+      return;
+    }
+    let active = true;
+    const t = setTimeout(async () => {
+      try {
+        const q = await quoteExternalDelivery({
+          sector: sector || undefined,
+          weightKg: w,
+          lengthCm: num(lengthCm),
+          widthCm: num(widthCm),
+          heightCm: num(heightCm),
+          dropLat: coords?.latitude,
+          dropLng: coords?.longitude,
+        });
+        if (active) setQuote(q);
+      } catch {
+        if (active) setQuote(null);
+      }
+    }, 400);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+  }, [sector, weightKg, lengthCm, widthCm, heightCm, coords]);
+
+  const pinLocation = async () => {
+    setPinning(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Allow location access to pin the delivery spot.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+    } catch {
+      Alert.alert('Location error', 'Could not get the location. Try again outdoors.');
+    } finally {
+      setPinning(false);
+    }
+  };
+
+  const creditPreview = useMemo(() => {
+    if (!quote || creditBalance <= 0 || !applyCredit) return null;
+    const applied = Math.min(creditBalance, quote.fee);
+    const net = Math.max(0, quote.fee - applied);
+    return { applied, net };
+  }, [quote, creditBalance, applyCredit]);
+
+  const submit = useCallback(async () => {
+    if (!recipientName.trim() || !recipientPhone.trim() || !sector || !landmark.trim()) {
+      Alert.alert('Missing details', 'Recipient name, phone, sector and landmark are required.');
+      return;
+    }
+    if (!hasPin) {
+      Alert.alert('Pin required', 'Pin the delivery location with “Use my location”.');
+      return;
+    }
+    if (!num(weightKg) || Number(weightKg) <= 0) {
+      Alert.alert('Weight required', 'Enter the package weight in kg.');
+      return;
+    }
+    if (intakeMethod === 'DRIVER_SWEEP' && (!pickupContactName.trim() || !pickupPhone.trim() || !pickupLandmark.trim())) {
+      Alert.alert('Pickup details', 'Pickup contact, phone and location are required for a driver sweep.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await bookExternalDelivery({
+        recipientName: recipientName.trim(),
+        recipientPhone: recipientPhone.trim(),
+        recipientEmail: recipientEmail.trim() || undefined,
+        recipientSector: sector,
+        recipientLandmark: landmark.trim(),
+        recipientLat: coords!.latitude,
+        recipientLng: coords!.longitude,
+        intakeMethod,
+        pickupContactName: pickupContactName.trim() || undefined,
+        pickupPhone: pickupPhone.trim() || undefined,
+        pickupLandmark: pickupLandmark.trim() || undefined,
+        packageDescription: packageDescription.trim() || undefined,
+        declaredValue: num(declaredValue),
+        packageWeightKg: num(weightKg),
+        packageLengthCm: num(lengthCm),
+        packageWidthCm: num(widthCm),
+        packageHeightCm: num(heightCm),
+        paymentMethod,
+        applyCredit,
+      });
+      const msg = res.fullyCovered
+        ? `Fee ${formatPrice(res.fee)} fully covered by credit. Delivery code: ${res.deliveryOtp}.`
+        : `Fee ${formatPrice(res.fee)}${res.creditApplied > 0 ? ` (credit −${formatPrice(res.creditApplied)}, pay ${formatPrice(res.amountDue)})` : ''}. Upload your payment proof to start it.`;
+      Alert.alert('Delivery booked', msg);
+      router.replace('/external');
+    } catch (err: any) {
+      Alert.alert('Could not book', err?.message ?? 'Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [
+    recipientName, recipientPhone, recipientEmail, sector, landmark, hasPin, coords,
+    intakeMethod, pickupContactName, pickupPhone, pickupLandmark,
+    packageDescription, declaredValue, weightKg, lengthCm, widthCm, heightCm,
+    paymentMethod, applyCredit, router,
+  ]);
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* Recipient */}
+      <Text style={styles.section}>Recipient</Text>
+      <Field label="Name" value={recipientName} onChangeText={setRecipientName} placeholder="Recipient name" />
+      <Field label="Phone" value={recipientPhone} onChangeText={setRecipientPhone} keyboardType="phone-pad" placeholder="07…" />
+      <Field
+        label="Email (optional — for tracking link)"
+        value={recipientEmail}
+        onChangeText={setRecipientEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        placeholder="name@example.com"
+      />
+
+      <Text style={styles.fieldLabel}>Kigali sector</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {KIGALI_SECTORS.map((s) => (
+          <TouchableOpacity
+            key={s}
+            style={[styles.chip, sector === s && styles.chipActive]}
+            onPress={() => setSector(s)}
+          >
+            <Text style={[styles.chipText, sector === s && styles.chipTextActive]}>{s}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <Field label="Landmark / directions" value={landmark} onChangeText={setLandmark} placeholder="Directions to the recipient" />
+
+      {/* Delivery location pin */}
+      <Text style={styles.section}>Delivery location</Text>
+      <Text style={styles.hint}>Pin the recipient&apos;s exact spot — it sets the distance used for pricing and routing.</Text>
+      <TouchableOpacity style={[styles.pinBtn, hasPin && styles.pinBtnDone]} onPress={pinLocation} disabled={pinning}>
+        <Ionicons name={hasPin ? 'checkmark-circle' : 'location-outline'} size={20} color={hasPin ? colors.success : colors.text} />
+        <Text style={styles.pinText}>
+          {pinning
+            ? 'Getting location…'
+            : hasPin
+              ? `Pinned (${coords!.latitude.toFixed(5)}, ${coords!.longitude.toFixed(5)})`
+              : 'Use my location'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Pickup */}
+      <Text style={styles.section}>Pickup</Text>
+      <View style={styles.toggleRow}>
+        {([
+          { value: 'HUB_DROP_OFF' as const, label: 'I drop at the hub' },
+          { value: 'DRIVER_SWEEP' as const, label: 'Sweep pickup' },
+        ]).map((o) => {
+          const active = intakeMethod === o.value;
+          return (
+            <TouchableOpacity
+              key={o.value}
+              style={[styles.toggle, active && (o.value === 'DRIVER_SWEEP' ? styles.toggleWarn : styles.toggleActive)]}
+              onPress={() => setIntakeMethod(o.value)}
+            >
+              <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{o.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {intakeMethod === 'DRIVER_SWEEP' ? (
+        <View style={{ marginTop: spacing.sm }}>
+          <Field label="Pickup contact" value={pickupContactName} onChangeText={setPickupContactName} placeholder="Contact name" />
+          <Field label="Pickup phone" value={pickupPhone} onChangeText={setPickupPhone} keyboardType="phone-pad" placeholder="07…" />
+          <Field label="Pickup location / landmark" value={pickupLandmark} onChangeText={setPickupLandmark} placeholder="Where to collect" />
+        </View>
+      ) : null}
+
+      {/* Package */}
+      <Text style={styles.section}>Package</Text>
+      <Field label="Description" value={packageDescription} onChangeText={setPackageDescription} placeholder="What's in the package" />
+      <View style={styles.row}>
+        <View style={styles.flex}>
+          <Field label="Weight (kg)" value={weightKg} onChangeText={setWeightKg} keyboardType="numeric" placeholder="0.0" />
+        </View>
+        <View style={styles.flex}>
+          <Field label="Declared value (optional)" value={declaredValue} onChangeText={setDeclaredValue} keyboardType="numeric" placeholder="0" />
+        </View>
+      </View>
+      <Text style={styles.hint}>Dimensions (cm) — optional, used when a bulky-but-light package costs more by volume.</Text>
+      <View style={styles.row}>
+        <View style={styles.flex}><Field label="Length" value={lengthCm} onChangeText={setLengthCm} keyboardType="numeric" placeholder="0" /></View>
+        <View style={styles.flex}><Field label="Width" value={widthCm} onChangeText={setWidthCm} keyboardType="numeric" placeholder="0" /></View>
+        <View style={styles.flex}><Field label="Height" value={heightCm} onChangeText={setHeightCm} keyboardType="numeric" placeholder="0" /></View>
+      </View>
+
+      {/* Payment method */}
+      <Text style={styles.section}>Payment method</Text>
+      <View style={styles.toggleRow}>
+        {([
+          { value: PaymentMethod.MTN_MOMO, label: 'MTN MoMo' },
+          { value: PaymentMethod.BANK_TRANSFER, label: 'Bank transfer' },
+        ]).map((o) => {
+          const active = paymentMethod === o.value;
+          return (
+            <TouchableOpacity
+              key={o.value}
+              style={[styles.toggle, active && styles.toggleActive]}
+              onPress={() => setPaymentMethod(o.value)}
+            >
+              <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{o.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Quote */}
+      <View style={styles.quoteCard}>
+        <View style={styles.quoteRow}>
+          <Text style={styles.quoteLabel}>Delivery fee</Text>
+          <Text style={styles.quoteFee}>{quote?.fee != null ? formatPrice(quote.fee) : '—'}</Text>
+        </View>
+        {quote?.basis === 'formula' ? (
+          <Text style={styles.quoteHint}>Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from hub</Text>
+        ) : null}
+        {quote?.basis === 'flat' ? (
+          <Text style={styles.quoteHint}>Flat sector rate — add a weight and pin the location for distance pricing.</Text>
+        ) : null}
+
+        {creditBalance > 0 && quote?.fee != null ? (
+          <View style={styles.creditToggleRow}>
+            <Text style={styles.creditToggleText}>Apply my credit ({formatPrice(creditBalance)})</Text>
+            <Switch value={applyCredit} onValueChange={setApplyCredit} />
+          </View>
+        ) : null}
+        {creditPreview ? (
+          <View style={styles.quoteRow}>
+            <Text style={styles.quoteLabel}>Credit −{formatPrice(creditPreview.applied)} · you pay</Text>
+            <Text style={styles.quoteNet}>{creditPreview.net <= 0 ? 'Fully covered' : formatPrice(creditPreview.net)}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={{ marginTop: spacing.lg, marginBottom: spacing.xl }}>
+        <Button label="Book delivery" onPress={submit} loading={submitting} />
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: spacing.lg },
+
+  section: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 1 },
+  fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6 },
+  hint: { fontSize: 12, color: colors.subtle, marginBottom: spacing.sm },
+
+  chips: { gap: 8, paddingBottom: spacing.md },
+  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: 13, color: colors.text },
+  chipTextActive: { color: colors.primaryText, fontWeight: '600' },
+
+  pinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  pinBtnDone: { borderColor: colors.success, backgroundColor: '#f0fdf4' },
+  pinText: { fontSize: 14, color: colors.text, flex: 1 },
+
+  toggleRow: { flexDirection: 'row', gap: spacing.sm },
+  toggle: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  toggleActive: { borderColor: colors.success, backgroundColor: '#f0fdf4' },
+  toggleWarn: { borderColor: colors.warning, backgroundColor: '#fffbeb' },
+  toggleText: { fontSize: 14, color: colors.muted, fontWeight: '600' },
+  toggleTextActive: { color: colors.text },
+
+  row: { flexDirection: 'row', gap: spacing.md },
+  flex: { flex: 1 },
+
+  quoteCard: {
+    marginTop: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  quoteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  quoteLabel: { fontSize: 14, color: colors.muted },
+  quoteFee: { fontSize: 18, fontWeight: '800', color: colors.text },
+  quoteHint: { fontSize: 11, color: colors.subtle, marginTop: 4 },
+  creditToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  creditToggleText: { fontSize: 13, color: colors.muted },
+  quoteNet: { fontSize: 15, fontWeight: '800', color: colors.success },
+});
