@@ -31,6 +31,23 @@ model User {
     returns     Return[]
     riderProfile       RiderProfile?
     assignedCorridors  DeliveryCorridor[]        @relation("CorridorRider")
+    pushTokens         PushToken[]
+}
+
+// Expo push notification tokens, one row per device. Used by the mobile app to
+// deliver delivery-status (and other) push notifications alongside Resend email.
+model PushToken {
+    id        String   @id @default(cuid())
+    userId    String
+    token     String   @unique
+    platform  String?  // "ios" | "android"
+    deviceId  String?  // stable per-install id, for de-duping a device's token
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 // Required for creating a Product: name, description, mrp, price, images, category, storeId
