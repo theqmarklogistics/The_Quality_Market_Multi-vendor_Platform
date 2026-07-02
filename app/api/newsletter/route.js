@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { Resend } from 'resend'
+import resend from '@/configs/resend'
 import { sendWelcomeEmail } from '@/lib/email'
 import { createRateLimiter, getClientIp } from '@/lib/rateLimit'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const newsletterLimiter = createRateLimiter({ max: 3, windowMs: 10 * 60_000 }) // 3 per 10 min
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
