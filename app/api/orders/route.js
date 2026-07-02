@@ -6,6 +6,7 @@ import { paymentMethod } from "@/lib/constants";
 import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
 import { getSocketServer } from "@/lib/socketServer";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
 
 const orderLimiter = createRateLimiter({ max: 5, windowMs: 60_000 });
 
@@ -27,6 +28,10 @@ export async function POST(request) {
         if(!userId){
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        // Release stock held by any now-expired orders before reserving for this one
+        // (throttled, best-effort — replaces the old expiry cron).
+        await maybeSweepExpiredOrders();
 
         const { items, addressId, paymentMethod: selectedPaymentMethod, couponCode, deliveryType: rawDeliveryType, landmarkAddress: rawLandmark, recipientLat: rawLat, recipientLng: rawLng } = await request.json();
 
@@ -227,9 +232,8 @@ export async function POST(request) {
         }
 
         // ── Phase 2: Create orders ────────────────────────────────────────────────
-        // The Prisma JS engine (driverAdapters) wraps create() in an implicit
-        // transaction even for flat inserts — PrismaNeonHttp rejects that.
-        // Use $executeRaw so the driver gets a single INSERT with no transaction.
+        // Use $executeRaw so each order is a single INSERT with no implicit transaction,
+        // and we control rollback explicitly.
         // If any insert fails, restore all decremented stock.
         const now = new Date();
         try {
@@ -350,6 +354,8 @@ export async function GET(request) {
         if(!userId){
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        // Lazy expiry so the customer sees up-to-date statuses (throttled, best-effort).
+        maybeSweepExpiredOrders();
         const rawOrders = await prisma.order.findMany({
             where: { userId },
             orderBy: { createdAt: 'desc' }

@@ -183,8 +183,7 @@ export async function POST(request) {
         const expiresVal = fullyCovered ? null : paymentExpiresAt;
 
         // Delivery-only order: no storeId, no OrderItems, escrow NOT_HELD.
-        // Raw insert mirrors app/api/orders/route.js (no implicit transaction on the
-        // Neon HTTP adapter).
+        // Raw single-statement insert mirrors app/api/orders/route.js.
         await prisma.$executeRaw`
             INSERT INTO "Order" (
                 id, "userId", "storeId", "addressId",

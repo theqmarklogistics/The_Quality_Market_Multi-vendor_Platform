@@ -32,9 +32,8 @@ export async function POST(request, { params }) {
             select: { assignedRiderId: true },
         });
 
-        // Plain update — no `include`. An update with a relation include emits a
-        // write + relation-read wrapped in an implicit transaction, which the Neon
-        // HTTP adapter rejects ("Transactions are not supported in HTTP mode").
+        // Plain update — no `include`. Keeps the write to a single statement; the
+        // assigned rider is re-read separately below rather than via a relation include.
         await prisma.deliveryCorridor.update({
             where: { id },
             data: { assignedRiderId: riderId || null },

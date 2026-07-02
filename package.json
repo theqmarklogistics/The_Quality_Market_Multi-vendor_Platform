@@ -14,8 +14,6 @@
   "dependencies": {
     "@clerk/nextjs": "^6.35.5",
     "@imagekit/nodejs": "^7.1.1",
-    "@neondatabase/serverless": "^1.0.2",
-    "@prisma/adapter-neon": "^7.1.0",
     "@prisma/client": "6.14.0",
     "@react-pdf/renderer": "^4.5.1",
     "@reduxjs/toolkit": "^2.8.2",
@@ -35,15 +33,13 @@
     "recharts": "^3.1.2",
     "resend": "^6.12.4",
     "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3",
-    "ws": "^8.18.3"
+    "socket.io-client": "^4.8.3"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/ws": "^8.18.1",
     "cross-env": "^10.1.0",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.4",

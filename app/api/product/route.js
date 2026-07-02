@@ -1,10 +1,16 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
 
 const PAGE_SIZE = 20;
 
 export async function GET(request) {
     try {
+        // Lazy order expiry (throttled, best-effort): the storefront is the most
+        // frequented route, so this reliably cleans up expired orders + restores
+        // stock whenever the shop is in use — without a timer-based cron.
+        maybeSweepExpiredOrders();
+
         const { searchParams } = new URL(request.url);
 
         const page     = Math.max(1, parseInt(searchParams.get('page')  || '1', 10));

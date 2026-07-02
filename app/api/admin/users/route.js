@@ -56,9 +56,8 @@ export async function POST(request) {
             });
 
             // Ensure a rider always has a profile dispatch can manage. Done as
-            // plain single statements (find then create): nested writes and
-            // secondary-unique upserts go through a transaction, which the Neon
-            // HTTP client does not support.
+            // plain single statements (find then create) — a simple, portable pattern
+            // that avoids relying on nested-write / upsert transaction semantics.
             if (normalizedRole === 'RIDER') {
                 const profile = await prisma.riderProfile.findUnique({ where: { userId: existing.id } });
                 if (!profile) {

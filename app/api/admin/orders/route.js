@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { logAdminAction } from "@/lib/auditLog";
+import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
 
 const ALLOWED_ORDER_STATUSES = ["ORDER_PLACED", "PROCESSING", "SHIPPED", "DELIVERED", "OTHER"];
 
@@ -21,6 +22,9 @@ export async function GET(request) {
         if (!isAdmin) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        // Lazy expiry (throttled, best-effort) — replaces the old expiry cron.
+        maybeSweepExpiredOrders();
 
         const { searchParams } = new URL(request.url);
         const page = Math.max(1, parseInt(searchParams.get('page') || '1'));

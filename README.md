@@ -131,8 +131,8 @@ The platform is localized to the Rwandan market (RWF currency) but is architecte
          │                    │                    │
          ▼                    ▼                    ▼
   ┌────────────┐      ┌──────────────┐     ┌─────────────┐
-  │   Clerk    │      │  PostgreSQL   │     │  Socket.IO  │
-  │  Auth      │      │  (Neon) via  │     │  Real-time  │
+  │   Clerk    │      │  PostgreSQL  │     │  Socket.IO  │
+  │  Auth      │      │ (Supabase)via│     │  Real-time  │
   │            │      │  Prisma ORM  │     │  Server     │
   └────────────┘      └──────────────┘     └─────────────┘
          │                    │                    │
@@ -157,8 +157,8 @@ The platform is localized to the Rwandan market (RWF currency) but is architecte
 | Icons | [Lucide React](https://lucide.dev) |
 | Charts | [Recharts](https://recharts.org) |
 | Authentication | [Clerk](https://clerk.com) (`@clerk/nextjs`) |
-| Database | PostgreSQL via [Neon](https://neon.tech) (serverless) |
-| ORM | [Prisma 6](https://www.prisma.io) with Neon adapter |
+| Database | PostgreSQL via [Supabase](https://supabase.com) |
+| ORM | [Prisma 6](https://www.prisma.io) |
 | State Management | [Redux Toolkit](https://redux-toolkit.js.org) + React-Redux |
 | Real-time | [Socket.IO 4](https://socket.io) (custom Node.js server) |
 | Image Hosting | [ImageKit](https://imagekit.io) |
@@ -200,7 +200,7 @@ Role assignment is managed by admins via the Users page. Invitations are sent by
 
 - Node.js 18+
 - npm
-- A PostgreSQL database (Neon recommended)
+- A PostgreSQL database (Supabase recommended)
 - Accounts for: Clerk, ImageKit, Resend, Inngest, Google AI Studio
 
 ### Installation
@@ -273,9 +273,11 @@ ADMIN_EMAIL=admin@example.com
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 
-# --- Database (Neon PostgreSQL) — https://neon.tech ---
-DATABASE_URL=postgresql://user:pass@host/dbname?sslmode=require
-DIRECT_URL=postgresql://user:pass@host/dbname?sslmode=require
+# --- Database (Supabase PostgreSQL) — https://supabase.com ---
+# From Supabase → Project → Connect → ORMs → Prisma.
+# DATABASE_URL = Transaction pooler (6543, PgBouncer); DIRECT_URL = direct (5432) for migrations.
+DATABASE_URL=postgresql://postgres.<ref>:<pass>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true
+DIRECT_URL=postgresql://postgres.<ref>:<pass>@aws-0-<region>.pooler.supabase.com:5432/postgres
 
 # --- Background Jobs (Inngest) — https://app.inngest.com ---
 INNGEST_EVENT_KEY=...
@@ -310,7 +312,22 @@ PINDO_API_TOKEN=...
 
 ## Database Setup
 
-The platform uses Prisma with a Neon PostgreSQL database. The schema is located at `prisma/schema.prisma`.
+The platform uses Prisma with a Supabase PostgreSQL database. The schema is located at `prisma/schema.prisma`. Prisma connects over a standard Postgres connection (no driver adapter): `DATABASE_URL` points at Supabase's Transaction pooler (port 6543, `?pgbouncer=true`) and `DIRECT_URL` at the direct connection (port 5432) used by migrations.
+
+### Migrating existing data (Neon → Supabase)
+
+To copy existing data from an old Neon database into Supabase, use the helper
+script — it applies the Prisma migrations to Supabase and then does a data-only
+`pg_dump`/restore:
+
+```bash
+export NEON_DATABASE_URL="postgresql://…neon.tech/neondb?sslmode=require"
+export SUPABASE_DIRECT_URL="postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres"
+bash scripts/migrate-neon-to-supabase.sh
+```
+
+Requires PostgreSQL client tools (`pg_dump`/`psql`) at version ≥ the Supabase
+server. See the comments at the top of `scripts/migrate-neon-to-supabase.sh`.
 
 ### Core Models
 

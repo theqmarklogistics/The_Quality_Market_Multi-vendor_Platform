@@ -148,7 +148,7 @@ export async function POST(request) {
         // Handle database connection errors
         if (error.message?.includes("fetch failed") || error.message?.includes("Error connecting to database") || error.code === 'ETIMEDOUT') {
             return NextResponse.json({
-                error: "Database connection timeout. Your Neon database may be paused. Please check your Neon dashboard to ensure the database is active, or try again in a few moments."
+                error: "Database connection timeout. Your Supabase database may be paused. Please check your Supabase dashboard to ensure the database is active, or try again in a few moments."
             }, {status: 500});
         }
         if (error.code === "P2002") {
@@ -188,7 +188,7 @@ export async function GET(request) {
         // Handle database connection errors
         if (error.message?.includes("fetch failed") || error.message?.includes("Error connecting to database") || error.code === 'ETIMEDOUT') {
             return NextResponse.json({
-                error: "Database connection timeout. Your Neon database may be paused. Please check your Neon dashboard to ensure the database is active, or try again in a few moments."
+                error: "Database connection timeout. Your Supabase database may be paused. Please check your Supabase dashboard to ensure the database is active, or try again in a few moments."
             }, {status: 500});
         }
         return NextResponse.json({error: error.code || error.message}, {status: 500});

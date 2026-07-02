@@ -27,8 +27,7 @@ export async function POST(request, { params }) {
             );
         }
 
-        // PrismaNeonHttp does not support $transaction in any form.
-        // Restore stock first (parallel HTTP requests), then cancel the order.
+        // Restore stock first (in parallel), then cancel the order.
         // If the order update fails after stock is restored, the order remains PENDING
         // and admin can correct it — better than cancelling without restoring stock.
         await Promise.all(

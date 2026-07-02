@@ -54,9 +54,8 @@ export async function GET(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // With driverAdapters (JS engine), findMany+include runs multiple SELECTs
-        // wrapped in a transaction that PrismaNeonHttp rejects.
-        // Fetch each piece separately and merge in JS to avoid any transaction.
+        // Fetch each piece separately and merge in JS instead of one findMany+include.
+        // Keeps each query independent and avoids a multi-SELECT transaction.
 
         const isAdmin = await authAdmin(userId);
         const conversationFilter = isAdmin
@@ -316,14 +315,11 @@ export async function POST(request) {
             return NextResponse.json({ conversation });
         }
 
-        // Create conversation + participants without a nested write so we stay on the
-        // HTTP adapter (PrismaNeonHttp) entirely. Nested writes require an implicit
-        // transaction which the HTTP adapter doesn't support, and the WebSocket adapter
-        // (prismaWs) is unreliable on Vercel when Neon auto-suspends.
+        // Create conversation + participants as separate statements (no nested write).
         //
         // Steps:
         //  1. Flat conversation create (single INSERT — no implicit transaction)
-        //  2. Batch $transaction to add both participants atomically (HTTP-compatible)
+        //  2. Add both participants
         //  3. Re-fetch with participants for the response shape callers expect
         const newConversation = await prisma.conversation.create({
             data: {
@@ -334,7 +330,6 @@ export async function POST(request) {
             }
         });
 
-        // PrismaNeonHttp does not support $transaction in any form.
         // Two sequential creates are safe here — if the second fails, the conversation
         // has no participants and is invisible to both users (all queries filter by
         // participants.some.userId). Next attempt will create a fresh conversation.

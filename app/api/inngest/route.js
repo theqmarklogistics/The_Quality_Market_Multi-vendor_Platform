@@ -2,7 +2,6 @@ import { serve } from "inngest/next";
 import { inngest } from "../../../inngest/client";
 import {
   deleteCouponOnExpiry,
-  expirePendingOrders,
   onChatMessageCreated,
   onPaymentProofReviewed,
   onPaymentProofSubmitted,
@@ -19,7 +18,6 @@ export const { GET, POST, PUT } = serve({
     syncUserUpdate,
     syncUserDeletion,
     deleteCouponOnExpiry,
-    expirePendingOrders,
     onChatMessageCreated,
     onPaymentProofSubmitted,
     onProductModerationUpdated,

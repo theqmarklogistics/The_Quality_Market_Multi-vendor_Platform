@@ -147,7 +147,7 @@ export async function POST(request, { params }) {
         const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         const now = new Date();
 
-        // Use raw SQL to avoid implicit transaction wrapping in PrismaNeonHttp.
+        // Raw single-statement INSERT — no implicit transaction wrapping.
         // Message schema has no updatedAt column — only createdAt.
         await prisma.$executeRaw`
             INSERT INTO "Message" (id, "conversationId", "senderId", content, "isRead", "createdAt")

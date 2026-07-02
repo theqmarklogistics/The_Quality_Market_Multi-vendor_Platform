@@ -24,7 +24,7 @@ export async function POST(request, { params }) {
         const corridor = await prisma.deliveryCorridor.findUnique({
             where: { id },
             include: {
-                orders: { select: { id: true, deliveryStatus: true, trackingToken: true, address: { select: { email: true, phone: true } } } },
+                orders: { select: { id: true, userId: true, deliveryStatus: true, trackingToken: true, address: { select: { email: true, phone: true } } } },
             },
         });
         if (!corridor) return NextResponse.json({ error: "Corridor not found" }, { status: 404 });

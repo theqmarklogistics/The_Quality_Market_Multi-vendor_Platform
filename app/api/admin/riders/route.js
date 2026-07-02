@@ -62,9 +62,8 @@ export async function PATCH(request) {
         if (vehicleType !== undefined) data.vehicleType = String(vehicleType).trim() || null;
         if (isActive !== undefined) data.isActive = !!isActive;
 
-        // Find-then-write with plain single statements. A secondary-unique upsert
-        // (on userId rather than the @id) routes through a transaction, which the
-        // Neon HTTP client does not support.
+        // Find-then-write with plain single statements — avoids relying on a
+        // secondary-unique upsert (on userId rather than the @id) and its transaction.
         const existingProfile = await prisma.riderProfile.findUnique({ where: { userId: riderId } });
         const profile = existingProfile
             ? await prisma.riderProfile.update({ where: { userId: riderId }, data })

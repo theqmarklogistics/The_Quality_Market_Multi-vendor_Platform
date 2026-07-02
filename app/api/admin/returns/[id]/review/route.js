@@ -26,8 +26,8 @@ export async function POST(request, { params }) {
             return NextResponse.json({ error: "Return request not found" }, { status: 404 });
         }
 
-        // Move order lookup outside the transaction (batch transactions can't contain reads
-        // that conditionally gate further writes — and PrismaNeonHttp requires batch form)
+        // Order lookup is kept outside any transaction: it conditionally gates the
+        // stock-restore writes below, which is cleaner as a plain sequential read.
         let orderItemsToRestore = [];
         if (status === 'COMPLETED') {
             const order = await prisma.order.findUnique({
@@ -37,7 +37,6 @@ export async function POST(request, { params }) {
             orderItemsToRestore = order?.orderItems ?? [];
         }
 
-        // PrismaNeonHttp does not support $transaction in any form.
         // Update the return status first, then restore stock in parallel.
         const updated = await prisma.return.update({
             where: { id },

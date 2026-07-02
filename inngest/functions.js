@@ -1,5 +1,5 @@
 import { inngest } from "./client";
-import prisma, { prismaWs } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 
 //Inngest function to save data to a database
 export const syncUserCreation = inngest.createFunction(
@@ -22,7 +22,7 @@ export const syncUserCreation = inngest.createFunction(
     })
 
         // Riders get a profile row up-front so dispatch can manage them immediately.
-        // Separate statement — nested writes run in a transaction, unsupported on the Neon HTTP client.
+        // Kept as a separate statement (no nested write) — a simple, portable pattern.
         if (role === 'RIDER') {
             await prisma.riderProfile.create({ data: { userId: data.id } });
         }
@@ -88,78 +88,10 @@ export const deleteCouponOnExpiry = inngest.createFunction(
     }
 )
 
-// Inngest cron to expire unpaid pending orders after timeout and restore stock
-export const expirePendingOrders = inngest.createFunction(
-    { id: "expire-pending-orders" },
-    { cron: "*/10 * * * *" },
-    async ({ step }) => {
-        await step.run("mark-expired-orders", async () => {
-            const now = new Date();
-
-            // ── Platform orders: restore stock, then expire. ─────────────────
-            const expiredOrders = await prisma.order.findMany({
-                where: {
-                    paymentStatus: "PENDING",
-                    isPaid: false,
-                    paymentExpiresAt: { lte: now },
-                    isExternalDelivery: false
-                },
-                include: { orderItems: true }
-            });
-
-            if (expiredOrders.length > 0) {
-                // Restoring stock and expiring the orders must be atomic. Interactive
-                // transactions aren't supported on the HTTP adapter, so use the WebSocket
-                // client (prismaWs) — the default HTTP `prisma` would throw here.
-                await prismaWs.$transaction(async (tx) => {
-                    for (const order of expiredOrders) {
-                        for (const item of order.orderItems) {
-                            await tx.product.update({
-                                where: { id: item.productId },
-                                data: {
-                                    warehouseQuantity: { increment: item.quantity },
-                                    inStock: true
-                                }
-                            });
-                        }
-                    }
-
-                    await tx.order.updateMany({
-                        where: { id: { in: expiredOrders.map(o => o.id) } },
-                        data: { paymentStatus: "EXPIRED" }
-                    });
-                });
-            }
-
-            // ── External delivery-only bookings: no stock to restore. Cancel only
-            // the truly abandoned ones — the partner never submitted payment proof.
-            // Submitted/under-review (or rejected) bookings are left for staff.
-            const abandonedExternal = await prisma.order.findMany({
-                where: {
-                    isExternalDelivery: true,
-                    isPaid: false,
-                    paymentStatus: "PENDING",
-                    paymentProofStatus: "NOT_SUBMITTED",
-                    paymentExpiresAt: { lte: now }
-                },
-                select: { id: true }
-            });
-
-            if (abandonedExternal.length > 0) {
-                await prisma.order.updateMany({
-                    where: { id: { in: abandonedExternal.map(o => o.id) } },
-                    data: {
-                        paymentStatus: "EXPIRED",
-                        deliveryStatus: "FAILED",
-                        failureReason: "Booking expired — payment not received within 24 hours"
-                    }
-                });
-            }
-
-            return expiredOrders.length + abandonedExternal.length;
-        });
-    }
-);
+// NOTE: Order expiry is no longer a cron. The old every-10-minute cron kept the database
+// compute busy around the clock (burning quota), so it was replaced by
+// lazy expiry on read paths — see lib/expireOrders.js (sweepExpiredOrders /
+// maybeSweepExpiredOrders), invoked from the storefront + order routes.
 
 // Chat notification event hook (for analytics/notification fanout)
 export const onChatMessageCreated = inngest.createFunction(
