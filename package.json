@@ -2,6 +2,9 @@
   "name": "the-quality-market",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "cross-env WS_NO_BUFFER_UTIL=1 WS_NO_UTF_8_VALIDATE=1 NODE_OPTIONS=--localstorage-file=./.node-localstorage node server.js",
     "build": "prisma generate && next build",

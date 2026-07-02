@@ -1,0 +1,13 @@
+node_modules
+.next
+mobile
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+build-error.log
+*.log
+clerk-nextjs
+assets/raw
