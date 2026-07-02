@@ -13,8 +13,13 @@ import { store } from '@/store';
 import { CartSync } from '@/store/CartSync';
 import { PushManager } from '@/push/PushManager';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { installGlobalErrorHandler } from '@/lib/crashReporting';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+
+// Report uncaught JS errors (outside the render tree) to the backend. Module
+// scope so it's installed before the first render.
+installGlobalErrorHandler();
 
 function InitialLayout() {
   const { isLoaded, isSignedIn } = useAuth();

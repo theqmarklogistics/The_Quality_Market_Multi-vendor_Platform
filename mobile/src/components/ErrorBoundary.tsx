@@ -2,10 +2,11 @@
 // single bad render shows a friendly recovery screen instead of white-screening the
 // whole app. Wraps the navigation in app/_layout.tsx. The fallback uses only static
 // imports (no providers/hooks) so it still renders even if context is the culprit.
-import { Component, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '@/theme';
+import { reportCrash } from '@/lib/crashReporting';
 
 interface Props {
   children: ReactNode;
@@ -22,9 +23,10 @@ export class ErrorBoundary extends Component<Props, State> {
     return { error };
   }
 
-  componentDidCatch(error: Error) {
-    // Surface for crash logs / dev console. Swap for a reporter (Sentry, etc.) later.
+  componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary] Uncaught render error:', error);
+    // Best-effort report to the backend's /api/client-error (no-op in dev).
+    reportCrash(error, { componentStack: info.componentStack ?? undefined });
   }
 
   reset = () => this.setState({ error: null });
