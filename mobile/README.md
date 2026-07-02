@@ -104,11 +104,11 @@ returns the matching role (seller for `SELLER`/`ADMIN`, delivery partner for
 > **No new dependencies — nothing to install for Phase 4.** The label PDF is fetched with the
 > Clerk bearer token via `expo-file-system` `downloadAsync` (iOS opens the share sheet; Android
 > saves to the app cache — share the tracking link to send it on). Everything else uses
-> packages already installed in earlier phases. Do **not** run `npm install` just for Phase 4;
-> `package.json` currently lists target versions newer than what's installed, so a plain
-> `npm install` hits an `ERESOLVE` peer conflict (`expo-router@56.x` wants `react@^19.2.7`
-> against the installed `react@18`). If you ever do need to reinstall, reconcile `package.json`
-> to one coherent Expo SDK first, or use `npm install --legacy-peer-deps`.
+> packages already installed in earlier phases.
+>
+> `package.json` and `package-lock.json` are reconciled to one coherent Expo SDK 56 tree
+> (verified in CI), so a clean `npm ci` — including the one EAS Build runs — reproduces the
+> working install.
 
 ## What's in Phase 5 (admin & logistics)
 
@@ -140,8 +140,7 @@ An **Ops console** for staff, role-gated and reusing the existing backend as-is
   **Approve** activates the store and emails a contract, **Reject** emails a reason.
 
 > **No new dependencies for Phase 5.** Everything uses packages already installed in
-> earlier phases. The same `npm install` caveat from Phase 4 applies — don't reinstall
-> just for this; if you must, use `--legacy-peer-deps` or reconcile to one Expo SDK first.
+> earlier phases.
 
 ## Prerequisites
 

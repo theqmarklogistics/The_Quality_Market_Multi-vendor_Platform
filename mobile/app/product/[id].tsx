@@ -48,12 +48,13 @@ export default function ProductDetailScreen() {
     dispatch(persistCart());
   }, [dispatch, id]);
 
+  const storeId = product?.store?.id;
   const onMessageSeller = useCallback(async () => {
-    if (!product?.store) return;
+    if (!storeId) return;
     try {
       const { conversation } = await createConversation({
         targetType: 'STORE',
-        storeId: product.store.id,
+        storeId,
       });
       router.push({
         pathname: '/conversation/[id]',
@@ -62,7 +63,7 @@ export default function ProductDetailScreen() {
     } catch (err: any) {
       Alert.alert('Could not open chat', err?.message ?? 'Try again.');
     }
-  }, [product?.store, router]);
+  }, [storeId, router]);
 
   if (loading) return <Loader />;
   if (error || !product) {

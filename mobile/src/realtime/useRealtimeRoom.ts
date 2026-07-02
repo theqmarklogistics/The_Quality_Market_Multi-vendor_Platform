@@ -16,7 +16,9 @@ export function useRealtimeRoom(opts: {
 
   // Keep latest handlers in a ref so re-renders don't re-subscribe.
   const handlersRef = useRef(handlers);
-  handlersRef.current = handlers;
+  useEffect(() => {
+    handlersRef.current = handlers;
+  });
   // Freeze the event-name set on first run (stable across the screen's life).
   const eventNamesRef = useRef(Object.keys(handlers));
 

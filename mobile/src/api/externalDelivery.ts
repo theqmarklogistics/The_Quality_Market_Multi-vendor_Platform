@@ -6,7 +6,8 @@
 import { apiGet, apiPost, getAuthToken } from './client';
 import { API_URL } from '@/constants';
 import type { PaymentMethod } from '@/constants';
-import * as FileSystem from 'expo-file-system';
+// SDK 54+ moved cacheDirectory/downloadAsync to the legacy entry point.
+import * as FileSystem from 'expo-file-system/legacy';
 
 export type ExternalPaymentProofStatus =
   | 'NOT_SUBMITTED'
