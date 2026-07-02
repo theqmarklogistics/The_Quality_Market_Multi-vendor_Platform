@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "rw.thequalitymarket.app"
@@ -54,8 +56,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
-      }
-    }
+        "projectId": "9228ac3c-13ce-425a-877a-5e0c512fb0f8"
+      },
+      "router": {}
+    },
+    "owner": "thequalitymarket"
   }
 }
