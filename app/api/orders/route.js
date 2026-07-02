@@ -231,6 +231,33 @@ export async function POST(request) {
             }
         }
 
+        // ── Phase 1.5: Reserve the coupon use (guarded, race-safe) ──────────────
+        // The maxUses check above is only a fast-path read; concurrent checkouts
+        // could both pass it. This guarded increment is the authoritative claim —
+        // it only succeeds while usedCount is still below maxUses.
+        let couponReserved = false;
+        if (couponCode && coupon) {
+            const claimed = await prisma.$queryRaw`
+                UPDATE "Coupon"
+                SET "usedCount" = "usedCount" + 1
+                WHERE code = ${coupon.code}
+                  AND ("maxUses" IS NULL OR "usedCount" < "maxUses")
+                RETURNING code
+            `;
+            if (!claimed || claimed.length === 0) {
+                await Promise.all(decremented.map(d =>
+                    prisma.$executeRaw`
+                        UPDATE "Product"
+                        SET "warehouseQuantity" = "warehouseQuantity" + ${d.quantity},
+                            "inStock" = true, "updatedAt" = NOW()
+                        WHERE id = ${d.id}
+                    `
+                )).catch(console.error);
+                return NextResponse.json({ error: "Coupon usage limit reached" }, { status: 400 });
+            }
+            couponReserved = true;
+        }
+
         // ── Phase 2: Create orders ────────────────────────────────────────────────
         // Use $executeRaw so each order is a single INSERT with no implicit transaction,
         // and we control rollback explicitly.
@@ -317,15 +344,17 @@ export async function POST(request) {
                     WHERE id = ${d.id}
                 `
             )).catch(console.error);
+            if (couponReserved) {
+                await prisma.$executeRaw`
+                    UPDATE "Coupon" SET "usedCount" = GREATEST("usedCount" - 1, 0) WHERE code = ${coupon.code}
+                `.catch(console.error);
+            }
             throw orderError;
         }
 
         // ── Phase 3: Cleanup — raw SQL so the JS engine cannot wrap in a transaction
         prisma.$executeRaw`UPDATE "User" SET cart = '{}'::jsonb WHERE id = ${userId}`.catch(console.error);
-
-        if (couponCode && coupon) {
-            prisma.$executeRaw`UPDATE "Coupon" SET "usedCount" = "usedCount" + 1 WHERE code = ${coupon.code}`.catch(console.error);
-        }
+        // Coupon use was already reserved in Phase 1.5 (guarded increment).
 
         try {
             const io = getSocketServer();
