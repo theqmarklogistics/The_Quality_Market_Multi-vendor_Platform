@@ -3,16 +3,101 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import { estimateEtaForStop, fetchOsrmRoute, haversineKm, KIGALI_HUB } from "@/lib/deliveryEta";
 
+// Long-polling support: a "?wait=1" client (typically the public recipient
+// tracking page when Socket.IO is unavailable, e.g. on a serverless / cold
+// Render instance) holds this request open for up to LONG_POLL_TIMEOUT_MS.
+// The server probes the corridor's rider position + the order's delivery
+// status every POLL_INTERVAL_MS and returns the moment either changes, or
+// immediately on terminal status. Empty-changes, after timeout, we return
+// the current state — so the client always gets a payload to render and can
+// immediately re-open a new long-poll.
+const POLL_INTERVAL_MS = 2000;
+const LONG_POLL_TIMEOUT_MS = 25_000;
+
+// Cheap change-probe — only reads the two columns the live tracking UI
+// depends on, on the Order + its corridor. Returns a snapshot fingerprint.
+async function probe(orderId) {
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+            deliveryStatus: true,
+            deliveredAt: true,
+            failureReason: true,
+            escrowStatus: true,
+            corridor: { select: { id: true, riderLat: true, riderLng: true, riderLocationAt: true, status: true } },
+        },
+    });
+    if (!order) return null;
+    return {
+        deliveryStatus: order.deliveryStatus,
+        deliveredAt: order.deliveredAt?.toISOString() ?? null,
+        failureReason: order.failureReason ?? null,
+        escrowStatus: order.escrowStatus,
+        corridorId: order.corridorId,
+        corridorStatus: order.corridor?.status ?? null,
+        riderLat: order.corridor?.riderLat ?? null,
+        riderLng: order.corridor?.riderLng ?? null,
+        riderLocationAt: order.corridor?.riderLocationAt?.toISOString() ?? null,
+    };
+}
+
+// Deterministic fingerprint of the probe — used to decide "did anything change?"
+function fingerprint(s) {
+    if (!s) return '';
+    return `${s.deliveryStatus}|${s.deliveredAt}|${s.corridorStatus}|${s.riderLat}|${s.riderLng}|${s.riderLocationAt}|${s.escrowStatus}|${s.failureReason}`;
+}
+
+const TERMINAL_STATUSES = new Set(['DELIVERED', 'FAILED']);
+
+async function longPollForChange(orderId, sinceFingerprint) {
+    const deadline = Date.now() + LONG_POLL_TIMEOUT_MS;
+    let current = await probe(orderId);
+    let currentFp = fingerprint(current);
+    if (currentFp !== sinceFingerprint || !current) return current;
+
+    while (Date.now() < deadline && current && !TERMINAL_STATUSES.has(current.deliveryStatus)) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const next = await probe(orderId);
+        const nextFp = fingerprint(next);
+        if (nextFp !== currentFp) return next;
+        current = next;
+    }
+    return current;
+}
+
 export async function GET(request, { params }) {
     try {
         const { userId } = getAuth(request);
         const { searchParams } = new URL(request.url);
         const token = searchParams.get("t");
+        const wantsLongPoll = searchParams.get("wait") === "1" || searchParams.get("wait") === "true";
+        const sinceFingerprint = wantsLongPoll ? (searchParams.get("since") || '') : '';
 
         const { orderId } = await params;
 
         if (!orderId) {
             return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
+        }
+
+        // Long-poll loop — observe + short-circuit on change before doing the
+        // expensive Order + corridor + OSRM fetch. Skip the loop entirely when
+        // long-polling isn't requested (regular clients get the immediate full
+        // response they always have).
+        if (wantsLongPoll) {
+            const snap = await longPollForChange(orderId, sinceFingerprint);
+            if (!snap) {
+                return NextResponse.json({ error: "Order not found" }, { status: 404 });
+            }
+            // If still unchanged at timeout or just-after, return the lightweight
+            // probe snapshot only — saves the OSRM roundtrip when nothing moved.
+            // Callers wanting the full ETA/route payload should request `wait=0`.
+            return NextResponse.json({
+                longPoll: true,
+                changed: fingerprint(snap) !== sinceFingerprint,
+                snapshot: snap,
+            }, {
+                headers: { 'Cache-Control': 'no-store' }
+            });
         }
 
         const order = await prisma.order.findUnique({
@@ -34,8 +119,6 @@ export async function GET(request, { params }) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
         }
 
-        // Access: either the logged-in owner, or anyone holding the order's public
-        // tracking token (the recipient's link — they have no platform account).
         const hasValidToken = !!token && !!order.trackingToken && token === order.trackingToken;
         if (!hasValidToken) {
             if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -51,16 +134,13 @@ export async function GET(request, { params }) {
             ? { lat: corridor.riderLat, lng: corridor.riderLng }
             : null;
 
-        // Customer location (pinned/live preferred, saved address as fallback)
         const recipientLat = order.recipientLat ?? order.address?.latitude ?? null;
         const recipientLng = order.recipientLng ?? order.address?.longitude ?? null;
 
-        // Straight-line distance from our hub to the delivery point (km).
         const hubDistanceKm = (recipientLat != null && recipientLng != null)
             ? haversineKm(KIGALI_HUB, { lat: recipientLat, lng: recipientLng })
             : null;
 
-        // ETA + route geometry: only meaningful once the rider is moving and located.
         let etaMinutes = null;
         let routeGeometry = null;
         if (riderPos && corridor && ["IN_TRANSIT", "ARRIVING"].includes(order.deliveryStatus)) {
@@ -69,10 +149,8 @@ export async function GET(request, { params }) {
                 lat: o.recipientLat ?? o.address?.latitude ?? null,
                 lng: o.recipientLng ?? o.address?.longitude ?? null,
             }));
-            // Haversine estimate as the guaranteed fallback.
             etaMinutes = estimateEtaForStop(riderPos, stops, order.stopSequence ?? 0);
 
-            // Try a real road route from the rider through the stops up to this one.
             const legStops = stops
                 .filter((s) => s.lat != null && s.lng != null && s.stopSequence != null && s.stopSequence <= (order.stopSequence ?? 0))
                 .sort((a, b) => a.stopSequence - b.stopSequence)
@@ -100,7 +178,6 @@ export async function GET(request, { params }) {
             failureReason: order.failureReason,
             deliveredAt: order.deliveredAt,
             podPhotoUrl: order.podPhotoUrl,
-            // Realtime tracking fields
             riderLat: corridor?.riderLat ?? null,
             riderLng: corridor?.riderLng ?? null,
             riderLocationAt: corridor?.riderLocationAt ?? null,
@@ -117,7 +194,6 @@ export async function GET(request, { params }) {
                 }
                 : null,
             store: order.store,
-            // External (off-platform) delivery context for the recipient view.
             isExternalDelivery: order.isExternalDelivery,
             packageDescription: order.packageDescription,
             senderName: order.isExternalDelivery ? (order.user?.name ?? null) : null,

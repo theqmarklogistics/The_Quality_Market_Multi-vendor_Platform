@@ -90,10 +90,11 @@ export async function POST(request) {
         // check if the coupon is valid for the new user
 
         if(couponCode && coupon.forNewUser){
-            const userOrders = await prisma.order.findMany({
-                where: { userId }
+            const hasOrdered = await prisma.order.findFirst({
+                where: { userId },
+                select: { id: true }
             });
-            if(userOrders.length > 0){
+            if(hasOrdered){
                 return NextResponse.json({ error: "Coupon valid for new users only" }, { status: 400 });
             }
         }
@@ -385,12 +386,24 @@ export async function GET(request) {
         }
         // Lazy expiry so the customer sees up-to-date statuses (throttled, best-effort).
         maybeSweepExpiredOrders();
-        const rawOrders = await prisma.order.findMany({
-            where: { userId },
-            orderBy: { createdAt: 'desc' }
-        });
 
-        if (!rawOrders.length) return NextResponse.json({ orders: [] }, { status: 200 });
+        // Pagination — protects against power users with thousands of orders.
+        const { searchParams } = request.nextUrl;
+        const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+        const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20));
+        const skip = (page - 1) * limit;
+
+        const [rawOrders, total] = await Promise.all([
+            prisma.order.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            }),
+            prisma.order.count({ where: { userId } })
+        ]);
+
+        if (!rawOrders.length) return NextResponse.json({ orders: [], page, limit, total: total || 0 }, { status: 200 });
 
         const orderIds = rawOrders.map(o => o.id);
         const addressIds = [...new Set(rawOrders.map(o => o.addressId).filter(Boolean))];
@@ -426,7 +439,7 @@ export async function GET(request) {
             address: addressMap.get(o.addressId) || null,
             returnRequest: returnMap.get(o.id) || null
         }));
-        return NextResponse.json({ orders }, { status: 200 });
+        return NextResponse.json({ orders, page, limit, total }, { status: 200 });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

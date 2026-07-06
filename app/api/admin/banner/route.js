@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import authAdmin from '@/middlewares/authAdmin'
 import prisma from '@/lib/prisma'
 import { logAdminAction } from '@/lib/auditLog'
@@ -38,6 +39,10 @@ export async function PUT(request) {
             update: data,
             create: { id: 'default', ...data },
         })
+
+        // Invalidate the cached public banner config so the next storefront
+        // GET sees the change immediately (rather than waiting up to 1h TTL).
+        revalidateTag('banner')
 
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
         logAdminAction({

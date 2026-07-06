@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authAdmin from "@/middlewares/authAdmin";
+import { invalidatePricingCache } from "@/lib/pricing";
 
 export async function GET(request) {
   try {
@@ -9,7 +10,10 @@ export async function GET(request) {
     const isAdmin = await authAdmin(userId);
     if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const commissions = await prisma.categoryCommission.findMany({ orderBy: { createdAt: 'desc' } });
+    const commissions = await prisma.categoryCommission.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 200
+    });
     return NextResponse.json({ commissions });
   } catch (error) {
     console.error(error);
@@ -40,6 +44,8 @@ export async function POST(request) {
         effectiveTo: effectiveTo ? new Date(effectiveTo) : null
       }
     });
+
+    invalidatePricingCache();
 
     return NextResponse.json({ commission: created }, { status: 201 });
   } catch (error) {

@@ -1,11 +1,25 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
+import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 
 const PAGE_SIZE = 20;
 
+// 60 storefront product-listing requests per minute per IP — generous for a
+// browsing human, hostile to scrapers/LLM-training bots.
+const productListLimiter = createRateLimiter({ max: 60, windowMs: 60_000 });
+
 export async function GET(request) {
     try {
+        const ip = getClientIp(request);
+        const rl = productListLimiter(`product:${ip}`);
+        if (!rl.success) {
+            return NextResponse.json(
+                { error: 'Too many requests. Please slow down.' },
+                { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+            );
+        }
+
         // Lazy order expiry (throttled, best-effort): the storefront is the most
         // frequented route, so this reliably cleans up expired orders + restores
         // stock whenever the shop is in use — without a timer-based cron.

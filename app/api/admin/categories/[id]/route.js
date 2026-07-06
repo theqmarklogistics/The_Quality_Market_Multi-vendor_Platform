@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import authAdmin from '@/middlewares/authAdmin'
 import prisma from '@/lib/prisma'
 
@@ -26,6 +27,7 @@ export async function PUT(request, { params }) {
         if (body.sortOrder != null) data.sortOrder = Number(body.sortOrder)
 
         const category = await prisma.category.update({ where: { id }, data })
+        revalidateTag('categories')
         return NextResponse.json({ category })
     } catch (error) {
         console.error('Admin categories PUT error:', error.message)
@@ -47,12 +49,13 @@ export async function DELETE(request, { params }) {
         const productCount = await prisma.product.count({ where: { category: cat.name } })
         if (productCount > 0) {
             return NextResponse.json(
-                { error: `Cannot delete — ${productCount} product${productCount !== 1 ? 's' : ''} use this category. Deactivate it instead.` },
+                { error: `Cannot delete — ${productCount} product${            productCount !== 1 ? 's' : ''} use this category. Deactivate it instead.` },
                 { status: 400 }
             )
         }
 
         await prisma.category.delete({ where: { id } })
+        revalidateTag('categories')
         return NextResponse.json({ message: 'Category deleted.' })
     } catch (error) {
         console.error('Admin categories DELETE error:', error.message)

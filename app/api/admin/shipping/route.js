@@ -9,7 +9,10 @@ export async function GET(request) {
     const isAdmin = await authAdmin(userId);
     if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const rules = await prisma.shippingRule.findMany({ orderBy: { priority: 'desc' } });
+    const rules = await prisma.shippingRule.findMany({
+      orderBy: { priority: 'desc' },
+      take: 100
+    });
     return NextResponse.json({ rules });
   } catch (error) {
     console.error(error);

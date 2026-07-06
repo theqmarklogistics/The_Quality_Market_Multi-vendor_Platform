@@ -135,7 +135,7 @@ export default function AdminDashboard() {
             </div>
 
             <div className="mt-12">
-                <OrdersAreaChart allOrders={dashboardData.allOrders} />
+                <OrdersAreaChart allOrders={dashboardData.allOrders} allOrdersDaily={dashboardData.allOrdersDaily} />
             </div>
         </div>
     )

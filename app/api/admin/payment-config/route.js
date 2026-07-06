@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { logAdminAction } from "@/lib/auditLog";
@@ -50,6 +51,8 @@ export async function PUT(request) {
 
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
         logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'PAYMENT_CONFIG_UPDATED', targetType: 'PaymentConfig', targetId: 'default' });
+
+        revalidateTag('payment-config')
 
         return NextResponse.json({ config });
     } catch (error) {

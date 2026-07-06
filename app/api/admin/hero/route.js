@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import imageKit, { toFile } from "@/configs/imageKit";
@@ -57,6 +58,9 @@ export async function PUT(request) {
             update: data,
             create: { slot, ...data },
         })
+
+        // Invalidate cached hero config so the next storefront GET sees the change.
+        revalidateTag('hero')
 
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
         logAdminAction({ adminId: userId, adminName: admin?.name || '', action: 'HERO_UPDATED', targetType: 'HeroConfig', targetId: slot, notes: `Slot "${slot}" updated` })

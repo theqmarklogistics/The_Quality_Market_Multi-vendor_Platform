@@ -71,7 +71,15 @@ export async function DELETE(request) {
             return NextResponse.json({error: "Not Unauthorized"}, {status: 401});
         }
 
-        const coupons = await prisma.coupon.findMany();
+        const coupons = await prisma.coupon.findMany({
+            orderBy: { expiresAt: 'desc' },
+            take: 200,
+            select: {
+                code: true, description: true, discount: true,
+                forNewUser: true, isPublic: true, expiresAt: true,
+                maxUses: true, usedCount: true, createdAt: true
+            }
+        });
         return NextResponse.json({coupons});
     } catch (error) {
         console.error(error);

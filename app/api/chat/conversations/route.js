@@ -1,5 +1,6 @@
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 import authAdmin from "@/middlewares/authAdmin";
@@ -78,27 +79,45 @@ export async function GET(request) {
 
         const conversationIds = rawConversations.map(c => c.id);
 
-        // Parallel: participants list, last message per conv, unread count per conv
-        const [participants, lastMessages, unreadCounts] = await Promise.all([
+        // Parallel batch queries — avoids the previous N×2 roundtrips per page:
+        //   - participants: 1 findMany
+        //   - unread counts: 1 groupBy on Message
+        //   - last messages: 1 raw SQL using DISTINCT ON (Postgres-specific; Supabase runs PG)
+        const [participants, unreadGroups, lastMessageRows] = await Promise.all([
             prisma.conversationParticipant.findMany({
                 where: { conversationId: { in: conversationIds } }
             }),
-            Promise.all(
-                conversationIds.map(id =>
-                    prisma.message.findFirst({
-                        where: { conversationId: id },
-                        orderBy: { createdAt: "desc" }
-                    })
-                )
-            ),
-            Promise.all(
-                conversationIds.map(id =>
-                    prisma.message.count({
-                        where: { conversationId: id, isRead: false, senderId: { not: userId } }
-                    })
-                )
-            )
+            prisma.message.groupBy({
+                by: ['conversationId'],
+                where: {
+                    conversationId: { in: conversationIds },
+                    isRead: false,
+                    senderId: { not: userId }
+                },
+                _count: { _all: true }
+            }),
+            conversationIds.length
+                ? prisma.$queryRaw`
+                    SELECT DISTINCT ON ("conversationId") *
+                    FROM "Message"
+                    WHERE "conversationId" IN (${Prisma.join(conversationIds)})
+                    ORDER BY "conversationId", "createdAt" DESC
+                  `.catch(() => [])
+                : Promise.resolve([])
         ]);
+
+        // Map: conversationId → last message (raw row) — Postgres returns these
+        // as plain objects already; cast the createdAt back to a Date for the client.
+        const lastMessageByConv = new Map();
+        for (const row of lastMessageRows) {
+            if (row && row.conversationId) {
+                lastMessageByConv.set(row.conversationId, {
+                    ...row,
+                    createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt)
+                });
+            }
+        }
+        const unreadByConv = new Map(unreadGroups.map(g => [g.conversationId, g._count._all]));
 
         // Batch-fetch all participant users in one query
         const participantUserIds = [...new Set(participants.map(p => p.userId))];
@@ -108,13 +127,13 @@ export async function GET(request) {
         const userMap = new Map(users.map(u => [u.id, u]));
 
         // Merge into the shape the frontend expects
-        const conversations = rawConversations.map((conv, i) => ({
+        const conversations = rawConversations.map((conv) => ({
             ...conv,
             participants: participants
                 .filter(p => p.conversationId === conv.id)
                 .map(p => ({ ...p, user: userMap.get(p.userId) || null })),
-            messages: lastMessages[i] ? [lastMessages[i]] : [],
-            _count: { messages: unreadCounts[i] }
+            messages: lastMessageByConv.has(conv.id) ? [lastMessageByConv.get(conv.id)] : [],
+            _count: { messages: unreadByConv.get(conv.id) || 0 }
         }));
 
         return NextResponse.json({ conversations });

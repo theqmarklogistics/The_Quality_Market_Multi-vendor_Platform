@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import authAdmin from '@/middlewares/authAdmin'
 import prisma from '@/lib/prisma'
 
@@ -38,6 +39,10 @@ export async function POST(request) {
         const category = await prisma.category.create({
             data: { name, commissionPercent, sortOrder },
         })
+
+        // Invalidate cached public categories list so the storefront sees the new one.
+        revalidateTag('categories')
+
         return NextResponse.json({ category }, { status: 201 })
     } catch (error) {
         console.error('Admin categories POST error:', error.message)

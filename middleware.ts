@@ -1,6 +1,20 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 
-export default clerkMiddleware();
+// Pulic, unauthenticated storefront endpoints. Listing them here lets Clerk's
+// middleware skip JWT verification entirely on these hot read paths — a fresh
+// home page load otherwise pays one JWKS verify per /api/categories, /api/hero,
+// /api/banner, /api/product call. Writes still go through authenticated routes.
+export default clerkMiddleware({
+  publicRoutes: [
+    '/api/health',
+    '/api/product(.*)',
+    '/api/categories',
+    '/api/hero',
+    '/api/banner',
+    '/api/newsletter/unsubscribe',
+    '/api/delivery/external/quote',
+  ],
+});
 
 export const config = {
   matcher: [

@@ -2,6 +2,7 @@
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authAdmin from "@/middlewares/authAdmin";
+import { invalidatePricingCache } from "@/lib/pricing";
 
 export async function GET(request) {
   try {
@@ -10,7 +11,8 @@ export async function GET(request) {
     if (!isAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const rates = await prisma.weightShippingRate.findMany({
-      orderBy: [{ zone: "asc" }, { minWeightKg: "asc" }]
+      orderBy: [{ zone: "asc" }, { minWeightKg: "asc" }],
+      take: 200
     });
     return NextResponse.json({ rates });
   } catch (error) {
@@ -32,6 +34,7 @@ export async function PUT(request) {
     await Promise.all(patches.map(({ id, cost }) =>
       prisma.weightShippingRate.update({ where: { id }, data: { cost: Number(cost) } })
     ));
+    invalidatePricingCache();
     return NextResponse.json({ message: "Rates updated" });
   } catch (error) {
     console.error(error);

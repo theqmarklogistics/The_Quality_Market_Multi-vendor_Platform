@@ -1,11 +1,16 @@
-import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { cachedJson, withCache } from "@/lib/cache";
 
-// Public endpoint — returns MoMo details only (bank details kept private, sent via invoice)
+// Public endpoint — returns MoMO details only (bank details kept private).
+// Cached 5 min (shorter than other config — store/checkout uses it). Tag "payment-config".
 export async function GET() {
     try {
-        const config = await prisma.paymentConfig.findUnique({ where: { id: 'default' } });
-        return NextResponse.json({
+        const config = await withCache(
+            ['payment-config', 'default'],
+            () => prisma.paymentConfig.findUnique({ where: { id: 'default' } }),
+            { tags: ['payment-config'], ttlSeconds: 300 }
+        );
+        return cachedJson({
             momoPayCode: config?.momoPayCode || null,
             momoAccountName: config?.momoAccountName || null,
             momoConfigured: !!(config?.momoPayCode && config?.momoAccountName),
@@ -13,6 +18,6 @@ export async function GET() {
         });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({ momoPayCode: null, momoAccountName: null, momoConfigured: false, bankConfigured: false });
+        return cachedJson({ momoPayCode: null, momoAccountName: null, momoConfigured: false, bankConfigured: false });
     }
 }

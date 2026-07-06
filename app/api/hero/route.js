@@ -1,5 +1,9 @@
-import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import prisma from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { cachedJson, withCache } from '@/lib/cache';
+import { createRateLimiter, getClientIp } from '@/lib/rateLimit';
+
+const heroLimiter = createRateLimiter({ max: 30, windowMs: 60_000 });
 
 const DEFAULTS = {
     main: {
@@ -30,21 +34,31 @@ const DEFAULTS = {
         linkHref: '/shop',
         imageUrl: null,
     },
-}
+};
 
-export async function GET() {
+// The hero config is admin-managed and changes rarely — cached for 1h under
+// tag "hero". The admin POST that mutates it invalidates via revalidateTag.
+export async function GET(request) {
     try {
-        const rows = await prisma.heroConfig.findMany()
-        const bySlot = Object.fromEntries(rows.map(r => [r.slot, r]))
+        const rl = heroLimiter(`hero:${getClientIp(request)}`);
+        if (!rl.success) {
+            return NextResponse.json({ error: 'Too many requests.' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } });
+        }
+        const rows = await withCache(
+            ['hero', 'all'],
+            () => prisma.heroConfig.findMany(),
+            { tags: ['hero'], ttlSeconds: 3600 }
+        );
+        const bySlot = Object.fromEntries(rows.map(r => [r.slot, r]));
 
-        const result = {}
+        const result = {};
         for (const key of ['main', 'card1', 'card2']) {
-            result[key] = { ...DEFAULTS[key], ...(bySlot[key] || {}) }
+            result[key] = { ...DEFAULTS[key], ...(bySlot[key] || {}) };
         }
 
-        return NextResponse.json(result)
+        return cachedJson(result);
     } catch (error) {
-        console.error('Hero config GET error:', error.message)
-        return NextResponse.json(DEFAULTS)
+        console.error('Hero config GET error:', error.message);
+        return cachedJson(DEFAULTS);
     }
 }

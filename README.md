@@ -587,15 +587,41 @@ All API routes live under `/api`. Admin routes require `ADMIN` role; store route
 
 ## Deployment
 
-### Vercel (Recommended)
+> ⚠️ **Do NOT deploy this project to Vercel.** The platform depends on a custom
+> `server.js` (Socket.IO) for live delivery tracking, dispatch board, chat, and
+> admin notifications. Vercel's serverless runtime cannot run `server.js`, so
+> Socket.IO would never initialize (`global.io` would be undefined) and those
+> features would silently fall back to polling — or never work at all. The
+> platform's free-tier Hobby plan also forbids commercial use. See
+> [`LAUNCH_GUIDE.md`](./LAUNCH_GUIDE.md) for the full reasoning.
+
+### Render (Recommended — free tier)
+
+The entire app (Next.js + Socket.IO + delivery tracking + chat) runs in a
+single Render web service via the included `Dockerfile` → `node server.js`.
 
 1. Push your repository to GitHub
-2. Import the project in [Vercel](https://vercel.com)
-3. Add all environment variables from `.env` in the Vercel project settings
-4. Set the build command to `npm run build` (default)
-5. Deploy
+2. In Render, create a new **Web Service** → **Deploy from Docker repo**
+3. Connect your GitHub repo (point the Dockerfile path at the project root)
+4. Set all environment variables from `.env.example` in Render's Environment tab
+5. Make sure `NEXT_PUBLIC_SOCKET_ENABLED=true` (the custom server is running)
+6. Wire [UptimeRobot](https://uptimerobot.com) to ping `https://<your-host>/api/health`
+   every 5 min — this both monitors uptime and prevents the free service from
+   sleeping after 15 min idle (no cold starts during business hours)
 
-> **Important:** The custom `server.js` (Socket.IO) is not compatible with Vercel's serverless runtime. For real-time messaging in production, deploy the Socket.IO server separately (e.g., Railway, Render, or a VPS) and point `NEXT_PUBLIC_APP_URL` to that host.
+Free-tier caveats (see [`LAUNCH_GUIDE.md`](./LAUNCH_GUIDE.md) for the full list):
+- Render sleeps the service after 15 min idle (cold start ~1 min)
+- Supabase pauses the DB after 7 days of no activity — the UptimeRobot ping also
+  prevents this
+- Resend caps transactional email at 100/day on the free tier
+- Clerk free tier = 10K MAU; upgrade to a paid plan before crossing that
+
+### Other free-tier hosts
+
+The same `Dockerfile` runs on Koyeb, Fly.io, or any host that supports Docker
+web services; alternatively self-host behind [Caddy](https://caddyserver.com/)
+or Nginx on a VPS. The only hard requirement is that `node server.js` runs as a
+long-lived process (not serverless), so Socket.IO stays alive.
 
 ### Self-Hosted (Node.js)
 

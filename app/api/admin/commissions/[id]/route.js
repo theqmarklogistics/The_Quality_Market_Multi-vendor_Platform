@@ -2,6 +2,7 @@
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authAdmin from "@/middlewares/authAdmin";
+import { invalidatePricingCache } from "@/lib/pricing";
 
 export async function PUT(request, { params }) {
   try {
@@ -29,6 +30,8 @@ export async function PUT(request, { params }) {
       }
     });
 
+    invalidatePricingCache();
+
     return NextResponse.json({ commission: updated });
   } catch (error) {
     console.error(error);
@@ -44,6 +47,7 @@ export async function DELETE(request, { params }) {
 
     const { id } = await params;
     await prisma.categoryCommission.delete({ where: { id } });
+    invalidatePricingCache();
     return NextResponse.json({ message: "Deleted" });
   } catch (error) {
     console.error(error);
