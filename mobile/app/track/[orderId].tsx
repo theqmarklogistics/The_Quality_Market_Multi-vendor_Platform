@@ -5,13 +5,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import { useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,12 +21,18 @@ import { DeliveryTimeline } from '@/components/DeliveryTimeline';
 import { Button, EmptyState, Loader } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 
+const maps = Platform.OS === 'web' ? null : require('react-native-maps');
+const MapView = maps?.default as any;
+const Marker = maps?.Marker as any;
+const Polyline = maps?.Polyline as any;
+const PROVIDER_GOOGLE = maps?.PROVIDER_GOOGLE as any;
+
 // Kigali centre — fallback map region before any coordinates are known.
 const KIGALI = { latitude: -1.9577, longitude: 30.1127 };
 
 export default function TrackScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
 
   const [data, setData] = useState<TrackingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,7 +124,7 @@ export default function TrackScreen() {
       ? { lat: data.recipientLat, lng: data.recipientLng }
       : null;
 
-  const initialRegion: Region = {
+  const initialRegion = {
     latitude: rider?.lat ?? recipient?.lat ?? KIGALI.latitude,
     longitude: rider?.lng ?? recipient?.lng ?? KIGALI.longitude,
     latitudeDelta: 0.05,
@@ -134,30 +140,37 @@ export default function TrackScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xl }}>
       {showMap ? (
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
-          initialRegion={initialRegion}
-        >
-          {rider ? (
-            <Marker coordinate={{ latitude: rider.lat, longitude: rider.lng }} title="Rider">
-              <View style={styles.riderPin}>
-                <Ionicons name="bicycle" size={18} color="#fff" />
-              </View>
-            </Marker>
-          ) : null}
-          {recipient ? (
-            <Marker
-              coordinate={{ latitude: recipient.lat, longitude: recipient.lng }}
-              title="Delivery location"
-              pinColor={colors.success}
-            />
-          ) : null}
-          {routeCoords.length > 1 ? (
-            <Polyline coordinates={routeCoords} strokeColor={colors.primary} strokeWidth={4} />
-          ) : null}
-        </MapView>
+        Platform.OS === 'web' ? (
+          <View style={[styles.map, styles.mapPlaceholder]}>
+            <Ionicons name="map-outline" size={40} color={colors.subtle} />
+            <Text style={styles.muted}>Live tracking map is available on Android and iOS.</Text>
+          </View>
+        ) : (
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            initialRegion={initialRegion}
+          >
+            {rider ? (
+              <Marker coordinate={{ latitude: rider.lat, longitude: rider.lng }} title="Rider">
+                <View style={styles.riderPin}>
+                  <Ionicons name="bicycle" size={18} color="#fff" />
+                </View>
+              </Marker>
+            ) : null}
+            {recipient ? (
+              <Marker
+                coordinate={{ latitude: recipient.lat, longitude: recipient.lng }}
+                title="Delivery location"
+                pinColor={colors.success}
+              />
+            ) : null}
+            {routeCoords.length > 1 ? (
+              <Polyline coordinates={routeCoords} strokeColor={colors.primary} strokeWidth={4} />
+            ) : null}
+          </MapView>
+        )
       ) : (
         <View style={[styles.map, styles.mapPlaceholder]}>
           <Ionicons name="map-outline" size={40} color={colors.subtle} />

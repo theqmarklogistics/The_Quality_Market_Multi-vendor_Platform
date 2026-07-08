@@ -144,7 +144,7 @@ An **Ops console** for staff, role-gated and reusing the existing backend as-is
 
 ## Prerequisites
 
-- Node.js 18+ and npm.
+- Node.js 22.12+ and npm.
 - The backend running and reachable (see `../README` / `../.env`). For realtime later,
   run the backend via the custom server (`npm start` → `node server.js`), not Vercel.
 - A physical Android device with **Expo Go** (quickest) or an Android emulator. For

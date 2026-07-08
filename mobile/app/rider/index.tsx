@@ -9,6 +9,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import {
@@ -32,6 +32,12 @@ import { useRealtimeRoom } from '@/realtime/useRealtimeRoom';
 import { useMyRole, canAccessRider } from '@/hooks/useMyRole';
 import { EmptyState, Loader } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
+
+const maps = Platform.OS === 'web' ? null : require('react-native-maps');
+const MapView = maps?.default as any;
+const Marker = maps?.Marker as any;
+const Polyline = maps?.Polyline as any;
+const PROVIDER_GOOGLE = maps?.PROVIDER_GOOGLE as any;
 
 const KIGALI = { latitude: -1.9577, longitude: 30.1127 };
 
@@ -70,7 +76,7 @@ export default function RiderConsoleScreen() {
   const [failReason, setFailReason] = useState(FAILURE_REASONS[0]);
   const [failNote, setFailNote] = useState('');
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const didFit = useRef(false);
 
   const allowed = canAccessRider(role);
@@ -262,7 +268,7 @@ export default function RiderConsoleScreen() {
   const mapStops = stops.filter((s) => s.lat != null && s.lng != null);
   const pending = stops.filter((s) => !['DELIVERED', 'FAILED'].includes(s.deliveryStatus)).length;
 
-  const initialRegion: Region = {
+  const initialRegion = {
     latitude: riderPos?.lat ?? mapStops[0]?.lat ?? KIGALI.latitude,
     longitude: riderPos?.lng ?? mapStops[0]?.lng ?? KIGALI.longitude,
     latitudeDelta: 0.06,
@@ -286,42 +292,49 @@ export default function RiderConsoleScreen() {
         </View>
 
         {/* Map */}
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
-          initialRegion={initialRegion}
-          onLayout={() => {
-            if (didFit.current || routeCoords.length < 2) return;
-            didFit.current = true;
-            mapRef.current?.fitToCoordinates(routeCoords, {
-              edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
-              animated: false,
-            });
-          }}
-        >
-          {riderPos ? (
-            <Marker coordinate={{ latitude: riderPos.lat, longitude: riderPos.lng }} title="You">
-              <View style={styles.riderPin}>
-                <Ionicons name="bicycle" size={16} color="#fff" />
-              </View>
-            </Marker>
-          ) : null}
-          {mapStops.map((s) => (
-            <Marker
-              key={s.orderId}
-              coordinate={{ latitude: s.lat!, longitude: s.lng! }}
-              title={`#${s.stopSequence} ${s.recipientName ?? ''}`.trim()}
-            >
-              <View style={styles.stopPin}>
-                <Text style={styles.stopPinText}>{s.stopSequence}</Text>
-              </View>
-            </Marker>
-          ))}
-          {routeCoords.length > 1 ? (
-            <Polyline coordinates={routeCoords} strokeColor={colors.subtle} strokeWidth={3} />
-          ) : null}
-        </MapView>
+        {Platform.OS === 'web' ? (
+          <View style={[styles.map, styles.mapPlaceholder]}>
+            <Ionicons name="map-outline" size={40} color={colors.subtle} />
+            <Text style={styles.muted}>Live rider map is available on Android and iOS.</Text>
+          </View>
+        ) : (
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={styles.map}
+            initialRegion={initialRegion}
+            onLayout={() => {
+              if (didFit.current || routeCoords.length < 2) return;
+              didFit.current = true;
+              mapRef.current?.fitToCoordinates(routeCoords, {
+                edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
+                animated: false,
+              });
+            }}
+          >
+            {riderPos ? (
+              <Marker coordinate={{ latitude: riderPos.lat, longitude: riderPos.lng }} title="You">
+                <View style={styles.riderPin}>
+                  <Ionicons name="bicycle" size={16} color="#fff" />
+                </View>
+              </Marker>
+            ) : null}
+            {mapStops.map((s) => (
+              <Marker
+                key={s.orderId}
+                coordinate={{ latitude: s.lat!, longitude: s.lng! }}
+                title={`#${s.stopSequence} ${s.recipientName ?? ''}`.trim()}
+              >
+                <View style={styles.stopPin}>
+                  <Text style={styles.stopPinText}>{s.stopSequence}</Text>
+                </View>
+              </Marker>
+            ))}
+            {routeCoords.length > 1 ? (
+              <Polyline coordinates={routeCoords} strokeColor={colors.subtle} strokeWidth={3} />
+            ) : null}
+          </MapView>
+        )}
 
         {/* Stops */}
         <View style={styles.body}>
@@ -546,6 +559,14 @@ const styles = StyleSheet.create({
   headerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
 
   map: { width: '100%', height: 240 },
+  mapPlaceholder: {
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: spacing.xl,
+  },
+  muted: { fontSize: 13, color: colors.muted },
   riderPin: {
     backgroundColor: colors.success,
     width: 30,

@@ -1,7 +1,7 @@
 // Root layout: wires Clerk auth, the API token bridge, and the Redux store, then
 // gates navigation between the (auth) and (tabs) route groups based on session state.
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
@@ -16,6 +16,14 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { installGlobalErrorHandler } from '@/lib/crashReporting';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+
+const isLocalWebHost =
+  Platform.OS === 'web' &&
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+const hasProductionClerkKeyOnLocalhost =
+  isLocalWebHost && publishableKey.startsWith('pk_live_');
 
 // Report uncaught JS errors (outside the render tree) to the backend. Module
 // scope so it's installed before the first render.
@@ -78,6 +86,31 @@ export default function RootLayout() {
   if (!publishableKey) {
     throw new Error(
       'Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Copy .env.example to .env and set it.',
+    );
+  }
+
+  if (hasProductionClerkKeyOnLocalhost) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
+          backgroundColor: '#111827',
+        }}
+      >
+        <View style={{ maxWidth: 520, gap: 12 }}>
+          <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700' }}>
+            Clerk production key cannot run on localhost
+          </Text>
+          <Text style={{ color: '#cbd5e1', fontSize: 16, lineHeight: 24 }}>
+            This Expo web session is running on localhost, but your `pk_live_...` Clerk key is
+            only allowed on the production domain. To test locally, switch to a Clerk test key
+            or run the app from the production domain.
+          </Text>
+        </View>
+      </View>
     );
   }
 

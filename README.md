@@ -198,7 +198,7 @@ Role assignment is managed by admins via the Users page. Invitations are sent by
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22.12+
 - npm
 - A PostgreSQL database (Supabase recommended)
 - Accounts for: Clerk, ImageKit, Resend, Inngest, Google AI Studio

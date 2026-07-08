@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "687024282793",
+    "project_id": "the-quality-market",
+    "storage_bucket": "the-quality-market.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:687024282793:android:d160d43cefe3e740b41db8",
+        "android_client_info": {
+          "package_name": "rw.thequalitymarket.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZFP32ThpkYu44OZnKdh8Hbu6-13f1tSg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
