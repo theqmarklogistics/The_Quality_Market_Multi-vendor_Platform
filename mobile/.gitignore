@@ -22,6 +22,10 @@ ios/
 .env
 .env.local
 .env*.local
+# Firebase Admin SDK service-account keys — full-access secrets, never commit.
+# (google-services.json is a different, public-safe file and stays committed.)
+*firebase-adminsdk*.json
+service-account*.json
 
 # Debug
 npm-debug.*
