@@ -35,9 +35,18 @@ jobs:
         run: npm run lint
 
       - name: Pricing tests
+        # On failure, emit the output as a check-run annotation so the cause is
+        # visible on the commit page without opening the raw logs.
         run: |
-          npm run test:pricing
-          npm run test:delivery-pricing
+          for t in test:pricing test:delivery-pricing; do
+            if ! out=$(npm run "$t" 2>&1); then
+              echo "$out"
+              tailout=$(echo "$out" | tail -n 40)
+              echo "::error title=$t failed::${tailout//$'\n'/%0A}"
+              exit 1
+            fi
+            echo "$out"
+          done
 
       - name: Build
         run: npx next build
@@ -71,7 +80,14 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
 
       - name: Install dependencies (same clean install EAS Build runs)
-        run: npm ci
+        run: |
+          if ! out=$(npm ci 2>&1); then
+            echo "$out"
+            tailout=$(echo "$out" | tail -n 40)
+            echo "::error title=mobile npm ci failed::${tailout//$'\n'/%0A}"
+            exit 1
+          fi
+          echo "$out"
 
       - name: Typecheck
         run: npm run typecheck
