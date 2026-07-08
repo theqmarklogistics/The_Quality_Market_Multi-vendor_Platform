@@ -19,7 +19,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Must match the Dockerfile / README (>= 22.12): server.js and the
+          # pricing scripts are ESM-without-"type" and need module syntax
+          # detection, which Node 20 lacks.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -63,7 +66,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
