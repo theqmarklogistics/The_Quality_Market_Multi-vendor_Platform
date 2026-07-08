@@ -37,6 +37,11 @@ jobs:
       - name: Pricing tests
         # On failure, emit the output as a check-run annotation so the cause is
         # visible on the commit page without opening the raw logs.
+        env:
+          # Dummy values — lib/prisma.js requires DATABASE_URL at import time,
+          # but the pricing checks are pure math and never touch the DB.
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
         run: |
           for t in test:pricing test:delivery-pricing; do
             if ! out=$(npm run "$t" 2>&1); then
