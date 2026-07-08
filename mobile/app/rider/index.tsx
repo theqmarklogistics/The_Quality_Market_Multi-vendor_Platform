@@ -33,7 +33,11 @@ import { useMyRole, canAccessRider } from '@/hooks/useMyRole';
 import { EmptyState, Loader } from '@/components/ui';
 import { colors, radius, spacing } from '@/theme';
 
-const maps = Platform.OS === 'web' ? null : require('react-native-maps');
+// Native maps need a Google Maps API key on Android; until one is configured
+// the screen degrades to a placeholder (same as web).
+const MAPS_ENABLED =
+  Platform.OS !== 'web' && !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+const maps = MAPS_ENABLED ? require('react-native-maps') : null;
 const MapView = maps?.default as any;
 const Marker = maps?.Marker as any;
 const Polyline = maps?.Polyline as any;
@@ -292,10 +296,12 @@ export default function RiderConsoleScreen() {
         </View>
 
         {/* Map */}
-        {Platform.OS === 'web' ? (
+        {!MAPS_ENABLED ? (
           <View style={[styles.map, styles.mapPlaceholder]}>
             <Ionicons name="map-outline" size={40} color={colors.subtle} />
-            <Text style={styles.muted}>Live rider map is available on Android and iOS.</Text>
+            <Text style={styles.muted}>
+              The live map is not available in this build — follow the stop list below.
+            </Text>
           </View>
         ) : (
           <MapView

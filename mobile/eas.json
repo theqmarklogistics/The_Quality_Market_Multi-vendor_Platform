@@ -16,6 +16,12 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.thequalitymarket.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsudGhlcXVhbGl0eW1hcmtldC5jb20k",
+        "EXPO_PUBLIC_CURRENCY_SYMBOL": "RWF",
+        "EXPO_PUBLIC_SOCKET_ENABLED": "true"
+      },
       "android": {
         "buildType": "apk"
       },
