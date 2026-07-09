@@ -15,6 +15,7 @@ import { Link, useRouter } from 'expo-router';
 import { useSignIn } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/ui';
+import { BrandLogo } from '@/components/BrandLogo';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function SignInScreen() {
@@ -55,9 +56,7 @@ export default function SignInScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.brandMark}>
-          <Ionicons name="bag-handle" size={30} color={colors.primaryText} />
-        </View>
+        <BrandLogo size={84} style={styles.brandMark} />
         <Text style={styles.title}>
           The Quality <Text style={styles.titleAccent}>Market</Text>
         </Text>
@@ -130,12 +129,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   container: { flexGrow: 1, justifyContent: 'center', padding: spacing.xl },
   brandMark: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
     alignSelf: 'center',
     marginBottom: spacing.md,
   },

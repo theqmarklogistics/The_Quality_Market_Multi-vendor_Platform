@@ -15,6 +15,7 @@ import { Link, useRouter } from 'expo-router';
 import { useSignUp } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/ui';
+import { BrandLogo } from '@/components/BrandLogo';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function SignUpScreen() {
@@ -79,13 +80,13 @@ export default function SignUpScreen() {
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.brandMark}>
-          <Ionicons
-            name={pendingVerification ? 'mail-unread' : 'person-add'}
-            size={28}
-            color={colors.primaryText}
-          />
-        </View>
+        {pendingVerification ? (
+          <View style={styles.brandMark}>
+            <Ionicons name="mail-unread" size={28} color={colors.primaryText} />
+          </View>
+        ) : (
+          <BrandLogo size={84} style={styles.brandLogo} />
+        )}
 
         {pendingVerification ? (
           <>
@@ -186,6 +187,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
+  brandLogo: { alignSelf: 'center', marginBottom: spacing.md },
   title: {
     fontSize: 26,
     fontFamily: fonts.bold,

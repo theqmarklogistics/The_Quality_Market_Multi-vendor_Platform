@@ -14,9 +14,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getCategories, listProducts } from '@/api/products';
+import { getBestSelling, getCategories, listProducts } from '@/api/products';
 import type { Product } from '@/api/types';
 import { ProductCard } from '@/components/ProductCard';
+import { BrandLogo } from '@/components/BrandLogo';
 import { EmptyState, Skeleton } from '@/components/ui';
 import { PRODUCT_CATEGORIES } from '@/constants';
 import { colors, fonts, radius, spacing } from '@/theme';
@@ -35,6 +36,7 @@ export default function ShopScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bestSellers, setBestSellers] = useState<Product[]>([]);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -54,6 +56,11 @@ export default function ShopScreen() {
       })
       .catch(() => {
         // Fall back to the ported PRODUCT_CATEGORIES already in state.
+      });
+    getBestSelling(10)
+      .then((res) => setBestSellers(res.products ?? []))
+      .catch(() => {
+        // Rail is optional — hidden if the request fails.
       });
   }, []);
 
@@ -142,6 +149,27 @@ export default function ShopScreen() {
           </View>
         ) : null}
 
+        {/* Best selling — horizontal rail, mirrors the web BestSelling section */}
+        {!search && !activeCategory && bestSellers.length > 0 ? (
+          <View style={styles.bestWrap}>
+            <View style={styles.bestHead}>
+              <Ionicons name="flame" size={16} color={colors.primaryDark} />
+              <Text style={styles.bestTitle}>Best selling</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.bestRail}
+            >
+              {bestSellers.map((p) => (
+                <View key={p.id} style={styles.bestCard}>
+                  <ProductCard product={p} />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
         {/* Categories */}
         <ScrollView
           horizontal
@@ -166,16 +194,14 @@ export default function ShopScreen() {
         <Text style={styles.sectionLabel}>{sectionLabel}</Text>
       </View>
     ),
-    [searchInput, categories, activeCategory, search, sectionLabel],
+    [searchInput, categories, activeCategory, search, sectionLabel, bestSellers],
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Brand wordmark, two-tone like the web logo */}
+      {/* Brand lockup — logo mark + two-tone wordmark, mirroring the web header */}
       <View style={styles.brandRow}>
-        <Text style={styles.brand}>
-          The Quality <Text style={styles.brandAccent}>Market</Text>
-        </Text>
+        <BrandLogo direction="row" size={32} gap={8} showWordmark wordmarkSize={21} />
       </View>
 
       {loading ? (
@@ -271,8 +297,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
   },
-  brand: { fontSize: 22, color: colors.text, fontFamily: fonts.bold },
-  brandAccent: { color: colors.primary },
   list: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
   row: { gap: spacing.md },
   searchBox: {
@@ -339,6 +363,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bestWrap: { marginBottom: spacing.md },
+  bestHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
+  bestTitle: { fontSize: 16, color: colors.text, fontFamily: fonts.semibold },
+  bestRail: { gap: spacing.md, paddingRight: spacing.xs },
+  bestCard: { width: 150 },
   chips: { gap: 8, paddingBottom: spacing.md },
   chip: {
     borderWidth: 1,
