@@ -1,5 +1,5 @@
 'use client'
-import { MessageCircleIcon, PackageIcon, Search, ShoppingCart, User, TruckIcon, ChevronDownIcon, LayoutGridIcon } from "lucide-react";
+import { MessageCircleIcon, PackageIcon, Search, ShoppingCart, User, TruckIcon, ChevronDownIcon, LayoutGridIcon, MenuIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -31,6 +31,7 @@ const Navbar = () => {
     const [loadingAccess, setLoadingAccess] = useState(false)
     const [unreadChats, setUnreadChats] = useState(0)
     const [workspacesOpen, setWorkspacesOpen] = useState(false)
+    const [menuOpen, setMenuOpen] = useState(false)
     const workspacesRef = useRef(null)
     const cartCount = useSelector(state => state.cart.total)
 
@@ -221,23 +222,23 @@ const Navbar = () => {
         return () => document.removeEventListener('mousedown', onClick)
     }, [workspacesOpen])
 
-    useEffect(() => { setWorkspacesOpen(false) }, [pathname])
+    useEffect(() => { setWorkspacesOpen(false); setMenuOpen(false) }, [pathname])
 
     return (
         <nav className="relative bg-white">
             <div className="mx-6">
                 <div className="flex items-center justify-between max-w-7xl mx-auto py-4  transition-all">
 
-                    <Link href="/" className="relative flex items-center gap-2">
-                        <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-14 w-auto object-contain" priority />
-                        <div className="hidden lg:flex flex-col leading-tight">
-                            <span className="font-bold text-sm" style={{ color: '#4f6bcb' }}>The Quality Market</span>
-                            <span className="text-xs italic" style={{ color: '#79cc4f' }}>Quality is our Culture</span>
+                    <Link href="/" className="relative flex items-center gap-2 shrink-0">
+                        <Image src={assets.brandLogo} alt="The Quality Market" width={200} height={56} className="h-12 w-auto object-contain" priority />
+                        <div className="hidden 2xl:flex flex-col leading-tight">
+                            <span className="font-bold text-sm whitespace-nowrap" style={{ color: '#4f6bcb' }}>The Quality Market</span>
+                            <span className="text-xs italic whitespace-nowrap" style={{ color: '#79cc4f' }}>Quality is our Culture</span>
                         </div>
                     </Link>
 
-                    {/* Desktop Menu */}
-                    <div className="hidden sm:flex items-center gap-4 lg:gap-8 text-slate-600">
+                    {/* Desktop Menu — only shown at xl where the full inline row fits */}
+                    <div className="hidden xl:flex items-center gap-3 2xl:gap-5 text-slate-600">
                         <Link href="/">Home</Link>
                         <Link href="/shop">Shop</Link>
                         <Link href="/about">About</Link>
@@ -284,7 +285,7 @@ const Navbar = () => {
                         {/* Public invite for off-platform sellers to use our delivery service.
                             Hidden once they already hold the role (they get "My Deliveries"). */}
                         {staffRole !== 'EXTERNAL_SELLER' && (
-                            <Link href="/external" className="flex items-center gap-1.5 px-3 py-1 bg-green-600 text-white rounded-full text-sm hover:bg-green-700 transition">
+                            <Link href="/external" className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1 bg-green-600 text-white rounded-full text-sm hover:bg-green-700 transition">
                                 <TruckIcon size={14} /> Deliver with us
                             </Link>
                         )}
@@ -361,8 +362,8 @@ const Navbar = () => {
 
                     </div>
 
-                    {/* Mobile: search icon + cart + user */}
-                    <div className="sm:hidden flex items-center gap-3">
+                    {/* Compact bar — shown below xl where the full inline menu can't fit */}
+                    <div className="xl:hidden flex items-center gap-3 sm:gap-4">
                         <button
                             aria-label="Search products"
                             onClick={() => setMobileSearchOpen(v => !v)}
@@ -408,12 +409,50 @@ const Navbar = () => {
                                 Login
                             </button>
                         )}
+
+                        <button
+                            aria-label="Menu"
+                            aria-expanded={menuOpen}
+                            onClick={() => setMenuOpen(v => !v)}
+                            className="text-slate-600 hover:text-slate-800 transition"
+                        >
+                            {menuOpen ? <XIcon size={22} /> : <MenuIcon size={22} />}
+                        </button>
                     </div>
                 </div>
             </div>
+
+            {/* Collapsible menu — primary links + role shortcuts for < xl screens */}
+            {menuOpen && (
+                <div className="xl:hidden border-t border-slate-100 px-6 py-3">
+                    <div className="max-w-7xl mx-auto flex flex-col gap-1 text-slate-700">
+                        <Link href="/" className="py-2 hover:text-slate-900">Home</Link>
+                        <Link href="/shop" className="py-2 hover:text-slate-900">Shop</Link>
+                        <Link href="/about" className="py-2 hover:text-slate-900">About</Link>
+                        <Link href="/contact" className="py-2 hover:text-slate-900">Contact</Link>
+
+                        {staffRole !== 'EXTERNAL_SELLER' && (
+                            <Link href="/external" className="mt-2 flex items-center gap-1.5 self-start px-4 py-2 bg-green-600 text-white rounded-full text-sm hover:bg-green-700 transition">
+                                <TruckIcon size={15} /> Deliver with us
+                            </Link>
+                        )}
+
+                        {dashboards.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                                <span className="text-xs uppercase tracking-wide text-slate-400">Workspaces</span>
+                                {dashboards.map(d => (
+                                    <Link key={d.href} href={d.href} className={`self-start px-4 py-1.5 rounded-full text-sm ${d.color}`}>
+                                        {d.label}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
             {/* Mobile search bar — slides in below the nav row */}
             {mobileSearchOpen && (
-                <div className="sm:hidden px-4 pb-3">
+                <div className="xl:hidden px-4 pb-3">
                     <select
                         value={selectedCategory}
                         onChange={e => setSelectedCategory(e.target.value)}
