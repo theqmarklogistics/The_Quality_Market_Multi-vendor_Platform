@@ -19,10 +19,13 @@ export async function GET(request) {
                 deliveryType: "KIGALI_POOL",
                 corridorId: null,
                 deliveryStatus: { in: ["PENDING_INTAKE", "SORTING"] },
-                // External (off-platform) deliveries are prepaid — hide unpaid ones.
-                OR: [{ isExternalDelivery: false }, { isPaid: true }],
+                // Unpaid external (off-platform) deliveries are surfaced too, but
+                // flagged `paymentPending` below — the hub can accept/sort them,
+                // yet the batching engine independently refuses to route them
+                // until they're paid.
             },
             orderBy: { createdAt: "asc" },
+            take: 100,
             include: {
                 address: { select: { name: true, sector: true, district: true, phone: true } },
                 store: { select: { name: true } },
@@ -40,6 +43,10 @@ export async function GET(request) {
                 recipientPhone: o.address?.phone ?? null,
                 sector: o.address?.sector ?? o.address?.district ?? null,
                 landmarkAddress: o.landmarkAddress ?? null,
+                isExternalDelivery: o.isExternalDelivery,
+                packageDescription: o.packageDescription ?? null,
+                // Unpaid external bookings can be intaken but not routed yet.
+                paymentPending: o.isExternalDelivery && !o.isPaid,
             })),
         });
     } catch (error) {
