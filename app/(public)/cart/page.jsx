@@ -3,6 +3,7 @@ import Counter from "@/components/Counter";
 import OrderSummary from "@/components/OrderSummary";
 import PageTitle from "@/components/PageTitle";
 import { deleteItemFromCart } from "@/lib/features/cart/cartSlice";
+import { effectiveUnitPrice, isWholesaleApplied } from "@/lib/priceUtils";
 import { ArrowRightIcon, Trash2Icon, AlertTriangleIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -39,7 +40,7 @@ export default function Cart() {
             const product = allProducts.find(p => p.id === id);
             if (product) {
                 arr.push({ ...product, quantity });
-                total += product.price * quantity;
+                total += effectiveUnitPrice(product, quantity) * quantity;
             }
         }
         setCartArray(arr);
@@ -78,6 +79,8 @@ export default function Cart() {
                         <tbody>
                             {cartArray.map((item, index) => {
                                 const stockIssue = !item.inStock || item.warehouseQuantity < item.quantity;
+                                const unitPrice = effectiveUnitPrice(item, item.quantity);
+                                const wholesale = isWholesaleApplied(item, item.quantity);
                                 return (
                                     <tr key={index} className={`space-x-2 ${stockIssue ? 'opacity-60' : ''}`}>
                                         <td className="flex gap-3 my-4">
@@ -87,7 +90,20 @@ export default function Cart() {
                                             <div>
                                                 <p className="max-sm:text-sm">{item.name}</p>
                                                 <p className="text-xs text-slate-500">{item.category}</p>
-                                                <p>{currency}{item.price}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p>{currency}{unitPrice.toLocaleString()}</p>
+                                                    {wholesale && (
+                                                        <>
+                                                            <span className="text-xs text-slate-400 line-through">{currency}{item.price.toLocaleString()}</span>
+                                                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">Wholesale</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {!wholesale && item.wholesalePrice && item.wholesaleMinQty && (
+                                                    <p className="text-[11px] text-green-700 mt-0.5">
+                                                        Buy {item.wholesaleMinQty}+ for {currency}{item.wholesalePrice.toLocaleString()} each
+                                                    </p>
+                                                )}
                                                 {stockIssue && (
                                                     <p className="text-xs text-red-500 font-medium mt-0.5">
                                                         {!item.inStock ? 'Out of stock' : `Only ${item.warehouseQuantity} available`}
@@ -98,7 +114,7 @@ export default function Cart() {
                                         <td className="text-center">
                                             <Counter productId={item.id} />
                                         </td>
-                                        <td className="text-center">{currency}{(item.price * item.quantity).toLocaleString()}</td>
+                                        <td className="text-center">{currency}{(unitPrice * item.quantity).toLocaleString()}</td>
                                         <td className="text-center max-md:hidden">
                                             <button onClick={() => handleDeleteItemFromCart(item.id)} className="text-red-500 hover:bg-red-50 p-2.5 rounded-full active:scale-95 transition-all">
                                                 <Trash2Icon size={18} />
