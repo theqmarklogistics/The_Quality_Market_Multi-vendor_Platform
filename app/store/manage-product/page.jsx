@@ -152,7 +152,7 @@ export default function StoreManageProducts() {
                 </div>
             ) : (
                 <>
-                    <table className="w-full max-w-4xl text-left ring ring-slate-200 rounded overflow-hidden text-sm">
+                    <table className="w-full max-w-6xl text-left ring ring-slate-200 rounded overflow-hidden text-sm">
                         <thead className="bg-slate-50 text-gray-700 uppercase tracking-wider">
                             <tr>
                                 <th className="px-4 py-3">Name</th>
@@ -166,7 +166,7 @@ export default function StoreManageProducts() {
                         </thead>
                         <tbody className="text-slate-700">
                             {products.map((product) => (
-                                <tr key={product.id} className="border-t border-gray-200 hover:bg-gray-50">
+                                <tr key={product.id} className="border-t border-gray-200 hover:bg-gray-50 align-top">
                                     <td className="px-4 py-3">
                                         <div className="flex gap-2 items-center">
                                             {product.images?.[0] ? (
@@ -177,7 +177,9 @@ export default function StoreManageProducts() {
                                             {product.name}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 max-w-md text-slate-600 hidden md:table-cell truncate">{product.description}</td>
+                                    <td className="px-4 py-3 w-80 max-w-xs text-slate-600 hidden md:table-cell">
+                                        <p className="whitespace-normal break-words leading-relaxed">{product.description}</p>
+                                    </td>
                                     <td className="px-4 py-3 hidden md:table-cell">{currency} {product.mrp?.toLocaleString()}</td>
                                     <td className="px-4 py-3">{currency} {product.price?.toLocaleString()}</td>
                                     <td className="px-4 py-3 hidden lg:table-cell">{product.warehouseQuantity}</td>

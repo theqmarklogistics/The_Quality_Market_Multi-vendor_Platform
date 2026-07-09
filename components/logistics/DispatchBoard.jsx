@@ -23,6 +23,7 @@ export default function DispatchBoard() {
     const { getToken } = useAuth();
     const [date, setDate] = useState(todayStr());
     const [corridors, setCorridors] = useState([]);
+    const [poolable, setPoolable] = useState([]);
     const [riders, setRiders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
@@ -35,12 +36,14 @@ export default function DispatchBoard() {
         if (!silent) setLoading(true);
         try {
             const headers = await authHeaders();
-            const [c, r] = await Promise.all([
+            const [c, r, p] = await Promise.all([
                 axios.get(`/api/logistics/corridors?date=${date}`, { headers }),
                 axios.get(`/api/logistics/riders`, { headers }),
+                axios.get(`/api/logistics/orders/poolable`, { headers }),
             ]);
             setCorridors(c.data.corridors || []);
             setRiders(r.data.riders || []);
+            setPoolable(p.data.orders || []);
         } catch (err) {
             if (!silent) toast.error(err?.response?.data?.error || err.message);
         } finally {
@@ -150,6 +153,58 @@ export default function DispatchBoard() {
             {/* Live overview map */}
             <div className="rounded-3xl bg-white border border-slate-200 p-3 shadow-sm mb-6">
                 <LiveMap riders={mapRiders} stops={mapStops} showRoute height={300} />
+            </div>
+
+            {/* Available deliveries — un-batched pooled packages (internal + external)
+                awaiting intake/sorting at the hub. "Batch now" sweeps the routable
+                ones into corridors; unpaid external bookings show a Payment pending
+                badge and are held out of routing until paid. */}
+            <div className="rounded-3xl bg-white border border-slate-200 shadow-sm mb-6 overflow-hidden">
+                <div className="flex items-center justify-between gap-3 p-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                        <PackageIcon size={18} className="text-slate-500" />
+                        <p className="font-semibold text-slate-800">Available deliveries</p>
+                        <span className="text-xs text-slate-400">({poolable.length})</span>
+                    </div>
+                    <button onClick={runBatching} disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-slate-800 text-white px-3 py-1.5 text-sm font-medium hover:bg-slate-900 disabled:opacity-50"><LayersIcon size={14} /> Batch now</button>
+                </div>
+                {poolable.length === 0 ? (
+                    <p className="text-sm text-slate-400 px-4 py-6 text-center">No packages awaiting intake. New drop-offs and external bookings appear here.</p>
+                ) : (
+                    <div className="divide-y divide-slate-100">
+                        {poolable.map(o => (
+                            <div key={o.orderId} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                                <div className="min-w-0">
+                                    <p className="font-medium text-slate-800 truncate">
+                                        {o.recipientName || "Recipient"} · <span className="text-slate-400">{o.sector || "—"}</span>
+                                    </p>
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                        {o.isExternalDelivery
+                                            ? <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">External</span>
+                                            : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{o.storeName || "Store"}</span>}
+                                        {o.intakeMethod && (
+                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                                {o.intakeMethod === "DRIVER_SWEEP" ? "Driver sweep" : "Hub drop-off"}
+                                            </span>
+                                        )}
+                                        {o.paymentPending && (
+                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Payment pending</span>
+                                        )}
+                                    </div>
+                                    {(o.landmarkAddress || o.packageDescription) && (
+                                        <p className="mt-0.5 text-xs text-slate-400 truncate">{o.packageDescription || o.landmarkAddress}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] font-semibold text-slate-500">{o.deliveryStatus}</span>
+                                    {o.deliveryStatus === "PENDING_INTAKE" && (
+                                        <button disabled={busy} onClick={() => markIntake(o.orderId)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400">Mark sorted</button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {loading ? (
