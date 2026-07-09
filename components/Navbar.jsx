@@ -364,6 +364,17 @@ const Navbar = () => {
 
                     {/* Compact bar — shown below xl where the full inline menu can't fit */}
                     <div className="xl:hidden flex items-center gap-3 sm:gap-4">
+                        {/* Key CTA stays visible on phones — icon-only, with label from sm up */}
+                        {staffRole !== 'EXTERNAL_SELLER' && (
+                            <Link
+                                href="/external"
+                                aria-label="Deliver with us"
+                                className="flex items-center gap-1.5 whitespace-nowrap px-2.5 sm:px-3 py-1.5 bg-green-600 text-white rounded-full text-xs sm:text-sm hover:bg-green-700 transition"
+                            >
+                                <TruckIcon size={15} /> <span className="hidden sm:inline">Deliver with us</span>
+                            </Link>
+                        )}
+
                         <button
                             aria-label="Search products"
                             onClick={() => setMobileSearchOpen(v => !v)}
@@ -400,6 +411,15 @@ const Navbar = () => {
                                             <UserButton.Action labelIcon={<MessageCircleIcon size={16} />} label="Contact Admin" onClick={openAdminConversation} />
                                         </>
                                     )}
+                                    {staffRole === 'RIDER' && (
+                                        <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Rider Console" onClick={() => router.push('/rider')} />
+                                    )}
+                                    {(staffRole === 'LOGISTICS_MANAGER' || isAdmin) && (
+                                        <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Dispatch Board" onClick={() => router.push('/logistics')} />
+                                    )}
+                                    {staffRole === 'EXTERNAL_SELLER' && (
+                                        <UserButton.Action labelIcon={<PackageIcon size={16} />} label="My Deliveries" onClick={() => router.push('/external')} />
+                                    )}
                                     <UserButton.Action labelIcon={<PackageIcon size={16} />} label="My Orders" onClick={() => router.push('/orders')} />
                                     <UserButton.Action labelIcon={<MessageCircleIcon size={16} />} label="My Chats" onClick={() => router.push('/chat')} />
                                 </UserButton.MenuItems>
@@ -430,12 +450,6 @@ const Navbar = () => {
                         <Link href="/shop" className="py-2 hover:text-slate-900">Shop</Link>
                         <Link href="/about" className="py-2 hover:text-slate-900">About</Link>
                         <Link href="/contact" className="py-2 hover:text-slate-900">Contact</Link>
-
-                        {staffRole !== 'EXTERNAL_SELLER' && (
-                            <Link href="/external" className="mt-2 flex items-center gap-1.5 self-start px-4 py-2 bg-green-600 text-white rounded-full text-sm hover:bg-green-700 transition">
-                                <TruckIcon size={15} /> Deliver with us
-                            </Link>
-                        )}
 
                         {dashboards.length > 0 && (
                             <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
