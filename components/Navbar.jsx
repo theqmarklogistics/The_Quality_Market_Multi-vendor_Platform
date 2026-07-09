@@ -1,9 +1,9 @@
 'use client'
-import { MessageCircleIcon, PackageIcon, Search, ShoppingCart, User, TruckIcon } from "lucide-react";
+import { MessageCircleIcon, PackageIcon, Search, ShoppingCart, User, TruckIcon, ChevronDownIcon, LayoutGridIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import { useAuth, useClerk, useUser, UserButton } from "@clerk/nextjs";
 import axios from "axios";
@@ -30,6 +30,8 @@ const Navbar = () => {
     const [staffRole, setStaffRole] = useState(null) // RIDER | LOGISTICS_MANAGER | ...
     const [loadingAccess, setLoadingAccess] = useState(false)
     const [unreadChats, setUnreadChats] = useState(0)
+    const [workspacesOpen, setWorkspacesOpen] = useState(false)
+    const workspacesRef = useRef(null)
     const cartCount = useSelector(state => state.cart.total)
 
     useEffect(() => {
@@ -197,6 +199,30 @@ const Navbar = () => {
 
     const canShowAccessActions = user && !loadingAccess
 
+    // Role-based dashboard shortcuts. Grouped so the nav footprint stays fixed
+    // no matter how many roles a user holds — a single role renders as a direct
+    // pill, multiple roles collapse into one "Workspaces" dropdown.
+    const dashboards = []
+    if (canShowAccessActions && isAdmin) dashboards.push({ href: '/admin', label: 'Admin Dashboard', color: 'bg-slate-50 text-slate-800 hover:bg-slate-100' })
+    if (canShowAccessActions && isSeller) dashboards.push({ href: '/store', label: 'Store Dashboard', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' })
+    if (staffRole === 'RIDER') dashboards.push({ href: '/rider', label: 'Rider Console', color: 'bg-green-50 text-green-700 hover:bg-green-100' })
+    if (staffRole === 'LOGISTICS_MANAGER' || isAdmin) dashboards.push({ href: '/logistics', label: 'Dispatch', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' })
+    if (staffRole === 'EXTERNAL_SELLER') dashboards.push({ href: '/external', label: 'My Deliveries', color: 'bg-green-50 text-green-700 hover:bg-green-100' })
+
+    // Close the workspaces dropdown on outside click or route change.
+    useEffect(() => {
+        if (!workspacesOpen) return
+        const onClick = (e) => {
+            if (workspacesRef.current && !workspacesRef.current.contains(e.target)) {
+                setWorkspacesOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', onClick)
+        return () => document.removeEventListener('mousedown', onClick)
+    }, [workspacesOpen])
+
+    useEffect(() => { setWorkspacesOpen(false) }, [pathname])
+
     return (
         <nav className="relative bg-white">
             <div className="mx-6">
@@ -263,31 +289,41 @@ const Navbar = () => {
                             </Link>
                         )}
 
-                        {/* Visible dashboard shortcuts for quick access */}
-                        {canShowAccessActions && isSeller && (
-                            <Link href="/store" className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-sm hover:bg-emerald-100">
-                                Store Dashboard
+                        {/* Role dashboard shortcuts — a lone role shows as a direct pill,
+                            multiple roles collapse into one dropdown so the nav never overflows. */}
+                        {dashboards.length === 1 && (
+                            <Link href={dashboards[0].href} className={`whitespace-nowrap px-3 py-1 rounded-full text-sm ${dashboards[0].color}`}>
+                                {dashboards[0].label}
                             </Link>
                         )}
-                        {canShowAccessActions && isAdmin && (
-                            <Link href="/admin" className="px-3 py-1 bg-slate-50 text-slate-800 rounded-full text-sm hover:bg-slate-100">
-                                Admin Dashboard
-                            </Link>
-                        )}
-                        {(staffRole === 'RIDER') && (
-                            <Link href="/rider" className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100">
-                                Rider Console
-                            </Link>
-                        )}
-                        {(staffRole === 'LOGISTICS_MANAGER' || isAdmin) && (
-                            <Link href="/logistics" className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm hover:bg-blue-100">
-                                Dispatch
-                            </Link>
-                        )}
-                        {(staffRole === 'EXTERNAL_SELLER') && (
-                            <Link href="/external" className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm hover:bg-green-100">
-                                My Deliveries
-                            </Link>
+                        {dashboards.length > 1 && (
+                            <div className="relative" ref={workspacesRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => setWorkspacesOpen(v => !v)}
+                                    aria-haspopup="menu"
+                                    aria-expanded={workspacesOpen}
+                                    className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1 bg-slate-50 text-slate-800 rounded-full text-sm hover:bg-slate-100 transition"
+                                >
+                                    <LayoutGridIcon size={14} /> Workspaces
+                                    <ChevronDownIcon size={14} className={`transition-transform ${workspacesOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {workspacesOpen && (
+                                    <div role="menu" className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-slate-200 bg-white shadow-lg py-1.5 z-50">
+                                        {dashboards.map(d => (
+                                            <Link
+                                                key={d.href}
+                                                href={d.href}
+                                                role="menuitem"
+                                                onClick={() => setWorkspacesOpen(false)}
+                                                className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                            >
+                                                {d.label}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         { !user ? (
