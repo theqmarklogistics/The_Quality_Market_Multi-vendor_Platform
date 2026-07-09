@@ -31,7 +31,7 @@ import { startRiderTracking, stopRiderTracking } from '@/rider/locationTracking'
 import { useRealtimeRoom } from '@/realtime/useRealtimeRoom';
 import { useMyRole, canAccessRider } from '@/hooks/useMyRole';
 import { EmptyState, Loader } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 // Native maps need a Google Maps API key on Android; until one is configured
 // the screen degrades to a placeholder (same as web).
@@ -550,18 +550,18 @@ export default function RiderConsoleScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: 6 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginTop: 6 },
+  emptyTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text, marginTop: 6 },
   emptySub: { fontSize: 13, color: colors.muted, textAlign: 'center' },
   refreshBtn: { marginTop: spacing.md },
-  refreshText: { color: colors.success, fontWeight: '600', textDecorationLine: 'underline' },
+  refreshText: { color: colors.success, fontFamily: fonts.semibold, textDecorationLine: 'underline' },
 
   header: {
     backgroundColor: '#0f172a',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
   },
-  headerKicker: { color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: 2, fontWeight: '700' },
-  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 2 },
+  headerKicker: { color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: 2, fontFamily: fonts.bold },
+  headerTitle: { color: '#fff', fontSize: 20, fontFamily: fonts.bold, marginTop: 2 },
   headerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
 
   map: { width: '100%', height: 240 },
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-  stopPinText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  stopPinText: { color: '#fff', fontSize: 12, fontFamily: fonts.bold },
 
   body: { padding: spacing.lg, gap: spacing.md },
   stopCard: {
@@ -614,12 +614,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stopSeqText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  stopName: { fontSize: 15, fontWeight: '700', color: colors.text },
+  stopSeqText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
+  stopName: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   stopLandmark: { fontSize: 12, color: colors.muted, marginTop: 2 },
   stopPlace: { fontSize: 12, color: colors.subtle, marginTop: 2 },
   badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  badgeText: { fontSize: 10, fontFamily: fonts.bold },
 
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   actionOutline: {
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 10,
   },
-  actionOutlineText: { fontSize: 12, fontWeight: '600', color: colors.text },
+  actionOutlineText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.text },
   actionBtn: {
     flexGrow: 1,
     flexBasis: '47%',
@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
   },
   actionArriving: { backgroundColor: colors.warning },
   actionDeliver: { backgroundColor: colors.success },
-  actionBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  actionBtnText: { fontSize: 12, fontFamily: fonts.bold, color: '#fff' },
   actionFail: {
     flexBasis: '100%',
     flexDirection: 'row',
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 10,
   },
-  actionFailText: { fontSize: 12, fontWeight: '600', color: colors.danger },
+  actionFailText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.danger },
 
   footer: {
     position: 'absolute',
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
   },
   trackBtnStart: { backgroundColor: colors.success },
   trackBtnStop: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
-  trackText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  trackText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
   trackTextStop: { color: colors.danger },
 
   modalOverlay: {
@@ -695,7 +695,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: spacing.xl,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+  modalTitle: { fontSize: 18, fontFamily: fonts.bold, color: colors.text },
   modalSub: { fontSize: 13, color: colors.muted, marginTop: 4 },
   otpInput: {
     marginTop: spacing.lg,
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     textAlign: 'center',
     fontSize: 30,
-    fontWeight: '800',
+    fontFamily: fonts.bold,
     letterSpacing: 12,
     color: colors.text,
   },
@@ -718,7 +718,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  modalCancelText: { color: colors.muted, fontWeight: '600' },
+  modalCancelText: { color: colors.muted, fontFamily: fonts.semibold },
   modalConfirm: {
     flex: 1,
     backgroundColor: colors.success,
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
   },
-  modalConfirmText: { color: '#fff', fontWeight: '700' },
+  modalConfirmText: { color: '#fff', fontFamily: fonts.bold },
   modalFail: {
     flex: 1,
     backgroundColor: colors.danger,
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 12,
   },
-  photoBtnText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  photoBtnText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.text },
   photoNote: { fontSize: 11, color: colors.subtle, marginTop: 6 },
 
   reason: {
@@ -761,7 +761,7 @@ const styles = StyleSheet.create({
   },
   reasonActive: { borderColor: '#fca5a5', backgroundColor: '#fef2f2' },
   reasonText: { fontSize: 13, color: colors.muted },
-  reasonTextActive: { color: colors.danger, fontWeight: '600' },
+  reasonTextActive: { color: colors.danger, fontFamily: fonts.semibold },
   noteInput: {
     marginTop: spacing.md,
     borderWidth: 1,

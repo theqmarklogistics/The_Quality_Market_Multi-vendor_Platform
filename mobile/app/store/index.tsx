@@ -22,7 +22,7 @@ import {
 } from '@/api/store';
 import { useMyRole, canAccessSeller } from '@/hooks/useMyRole';
 import { EmptyState, Loader, Money, Stars } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const STATUS_COPY: Record<string, { title: string; subtitle: string }> = {
   no_store: {
@@ -219,8 +219,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
   },
-  headerKicker: { color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: 2, fontWeight: '700' },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 2 },
+  headerKicker: { color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: 2, fontFamily: fonts.bold },
+  headerTitle: { color: '#fff', fontSize: 22, fontFamily: fonts.bold, marginTop: 2 },
   headerEarnings: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 6, flexDirection: 'row' },
   earningsValue: { color: '#fff', fontSize: 14 },
 
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
-  metricValue: { fontSize: 20, fontWeight: '800', color: colors.text },
+  metricValue: { fontSize: 20, fontFamily: fonts.bold, color: colors.text },
   metricLabel: { fontSize: 11, color: colors.muted },
 
   shortcuts: { paddingHorizontal: spacing.lg, gap: spacing.sm },
@@ -255,12 +255,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shortcutTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  shortcutTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   shortcutSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
 
   section: { padding: spacing.lg },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.md },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  sectionTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
 
   lowStock: {
     flexDirection: 'row',
@@ -275,8 +275,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   lowStockOut: { borderColor: '#fecaca', backgroundColor: '#fef2f2' },
-  lowStockName: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
-  lowStockQty: { fontSize: 13, fontWeight: '700', color: colors.warning },
+  lowStockName: { flex: 1, fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
+  lowStockQty: { fontSize: 13, fontFamily: fonts.bold, color: colors.warning },
   lowStockQtyOut: { color: colors.danger },
 
   review: {
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   reviewTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  reviewUser: { fontSize: 14, fontWeight: '700', color: colors.text },
+  reviewUser: { fontSize: 14, fontFamily: fonts.bold, color: colors.text },
   reviewProduct: { fontSize: 12, color: colors.muted, marginTop: 2 },
   reviewBody: { fontSize: 13, color: colors.text, marginTop: 6, lineHeight: 19 },
 

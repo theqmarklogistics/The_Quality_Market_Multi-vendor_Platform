@@ -14,10 +14,11 @@ import {
 import { useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
 import { getMessages, sendMessage, type Message } from '@/api/chat';
 import { useRealtimeRoom } from '@/realtime/useRealtimeRoom';
 import { Loader } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function ChatRoomScreen() {
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
@@ -89,6 +90,9 @@ export default function ChatRoomScreen() {
             <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowTheirs]}>
               <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
                 <Text style={[styles.msgText, mine && styles.msgTextMine]}>{item.content}</Text>
+                <Text style={[styles.msgTime, mine && styles.msgTimeMine]}>
+                  {format(new Date(item.createdAt), 'HH:mm')}
+                </Text>
               </View>
             </View>
           );
@@ -107,8 +111,10 @@ export default function ChatRoomScreen() {
           style={[styles.sendBtn, (!input.trim() || sending) && styles.sendDisabled]}
           onPress={onSend}
           disabled={!input.trim() || sending}
+          accessibilityRole="button"
+          accessibilityLabel="Send message"
         >
-          <Ionicons name="send" size={18} color="#fff" />
+          <Ionicons name="send" size={18} color={colors.primaryText} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -121,34 +127,51 @@ const styles = StyleSheet.create({
   bubbleRow: { flexDirection: 'row', marginVertical: 2 },
   rowMine: { justifyContent: 'flex-end' },
   rowTheirs: { justifyContent: 'flex-start' },
-  bubble: { maxWidth: '80%', borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9 } as any,
-  bubbleMine: { backgroundColor: colors.primary, borderBottomRightRadius: 2 },
-  bubbleTheirs: { backgroundColor: colors.card, borderBottomLeftRadius: 2 },
-  msgText: { fontSize: 15, color: colors.text },
+  bubble: {
+    maxWidth: '80%',
+    borderRadius: radius.lg,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  } as any,
+  bubbleMine: { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
+  bubbleTheirs: { backgroundColor: colors.borderLight, borderBottomLeftRadius: 4 },
+  msgText: { fontSize: 15, color: colors.text, lineHeight: 21, fontFamily: fonts.regular },
   msgTextMine: { color: colors.primaryText },
+  msgTime: {
+    fontSize: 10.5,
+    color: colors.subtle,
+    alignSelf: 'flex-end',
+    marginTop: 3,
+    fontFamily: fonts.regular,
+  },
+  msgTimeMine: { color: 'rgba(255,255,255,0.75)' },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
     padding: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.borderLight,
+    backgroundColor: colors.bg,
   },
   input: {
     flex: 1,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: radius.xl,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
     maxHeight: 120,
+    minHeight: 46,
     fontSize: 15,
     color: colors.text,
+    fontFamily: fonts.regular,
+    backgroundColor: colors.surface,
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',

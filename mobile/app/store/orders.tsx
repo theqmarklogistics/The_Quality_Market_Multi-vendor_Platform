@@ -28,7 +28,7 @@ import {
 import { EmptyState, Loader, Money } from '@/components/ui';
 import { formatPrice } from '@/constants';
 import type { OrderStatus } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const STATUS_FILTERS: { label: string; value: OrderStatus | '' }[] = [
   { label: 'All', value: '' },
@@ -271,7 +271,7 @@ export default function SellerOrdersScreen() {
                 <View style={{ gap: spacing.sm }}>
                   {selected.orderItems.map((it) => (
                     <View key={String(it.id)} style={styles.itemRow}>
-                      <Image source={{ uri: it.product?.images?.[0] }} style={styles.itemThumb} />
+                      <Image source={{ uri: it.product?.images?.[0] }} style={styles.itemThumb} alt={it.product?.name ?? 'Product'} />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemName} numberOfLines={1}>{it.product?.name ?? 'Item'}</Text>
                         <Text style={styles.itemMeta}>Qty {it.quantity} · {formatPrice(it.price)}</Text>
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md },
   filterChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+  filterText: { fontSize: 12, color: colors.muted, fontFamily: fonts.semibold },
   filterTextActive: { color: colors.primaryText },
   count: { fontSize: 12, color: colors.subtle, marginTop: spacing.md },
 
@@ -415,17 +415,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  customer: { fontSize: 15, fontWeight: '700', color: colors.text },
+  customer: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   date: { fontSize: 12, color: colors.muted, marginTop: 2 },
   cardBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   cardRight: { alignItems: 'flex-end', gap: 4, flexDirection: 'row' },
   badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   statusBadge: { backgroundColor: '#f1f5f9' },
-  statusBadgeText: { fontSize: 10, fontWeight: '700', color: '#475569' },
+  statusBadgeText: { fontSize: 10, fontFamily: fonts.bold, color: '#475569' },
   paidBadge: { backgroundColor: '#dcfce7' },
   pendingBadge: { backgroundColor: '#fef3c7' },
   shipBadge: { backgroundColor: '#fef3c7' },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  badgeText: { fontSize: 10, fontFamily: fonts.bold },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
@@ -437,21 +437,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  modalTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text },
 
-  detailLabel: { fontSize: 11, fontWeight: '700', color: colors.subtle, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
-  detailValue: { fontSize: 15, fontWeight: '700', color: colors.text },
+  detailLabel: { fontSize: 11, fontFamily: fonts.bold, color: colors.subtle, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  detailValue: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   detailSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   itemThumb: { width: 48, height: 48, borderRadius: radius.sm, backgroundColor: colors.card },
-  itemName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  itemName: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
   itemMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
 
   summary: { marginTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, gap: 6 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   summaryLabel: { fontSize: 14, color: colors.muted },
-  summaryValue: { fontSize: 14, fontWeight: '600', color: colors.text },
+  summaryValue: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
 
   actionCard: {
     marginTop: spacing.lg,
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  actionCardTitle: { fontSize: 14, fontWeight: '700', color: '#92400e' },
+  actionCardTitle: { fontSize: 14, fontFamily: fonts.bold, color: '#92400e' },
   actionCardHint: { fontSize: 12, color: '#b45309', marginTop: 4, marginBottom: spacing.sm },
   feeRow: { flexDirection: 'row', gap: spacing.sm },
   feeInput: {
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   feeBtn: { backgroundColor: colors.warning, borderRadius: radius.sm, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
-  feeBtnText: { color: '#fff', fontWeight: '700' },
+  feeBtnText: { color: '#fff', fontFamily: fonts.bold },
 
   intakeOption: {
     flexDirection: 'row',
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   intakeOptionActive: { borderColor: '#86efac', backgroundColor: '#f0fdf4' },
-  intakeTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
+  intakeTitle: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
   intakeSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
 
   input: {
@@ -507,6 +507,6 @@ const styles = StyleSheet.create({
   primaryBtn: { borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginTop: spacing.md },
   processingBtn: { backgroundColor: colors.primary },
   shippedBtn: { backgroundColor: colors.success },
-  primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  primaryBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 15 },
   doneNote: { fontSize: 13, color: colors.muted, marginTop: spacing.lg, textAlign: 'center' },
 });

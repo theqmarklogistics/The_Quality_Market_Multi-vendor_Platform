@@ -14,21 +14,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
 import * as ImagePicker from 'expo-image-picker';
 import { getOrders, uploadPaymentProof } from '@/api/orders';
 import { createConversation } from '@/api/chat';
 import type { Order } from '@/api/types';
-import { Button, EmptyState, Loader, Money } from '@/components/ui';
+import { Badge, Button, EmptyState, Loader, Money } from '@/components/ui';
 import { RatingModal } from '@/components/RatingModal';
 import { formatPrice } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
-const statusColor: Record<string, string> = {
-  ORDER_PLACED: colors.warning,
-  PROCESSING: colors.warning,
-  SHIPPED: colors.primary,
-  DELIVERED: colors.success,
-  OTHER: colors.muted,
+const statusTone: Record<string, 'warning' | 'info' | 'brand' | 'success' | 'neutral'> = {
+  ORDER_PLACED: 'warning',
+  PROCESSING: 'info',
+  SHIPPED: 'brand',
+  DELIVERED: 'success',
+  OTHER: 'neutral',
 };
 
 export default function OrdersScreen() {
@@ -123,9 +124,22 @@ export default function OrdersScreen() {
         data={orders}
         keyExtractor={(o) => o.id}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListEmptyComponent={
-          <EmptyState icon="receipt-outline" title="No orders yet" subtitle="Your orders will appear here." />
+          <EmptyState
+            icon="receipt-outline"
+            title="No orders yet"
+            subtitle="Your orders will appear here."
+            actionLabel="Start shopping"
+            onAction={() => router.push('/(tabs)')}
+          />
         }
         renderItem={({ item }) => {
           const canUploadProof =
@@ -137,16 +151,25 @@ export default function OrdersScreen() {
           return (
             <View style={styles.card}>
               <View style={styles.cardHead}>
-                <Text style={styles.orderId}>#{item.id.slice(-8)}</Text>
-                <View style={[styles.badge, { backgroundColor: statusColor[item.status] ?? colors.muted }]}>
-                  <Text style={styles.badgeText}>{item.status.replace('_', ' ')}</Text>
+                <View>
+                  <Text style={styles.orderId}>#{item.id.slice(-8)}</Text>
+                  <Text style={styles.date}>
+                    {format(new Date(item.createdAt), 'MMM d, yyyy')}
+                  </Text>
                 </View>
+                <Badge
+                  label={item.status.replace(/_/g, ' ')}
+                  tone={statusTone[item.status] ?? 'neutral'}
+                />
               </View>
-              <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
 
               {item.orderItems.map((oi) => (
                 <View key={String(oi.id)} style={styles.itemRow}>
-                  <Image source={{ uri: oi.product?.images?.[0] }} style={styles.thumb} />
+                  <Image
+                    source={{ uri: oi.product?.images?.[0] }}
+                    style={styles.thumb}
+                    alt={oi.product?.name ?? 'Product'}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.itemName} numberOfLines={1}>
                       {oi.product?.name ?? 'Product'}
@@ -158,6 +181,8 @@ export default function OrdersScreen() {
                   {isDelivered ? (
                     <TouchableOpacity
                       style={styles.rateBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rate ${oi.product?.name ?? 'product'}`}
                       onPress={() =>
                         setRateTarget({
                           orderId: item.id,
@@ -166,7 +191,7 @@ export default function OrdersScreen() {
                         })
                       }
                     >
-                      <Ionicons name="star-outline" size={14} color={colors.text} />
+                      <Ionicons name="star" size={13} color={colors.primaryDark} />
                       <Text style={styles.rateText}>Rate</Text>
                     </TouchableOpacity>
                   ) : null}
@@ -180,17 +205,28 @@ export default function OrdersScreen() {
 
               {/* Payment */}
               <View style={styles.payRow}>
-                <Text style={styles.muted}>
-                  Payment: {item.isPaid ? 'Paid' : item.paymentStatus}
-                </Text>
+                <View style={styles.payState}>
+                  <Ionicons
+                    name={item.isPaid ? 'checkmark-circle' : 'time-outline'}
+                    size={15}
+                    color={item.isPaid ? colors.success : colors.warning}
+                  />
+                  <Text style={styles.muted}>
+                    Payment: {item.isPaid ? 'Paid' : item.paymentStatus}
+                  </Text>
+                </View>
                 {item.paymentProofStatus !== 'NOT_SUBMITTED' ? (
-                  <Text style={styles.proofStatus}>Proof: {item.paymentProofStatus}</Text>
+                  <Text style={styles.proofStatus}>
+                    Proof: {item.paymentProofStatus.replace(/_/g, ' ')}
+                  </Text>
                 ) : null}
               </View>
               {canUploadProof ? (
                 <Button
                   label="Upload payment proof"
                   variant="outline"
+                  size="md"
+                  icon="cloud-upload-outline"
                   onPress={() => uploadProof(item.id)}
                   loading={uploadingId === item.id}
                 />
@@ -199,14 +235,21 @@ export default function OrdersScreen() {
               {/* Delivery */}
               {item.deliveryType === 'KIGALI_POOL' ? (
                 <View style={styles.deliveryBox}>
-                  <Text style={styles.muted}>
-                    Pooled delivery: {item.deliveryStatus ?? 'PENDING_INTAKE'}
-                  </Text>
+                  <View style={styles.deliveryHead}>
+                    <Ionicons name="bicycle-outline" size={15} color={colors.primaryDark} />
+                    <Text style={styles.deliveryLabel}>
+                      Pooled delivery: {(item.deliveryStatus ?? 'PENDING_INTAKE').replace(/_/g, ' ')}
+                    </Text>
+                  </View>
                   {item.deliveryOtp ? (
-                    <Text style={styles.otp}>Delivery code: {item.deliveryOtp}</Text>
+                    <View style={styles.otpRow}>
+                      <Text style={styles.otpLabel}>Delivery code</Text>
+                      <Text style={styles.otp}>{item.deliveryOtp}</Text>
+                    </View>
                   ) : null}
                   <TouchableOpacity
                     style={styles.linkBtn}
+                    accessibilityRole="button"
                     onPress={() =>
                       router.push({ pathname: '/track/[orderId]', params: { orderId: item.id } })
                     }
@@ -218,7 +261,11 @@ export default function OrdersScreen() {
               ) : null}
 
               {item.storeId ? (
-                <TouchableOpacity style={styles.linkBtn} onPress={() => messageSeller(item)}>
+                <TouchableOpacity
+                  style={styles.linkBtn}
+                  accessibilityRole="button"
+                  onPress={() => messageSeller(item)}
+                >
                   <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.primary} />
                   <Text style={styles.linkText}>Message seller</Text>
                 </TouchableOpacity>
@@ -244,53 +291,79 @@ export default function OrdersScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  title: { fontSize: 24, fontWeight: '700', paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  title: {
+    fontSize: 24,
+    fontFamily: fonts.bold,
+    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   list: { padding: spacing.lg, gap: spacing.md },
   card: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.md,
     gap: spacing.sm,
+    ...shadows.card,
   },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderId: { fontSize: 15, fontWeight: '700', color: colors.text },
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  date: { fontSize: 12, color: colors.subtle },
+  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  orderId: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
+  date: { fontSize: 12, color: colors.subtle, marginTop: 1, fontFamily: fonts.regular },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   thumb: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: colors.card },
-  itemName: { fontSize: 14, color: colors.text },
-  itemMeta: { fontSize: 12, color: colors.muted },
+  itemName: { fontSize: 14, color: colors.text, fontFamily: fonts.medium },
+  itemMeta: { fontSize: 12, color: colors.muted, fontFamily: fonts.regular },
   rateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: colors.primaryBorder,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    minHeight: 34,
   },
-  rateText: { fontSize: 12, color: colors.text },
+  rateText: { fontSize: 12.5, color: colors.primaryDark, fontFamily: fonts.semibold },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.borderLight,
     paddingTop: spacing.sm,
   },
   payRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  muted: { fontSize: 13, color: colors.muted },
-  proofStatus: { fontSize: 13, color: colors.text, fontWeight: '600' },
+  payState: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  muted: { fontSize: 13, color: colors.muted, fontFamily: fonts.regular },
+  proofStatus: { fontSize: 12.5, color: colors.body, fontFamily: fonts.semibold },
   deliveryBox: {
-    backgroundColor: colors.card,
-    borderRadius: radius.sm,
-    padding: spacing.sm,
-    gap: 4,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: 6,
   },
-  otp: { fontSize: 15, fontWeight: '800', color: colors.text, letterSpacing: 2 },
-  linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6 },
-  linkText: { color: colors.primary, fontWeight: '600', fontSize: 14 },
+  deliveryHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  deliveryLabel: { fontSize: 13, color: colors.primaryDark, fontFamily: fonts.semibold },
+  otpRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  otpLabel: { fontSize: 12, color: colors.muted, fontFamily: fonts.regular },
+  otp: {
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    color: colors.text,
+    letterSpacing: 3,
+    fontVariant: ['tabular-nums'],
+  },
+  linkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    minHeight: 32,
+  },
+  linkText: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 14 },
 });

@@ -25,7 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { listPendingStores, reviewStore, type PendingStore } from '@/api/admin';
 import { useMyRole, canAccessAdmin } from '@/hooks/useMyRole';
 import { EmptyState, Loader } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function StoreApprovalsScreen() {
   const { role, loading: roleLoading } = useMyRole();
@@ -126,7 +126,7 @@ export default function StoreApprovalsScreen() {
           return (
             <TouchableOpacity style={styles.card} onPress={() => open(item)} activeOpacity={0.85}>
               {item.logo ? (
-                <Image source={{ uri: item.logo }} style={styles.logo} />
+                <Image source={{ uri: item.logo }} style={styles.logo} alt="Store logo" />
               ) : (
                 <View style={[styles.logo, styles.logoEmpty]}>
                   <Ionicons name="storefront" size={20} color={colors.subtle} />
@@ -163,7 +163,7 @@ export default function StoreApprovalsScreen() {
               <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }}>
                 <View style={styles.storeHead}>
                   {selected.logo ? (
-                    <Image source={{ uri: selected.logo }} style={styles.logoLg} />
+                    <Image source={{ uri: selected.logo }} style={styles.logoLg} alt="Store logo" />
                   ) : (
                     <View style={[styles.logoLg, styles.logoEmpty]}>
                       <Ionicons name="storefront" size={28} color={colors.subtle} />
@@ -283,13 +283,13 @@ const styles = StyleSheet.create({
   },
   logo: { width: 48, height: 48, borderRadius: radius.sm, backgroundColor: colors.card },
   logoEmpty: { alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 15, fontWeight: '700', color: colors.text },
+  name: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   sub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   owner: { fontSize: 12, color: colors.subtle, marginTop: 2 },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   badgePending: { backgroundColor: '#fef3c7' },
   badgeRejected: { backgroundColor: '#fee2e2' },
-  badgeText: { fontSize: 10, fontWeight: '800' },
+  badgeText: { fontSize: 10, fontFamily: fonts.bold },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '92%' },
@@ -301,17 +301,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  modalTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text },
 
   storeHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   logoLg: { width: 56, height: 56, borderRadius: radius.md, backgroundColor: colors.card },
-  storeName: { fontSize: 18, fontWeight: '800', color: colors.text },
+  storeName: { fontSize: 18, fontFamily: fonts.bold, color: colors.text },
   desc: { fontSize: 14, color: colors.text, lineHeight: 20, marginTop: spacing.md },
 
   detailGrid: { marginTop: spacing.lg, gap: spacing.sm },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   detailLabel: { fontSize: 13, color: colors.muted, width: 72 },
-  detailValue: { flex: 1, fontSize: 13, color: colors.text, fontWeight: '600' },
+  detailValue: { flex: 1, fontSize: 13, color: colors.text, fontFamily: fonts.semibold },
   detailLink: { color: colors.success },
 
   noteArea: {
@@ -330,5 +330,5 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   rejectBtn: { backgroundColor: colors.danger },
   approveBtn: { backgroundColor: colors.success },
-  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  actionBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
 });

@@ -24,7 +24,7 @@ import {
 } from '@/store/cartSlice';
 import { unitPrice } from '@/lib/pricing';
 import { formatPrice } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
 export default function CartScreen() {
   const router = useRouter();
@@ -105,18 +105,24 @@ export default function CartScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <Text style={styles.title}>Cart</Text>
-        <EmptyState
-          icon="cart-outline"
-          title="Your cart is empty"
-          subtitle="Browse the shop and add items to get started."
-        />
+        <View style={{ flex: 1, justifyContent: 'center' }}>
+          <EmptyState
+            icon="cart-outline"
+            title="Your cart is empty"
+            subtitle="Browse the shop and add items to get started."
+            actionLabel="Start shopping"
+            onAction={() => router.push('/(tabs)')}
+          />
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Text style={styles.title}>Cart ({cartCount})</Text>
+      <Text style={styles.title}>
+        Cart <Text style={styles.titleCount}>({cartCount})</Text>
+      </Text>
       <FlatList
         data={ids}
         keyExtractor={(id) => id}
@@ -128,7 +134,11 @@ export default function CartScreen() {
             return (
               <View style={styles.line}>
                 <Text style={styles.unavailable}>Item unavailable</Text>
-                <TouchableOpacity onPress={() => remove(id)}>
+                <TouchableOpacity
+                  onPress={() => remove(id)}
+                  hitSlop={10}
+                  accessibilityLabel="Remove unavailable item"
+                >
                   <Ionicons name="trash-outline" size={20} color={colors.danger} />
                 </TouchableOpacity>
               </View>
@@ -136,26 +146,43 @@ export default function CartScreen() {
           }
           return (
             <View style={styles.line}>
-              <Image source={{ uri: p.images?.[0] }} style={styles.thumb} />
+              <Image source={{ uri: p.images?.[0] }} style={styles.thumb} alt={p.name} />
               <View style={styles.lineBody}>
                 <Text style={styles.name} numberOfLines={2}>
                   {p.name}
                 </Text>
                 <Text style={styles.unit}>{formatPrice(unitPrice(p, qty))} each</Text>
-                <View style={styles.stepper}>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => dec(id)}>
-                    <Ionicons name="remove" size={18} color={colors.text} />
-                  </TouchableOpacity>
-                  <Text style={styles.qty}>{qty}</Text>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => inc(id)}>
-                    <Ionicons name="add" size={18} color={colors.text} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.removeBtn} onPress={() => remove(id)}>
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                <View style={styles.stepperRow}>
+                  <View style={styles.stepper}>
+                    <TouchableOpacity
+                      style={styles.stepBtn}
+                      onPress={() => dec(id)}
+                      hitSlop={6}
+                      accessibilityLabel="Decrease quantity"
+                    >
+                      <Ionicons name="remove" size={16} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.qty}>{qty}</Text>
+                    <TouchableOpacity
+                      style={styles.stepBtn}
+                      onPress={() => inc(id)}
+                      hitSlop={6}
+                      accessibilityLabel="Increase quantity"
+                    >
+                      <Ionicons name="add" size={16} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={() => remove(id)}
+                    hitSlop={8}
+                    accessibilityLabel={`Remove ${p.name} from cart`}
+                  >
+                    <Ionicons name="trash-outline" size={17} color={colors.danger} />
                   </TouchableOpacity>
                 </View>
               </View>
-              <Money value={unitPrice(p, qty) * qty} />
+              <Money value={unitPrice(p, qty) * qty} style={styles.lineTotal} />
             </View>
           );
         }}
@@ -165,8 +192,15 @@ export default function CartScreen() {
           <Text style={styles.totalLabel}>Subtotal</Text>
           <Money value={subtotal} style={styles.totalValue} />
         </View>
-        <Text style={styles.note}>Delivery fee is calculated at checkout.</Text>
-        <Button label="Proceed to checkout" onPress={() => router.push('/checkout')} />
+        <View style={styles.noteRow}>
+          <Ionicons name="information-circle-outline" size={14} color={colors.subtle} />
+          <Text style={styles.note}>Delivery fee is calculated at checkout.</Text>
+        </View>
+        <Button
+          label="Proceed to checkout"
+          icon="arrow-forward"
+          onPress={() => router.push('/checkout')}
+        />
       </View>
     </SafeAreaView>
   );
@@ -174,34 +208,66 @@ export default function CartScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  title: { fontSize: 24, fontWeight: '700', paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  title: {
+    fontSize: 24,
+    fontFamily: fonts.bold,
+    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  titleCount: { color: colors.primary },
   list: { padding: spacing.lg, gap: spacing.md },
-  line: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  thumb: { width: 64, height: 64, borderRadius: radius.sm, backgroundColor: colors.card },
-  lineBody: { flex: 1, gap: 4 },
-  name: { fontSize: 14, color: colors.text },
-  unit: { fontSize: 12, color: colors.muted },
-  unavailable: { flex: 1, color: colors.muted, fontStyle: 'italic' },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 2 },
-  stepBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: radius.sm,
+  line: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    ...shadows.card,
+  },
+  thumb: { width: 68, height: 68, borderRadius: radius.md, backgroundColor: colors.card },
+  lineBody: { flex: 1, gap: 3 },
+  name: { fontSize: 14, color: colors.text, fontFamily: fonts.medium, lineHeight: 19 },
+  unit: { fontSize: 12, color: colors.muted, fontFamily: fonts.regular },
+  unavailable: { flex: 1, color: colors.muted, fontStyle: 'italic', fontFamily: fonts.regular },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+  },
+  stepBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  qty: { fontSize: 15, fontWeight: '600', minWidth: 20, textAlign: 'center' },
-  removeBtn: { marginLeft: 'auto', padding: 4 },
+  qty: {
+    fontSize: 14,
+    fontFamily: fonts.semibold,
+    color: colors.text,
+    minWidth: 24,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  removeBtn: { marginLeft: spacing.md, padding: 6 },
+  lineTotal: { fontSize: 15 },
   footer: {
     padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.borderLight,
     gap: spacing.sm,
+    backgroundColor: colors.bg,
+    ...shadows.footer,
   },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 16, color: colors.muted },
-  totalValue: { fontSize: 20 },
-  note: { fontSize: 12, color: colors.subtle },
+  totalLabel: { fontSize: 16, color: colors.muted, fontFamily: fonts.medium },
+  totalValue: { fontSize: 22 },
+  noteRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: spacing.xs },
+  note: { fontSize: 12, color: colors.subtle, fontFamily: fonts.regular },
 });

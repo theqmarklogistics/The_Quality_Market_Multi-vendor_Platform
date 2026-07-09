@@ -7,6 +7,14 @@ import { StatusBar } from 'expo-status-bar';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
 import { Provider as ReduxProvider } from 'react-redux';
 
+import { useFonts } from 'expo-font';
+import {
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+} from '@expo-google-fonts/outfit';
+
 import { tokenCache } from '@/auth/tokenCache';
 import { ApiAuthBridge } from '@/api/authBridge';
 import { store } from '@/store';
@@ -14,6 +22,7 @@ import { CartSync } from '@/store/CartSync';
 import { PushManager } from '@/push/PushManager';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { installGlobalErrorHandler } from '@/lib/crashReporting';
+import { colors, fonts } from '@/theme';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
@@ -34,6 +43,14 @@ function InitialLayout() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Outfit is the same Google Font the web app uses (next/font).
+  const [fontsLoaded, fontError] = useFonts({
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+  });
+
   useEffect(() => {
     if (!isLoaded) return;
     const inAuthGroup = segments[0] === '(auth)';
@@ -44,10 +61,10 @@ function InitialLayout() {
     }
   }, [isLoaded, isSignedIn, segments, router]);
 
-  if (!isLoaded) {
+  if (!isLoaded || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -55,7 +72,16 @@ function InitialLayout() {
   return (
     <ErrorBoundary>
       <PushManager />
-      <Stack>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.bg },
+          headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 17, color: colors.text },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+          headerBackTitle: 'Back',
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

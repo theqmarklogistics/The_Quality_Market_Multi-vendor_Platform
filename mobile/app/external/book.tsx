@@ -26,7 +26,7 @@ import {
 } from '@/api/externalDelivery';
 import { Button, Field } from '@/components/ui';
 import { KIGALI_SECTORS, PaymentMethod, formatPrice } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const num = (v: string): number | undefined => {
   if (v === '' || v == null) return undefined;
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg },
 
-  section: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 1 },
+  section: { fontSize: 13, fontFamily: fonts.bold, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 1 },
   fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6 },
   hint: { fontSize: 12, color: colors.subtle, marginBottom: spacing.sm },
 
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 13, color: colors.text },
-  chipTextActive: { color: colors.primaryText, fontWeight: '600' },
+  chipTextActive: { color: colors.primaryText, fontFamily: fonts.semibold },
 
   pinBtn: {
     flexDirection: 'row',
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   },
   toggleActive: { borderColor: colors.success, backgroundColor: '#f0fdf4' },
   toggleWarn: { borderColor: colors.warning, backgroundColor: '#fffbeb' },
-  toggleText: { fontSize: 14, color: colors.muted, fontWeight: '600' },
+  toggleText: { fontSize: 14, color: colors.muted, fontFamily: fonts.semibold },
   toggleTextActive: { color: colors.text },
 
   row: { flexDirection: 'row', gap: spacing.md },
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   },
   quoteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   quoteLabel: { fontSize: 14, color: colors.muted },
-  quoteFee: { fontSize: 18, fontWeight: '800', color: colors.text },
+  quoteFee: { fontSize: 18, fontFamily: fonts.bold, color: colors.text },
   quoteHint: { fontSize: 11, color: colors.subtle, marginTop: 4 },
   creditToggleRow: {
     flexDirection: 'row',
@@ -400,5 +400,5 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   creditToggleText: { fontSize: 13, color: colors.muted },
-  quoteNet: { fontSize: 15, fontWeight: '800', color: colors.success },
+  quoteNet: { fontSize: 15, fontFamily: fonts.bold, color: colors.success },
 });

@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { addRating } from '@/api/ratings';
 import { Button } from './ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 export function RatingModal({
   visible,
@@ -52,14 +52,21 @@ export function RatingModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
+          <View style={styles.grabber} />
           <Text style={styles.title}>Rate {productName}</Text>
           <View style={styles.stars}>
             {[1, 2, 3, 4, 5].map((i) => (
-              <TouchableOpacity key={i} onPress={() => setRating(i)}>
+              <TouchableOpacity
+                key={i}
+                onPress={() => setRating(i)}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel={`${i} star${i === 1 ? '' : 's'}`}
+              >
                 <Ionicons
-                  name={i <= rating ? 'star' : 'star-outline'}
-                  size={36}
-                  color={colors.star}
+                  name="star"
+                  size={38}
+                  color={i <= rating ? colors.star : colors.starEmpty}
                 />
               </TouchableOpacity>
             ))}
@@ -83,26 +90,36 @@ export function RatingModal({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.bg,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     padding: spacing.lg,
+    paddingBottom: spacing.xl,
     gap: spacing.md,
   },
-  title: { fontSize: 18, fontWeight: '700', color: colors.text },
-  stars: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  grabber: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: 2,
+  },
+  title: { fontSize: 18, fontFamily: fonts.bold, color: colors.text },
+  stars: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     padding: spacing.md,
-    minHeight: 80,
+    minHeight: 88,
     textAlignVertical: 'top',
     fontSize: 15,
     color: colors.text,
+    fontFamily: fonts.regular,
   },
-  cancel: { alignItems: 'center', paddingVertical: spacing.sm },
-  cancelText: { color: colors.muted, fontSize: 15 },
+  cancel: { alignItems: 'center', paddingVertical: spacing.sm, minHeight: 44 },
+  cancelText: { color: colors.muted, fontSize: 15, fontFamily: fonts.medium },
 });

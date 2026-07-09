@@ -34,7 +34,7 @@ import { useMyRole, canAccessOps } from '@/hooks/useMyRole';
 import { useRealtimeRoom } from '@/realtime/useRealtimeRoom';
 import { EmptyState, Loader } from '@/components/ui';
 import { SOCKET_ENABLED } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 // Local YYYY-MM-DD key (the corridors API matches the day window on this).
 function dateKey(d: Date): string {
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dateCenter: { alignItems: 'center' },
-  dateLabel: { fontSize: 16, fontWeight: '800', color: colors.text },
+  dateLabel: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
   dateSub: { fontSize: 12, color: colors.subtle, marginTop: 1 },
 
   list: { padding: spacing.lg, gap: spacing.md },
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   poolBannerEmpty: { borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' },
-  poolTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
+  poolTitle: { fontSize: 14, fontFamily: fonts.bold, color: colors.text },
   poolSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   batchBtn: {
     backgroundColor: colors.warning,
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minWidth: 92,
   },
-  batchBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  batchBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 13 },
   btnDisabled: { opacity: 0.45 },
 
   card: {
@@ -523,10 +523,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   cardHead: { flexDirection: 'row', alignItems: 'center' },
-  cardName: { fontSize: 16, fontWeight: '800', color: colors.text },
+  cardName: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
   cardMeta: { fontSize: 12, color: colors.muted, marginTop: 2 },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  badgeText: { fontSize: 11, fontWeight: '800' },
+  badgeText: { fontSize: 11, fontFamily: fonts.bold },
 
   riderRow: {
     flexDirection: 'row',
@@ -537,9 +537,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  riderName: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
-  riderUnset: { color: colors.subtle, fontStyle: 'italic', fontWeight: '400' },
-  riderAction: { fontSize: 13, fontWeight: '700', color: colors.success },
+  riderName: { flex: 1, fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
+  riderUnset: { color: colors.subtle, fontStyle: 'italic', fontFamily: fonts.regular },
+  riderAction: { fontSize: 13, fontFamily: fonts.bold, color: colors.success },
 
   stops: { marginTop: spacing.md, gap: spacing.sm },
   stop: {
@@ -557,24 +557,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
     color: '#fff',
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: fonts.bold,
     textAlign: 'center',
     lineHeight: 24,
     overflow: 'hidden',
   },
-  stopName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  stopName: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
   stopSub: { fontSize: 12, color: colors.muted, marginTop: 1 },
-  stopStatus: { fontSize: 11, color: colors.subtle, marginTop: 2, fontWeight: '600' },
+  stopStatus: { fontSize: 11, color: colors.subtle, marginTop: 2, fontFamily: fonts.semibold },
 
   actions: { marginTop: spacing.md, gap: spacing.sm },
   actionBtn: { borderRadius: radius.md, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   actionPrimary: { backgroundColor: colors.primary },
-  actionPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  actionPrimaryText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
   actionSuccess: { backgroundColor: colors.success },
   actionNeutral: { borderWidth: 1, borderColor: colors.border },
-  actionNeutralText: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  actionNeutralText: { color: colors.text, fontFamily: fonts.bold, fontSize: 14 },
   completedNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  completedText: { fontSize: 13, color: colors.success, fontWeight: '600' },
+  completedText: { fontSize: 13, color: colors.success, fontFamily: fonts.semibold },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%' },
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  modalTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text },
   riderOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  riderOptName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  riderOptName: { fontSize: 15, fontFamily: fonts.semibold, color: colors.text },
   riderOptSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   noRiders: { fontSize: 14, color: colors.muted, textAlign: 'center', paddingVertical: spacing.xl },
 });

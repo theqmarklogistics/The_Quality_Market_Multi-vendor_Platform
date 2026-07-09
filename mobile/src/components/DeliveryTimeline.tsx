@@ -1,7 +1,7 @@
 // Vertical status stepper for a pooled delivery.
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const STEPS: { key: string; label: string }[] = [
   { key: 'PENDING_INTAKE', label: 'Order received at hub' },
@@ -73,15 +73,21 @@ const styles = StyleSheet.create({
   dotCurrent: { borderColor: colors.primary, backgroundColor: colors.primary },
   rail: { width: 2, height: 26, backgroundColor: colors.border },
   railActive: { backgroundColor: colors.success },
-  label: { fontSize: 14, color: colors.subtle, marginLeft: spacing.sm, paddingBottom: 18 },
-  labelActive: { color: colors.text, fontWeight: '600' },
+  label: {
+    fontSize: 14,
+    color: colors.subtle,
+    marginLeft: spacing.sm,
+    paddingBottom: 18,
+    fontFamily: fonts.regular,
+  },
+  labelActive: { color: colors.text, fontFamily: fonts.semibold },
   failed: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#fff5f5',
+    backgroundColor: colors.dangerBg,
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: radius.md,
   },
-  failedText: { color: colors.danger, fontWeight: '600' },
+  failedText: { color: colors.dangerDeep, fontFamily: fonts.semibold },
 });

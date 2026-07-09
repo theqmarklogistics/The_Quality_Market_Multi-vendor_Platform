@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { getAddresses } from '@/api/addresses';
@@ -29,16 +30,22 @@ import {
   PaymentMethod,
   formatPrice,
 } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
 const paymentLabels: Record<string, string> = {
   [PaymentMethod.MTN_MOMO]: 'MTN Mobile Money',
   [PaymentMethod.BANK_TRANSFER]: 'Bank transfer',
 };
 
+const paymentIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+  [PaymentMethod.MTN_MOMO]: 'phone-portrait-outline',
+  [PaymentMethod.BANK_TRANSFER]: 'business-outline',
+};
+
 export default function CheckoutScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
   const cartItems = useAppSelector((s) => s.cart.cartItems);
   const ids = useMemo(() => Object.keys(cartItems), [cartItems]);
 
@@ -187,47 +194,45 @@ export default function CheckoutScreen() {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Address */}
-        <Text style={styles.sectionTitle}>Delivery address</Text>
+        <SectionHeading icon="location-outline" title="Delivery address" />
         {addresses.length === 0 ? (
           <Text style={styles.muted}>No saved addresses yet.</Text>
         ) : (
           addresses.map((a) => (
-            <TouchableOpacity
+            <OptionRow
               key={a.id}
-              style={[styles.option, addressId === a.id && styles.optionActive]}
+              active={addressId === a.id}
               onPress={() => setAddressId(a.id)}
-            >
-              <Ionicons
-                name={addressId === a.id ? 'radio-button-on' : 'radio-button-off'}
-                size={20}
-                color={addressId === a.id ? colors.primary : colors.subtle}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>{a.name}</Text>
-                <Text style={styles.optionSub}>
-                  {[a.street, a.sector, a.city].filter(Boolean).join(', ')} · {a.phone}
-                </Text>
-              </View>
-            </TouchableOpacity>
+              title={a.name}
+              subtitle={`${[a.street, a.sector, a.city].filter(Boolean).join(', ')} · ${a.phone}`}
+            />
           ))
         )}
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/address/new')}>
-          <Ionicons name="add" size={18} color={colors.primary} />
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => router.push('/address/new')}
+          accessibilityRole="button"
+          accessibilityLabel="Add a new address"
+        >
+          <View style={styles.addIcon}>
+            <Ionicons name="add" size={16} color={colors.primaryDark} />
+          </View>
           <Text style={styles.addText}>Add a new address</Text>
         </TouchableOpacity>
 
         {/* Delivery type */}
-        <Text style={styles.sectionTitle}>Delivery method</Text>
-        <DeliveryOption
+        <SectionHeading icon="bicycle-outline" title="Delivery method" />
+        <OptionRow
           active={deliveryType === DeliveryType.STANDARD_UNPOOLED}
           title="Standard delivery"
           subtitle="Seller-fulfilled. Fee set per seller."
           onPress={() => setDeliveryType(DeliveryType.STANDARD_UNPOOLED)}
         />
-        <DeliveryOption
+        <OptionRow
           active={deliveryType === DeliveryType.KIGALI_POOL}
           title="Kigali pooled delivery"
           subtitle="Shared rider routes — save up to 60%."
+          badge="Save up to 60%"
           onPress={() => setDeliveryType(DeliveryType.KIGALI_POOL)}
         />
 
@@ -246,13 +251,14 @@ export default function CheckoutScreen() {
               style={[styles.pinBtn, pin && styles.pinBtnDone]}
               onPress={pinLocation}
               disabled={pinning}
+              accessibilityRole="button"
             >
               <Ionicons
                 name={pin ? 'checkmark-circle' : 'location-outline'}
                 size={18}
                 color={pin ? colors.success : colors.text}
               />
-              <Text style={styles.pinText}>
+              <Text style={[styles.pinText, pin && styles.pinTextDone]}>
                 {pinning
                   ? 'Getting location…'
                   : pin
@@ -264,24 +270,19 @@ export default function CheckoutScreen() {
         ) : null}
 
         {/* Payment */}
-        <Text style={styles.sectionTitle}>Payment method</Text>
+        <SectionHeading icon="wallet-outline" title="Payment method" />
         {CHECKOUT_PAYMENT_METHODS.map((m) => (
-          <TouchableOpacity
+          <OptionRow
             key={m}
-            style={[styles.option, payment === m && styles.optionActive]}
+            active={payment === m}
+            title={paymentLabels[m]}
+            leadingIcon={paymentIcons[m]}
             onPress={() => setPayment(m)}
-          >
-            <Ionicons
-              name={payment === m ? 'radio-button-on' : 'radio-button-off'}
-              size={20}
-              color={payment === m ? colors.primary : colors.subtle}
-            />
-            <Text style={styles.optionTitle}>{paymentLabels[m]}</Text>
-          </TouchableOpacity>
+          />
         ))}
 
         {/* Coupon */}
-        <Text style={styles.sectionTitle}>Coupon</Text>
+        <SectionHeading icon="pricetag-outline" title="Coupon" />
         <View style={styles.couponRow}>
           <TextInput
             style={[styles.input, { flex: 1 }]}
@@ -296,6 +297,7 @@ export default function CheckoutScreen() {
             <Button
               label="Remove"
               variant="outline"
+              size="md"
               onPress={() => {
                 setCoupon(null);
                 setCouponCode('');
@@ -303,18 +305,27 @@ export default function CheckoutScreen() {
               }}
             />
           ) : (
-            <Button label="Apply" variant="outline" onPress={applyCoupon} loading={verifying} />
+            <Button
+              label="Apply"
+              variant="outline"
+              size="md"
+              onPress={applyCoupon}
+              loading={verifying}
+            />
           )}
         </View>
         {coupon ? (
-          <Text style={styles.couponOk}>✓ {coupon.discount}% off applied</Text>
+          <View style={styles.couponOkRow}>
+            <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+            <Text style={styles.couponOk}>{coupon.discount}% off applied</Text>
+          </View>
         ) : couponError ? (
           <Text style={styles.couponErr}>{couponError}</Text>
         ) : null}
       </ScrollView>
 
       {/* Summary + place */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: spacing.lg + insets.bottom }]}>
         <View style={styles.sumRow}>
           <Text style={styles.muted}>Subtotal</Text>
           <Text style={styles.sumVal}>{formatPrice(subtotal)}</Text>
@@ -322,44 +333,80 @@ export default function CheckoutScreen() {
         {discount > 0 ? (
           <View style={styles.sumRow}>
             <Text style={styles.muted}>Discount</Text>
-            <Text style={[styles.sumVal, { color: colors.success }]}>
+            <Text style={[styles.sumVal, { color: colors.successDeep }]}>
               −{formatPrice(discount)}
             </Text>
           </View>
         ) : null}
         <View style={styles.sumRow}>
           <Text style={styles.totalLabel}>Estimated total</Text>
-          <Money value={estimatedTotal} style={{ fontSize: 18 }} />
+          <Money value={estimatedTotal} style={{ fontSize: 20 }} />
         </View>
         <Text style={styles.note}>+ delivery fee, calculated by the server.</Text>
-        <Button label="Place order" onPress={placeOrder} loading={placing} />
+        <Button label="Place order" icon="bag-check-outline" onPress={placeOrder} loading={placing} />
       </View>
     </View>
   );
 }
 
-function DeliveryOption({
+function SectionHeading({
+  icon,
+  title,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+}) {
+  return (
+    <View style={styles.sectionRow}>
+      <Ionicons name={icon} size={17} color={colors.primary} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
+function OptionRow({
   active,
   title,
   subtitle,
+  badge,
+  leadingIcon,
   onPress,
 }: {
   active: boolean;
   title: string;
-  subtitle: string;
+  subtitle?: string;
+  badge?: string;
+  leadingIcon?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={[styles.option, active && styles.optionActive]} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.option, active && styles.optionActive]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: active }}
+    >
       <Ionicons
         name={active ? 'radio-button-on' : 'radio-button-off'}
         size={20}
         color={active ? colors.primary : colors.subtle}
       />
+      {leadingIcon ? (
+        <Ionicons name={leadingIcon} size={20} color={active ? colors.primaryDark : colors.muted} />
+      ) : null}
       <View style={{ flex: 1 }}>
-        <Text style={styles.optionTitle}>{title}</Text>
-        <Text style={styles.optionSub}>{subtitle}</Text>
+        <View style={styles.optionTitleRow}>
+          <Text style={styles.optionTitle}>{title}</Text>
+          {badge ? (
+            <View style={styles.optionBadge}>
+              <Text style={styles.optionBadgeText}>{badge}</Text>
+            </View>
+          ) : null}
+        </View>
+        {subtitle ? <Text style={styles.optionSub}>{subtitle}</Text> : null}
       </View>
+      {active ? <Ionicons name="checkmark-circle" size={20} color={colors.primary} /> : null}
     </TouchableOpacity>
   );
 }
@@ -368,62 +415,100 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
-  muted: { fontSize: 14, color: colors.muted },
+  sectionTitle: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
+  muted: { fontSize: 14, color: colors.muted, fontFamily: fonts.regular },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    minHeight: 56,
   },
-  optionActive: { borderColor: colors.primary, backgroundColor: '#fafafa' },
-  optionTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
-  optionSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: spacing.sm },
-  addText: { color: colors.primary, fontWeight: '600' },
+  optionActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  optionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  optionTitle: { fontSize: 15, fontFamily: fonts.semibold, color: colors.text },
+  optionSub: { fontSize: 12.5, color: colors.muted, marginTop: 2, fontFamily: fonts.regular },
+  optionBadge: {
+    backgroundColor: colors.primaryTint,
+    borderRadius: radius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  optionBadgeText: { fontSize: 10.5, color: colors.primaryDark, fontFamily: fonts.bold },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+  },
+  addIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addText: { color: colors.primaryDark, fontFamily: fonts.semibold, fontSize: 14 },
   poolBox: { gap: spacing.sm },
-  fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 2 },
+  fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 2, fontFamily: fonts.medium },
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    minHeight: 48,
     fontSize: 15,
     color: colors.text,
+    fontFamily: fonts.regular,
   },
   pinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     padding: spacing.md,
+    minHeight: 48,
   },
-  pinBtnDone: { borderColor: colors.success, backgroundColor: '#f0fff4' },
-  pinText: { fontSize: 14, color: colors.text },
-  couponRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
-  couponOk: { color: colors.success, marginTop: 6, fontWeight: '600' },
-  couponErr: { color: colors.danger, marginTop: 6 },
+  pinBtnDone: { borderColor: colors.primaryBorder, backgroundColor: colors.primarySoft },
+  pinText: { fontSize: 14, color: colors.text, fontFamily: fonts.medium },
+  pinTextDone: { color: colors.primaryDark },
+  couponRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  couponOkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  couponOk: { color: colors.successDeep, fontFamily: fonts.semibold, fontSize: 13.5 },
+  couponErr: { color: colors.danger, marginTop: 6, fontFamily: fonts.medium, fontSize: 13 },
   footer: {
     padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.borderLight,
     gap: spacing.xs,
+    backgroundColor: colors.bg,
+    ...shadows.footer,
   },
   sumRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sumVal: { fontSize: 14, color: colors.text },
-  totalLabel: { fontSize: 16, fontWeight: '700', color: colors.text },
-  note: { fontSize: 12, color: colors.subtle, marginBottom: spacing.sm },
+  sumVal: {
+    fontSize: 14,
+    color: colors.text,
+    fontFamily: fonts.medium,
+    fontVariant: ['tabular-nums'],
+  },
+  totalLabel: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
+  note: { fontSize: 12, color: colors.subtle, marginBottom: spacing.sm, fontFamily: fonts.regular },
 });

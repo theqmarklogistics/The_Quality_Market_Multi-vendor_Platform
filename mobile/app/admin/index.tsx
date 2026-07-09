@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAdminDashboard, type AdminDashboard } from '@/api/admin';
 import { useMyRole, canAccessAdmin, canAccessOps } from '@/hooks/useMyRole';
 import { EmptyState, Loader, Money } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 interface Triage {
   label: string;
@@ -189,10 +189,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xl,
   },
-  headerKicker: { color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: 2, fontWeight: '700' },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 2 },
+  headerKicker: { color: 'rgba(255,255,255,0.6)', fontSize: 11, letterSpacing: 2, fontFamily: fonts.bold },
+  headerTitle: { color: '#fff', fontSize: 22, fontFamily: fonts.bold, marginTop: 2 },
   headerStats: { flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.lg, gap: spacing.md },
-  headerStatValue: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  headerStatValue: { color: '#fff', fontSize: 18, fontFamily: fonts.bold },
   headerStatLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 2 },
 
   shortcuts: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, gap: spacing.sm },
@@ -213,11 +213,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shortcutTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  shortcutTitle: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   shortcutSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
 
   section: { padding: spacing.lg },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  sectionTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.md },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   tile: {
     width: '47%',
@@ -230,6 +230,6 @@ const styles = StyleSheet.create({
   },
   tileAlert: { borderColor: '#fecaca', backgroundColor: '#fef2f2' },
   tileTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  tileValue: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 4 },
+  tileValue: { fontSize: 24, fontFamily: fonts.bold, color: colors.text, marginTop: 4 },
   tileLabel: { fontSize: 12, color: colors.muted },
 });
