@@ -13,9 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import { formatDistanceToNowStrict } from 'date-fns';
 import { getConversations, createConversation, type Conversation } from '@/api/chat';
 import { Button, EmptyState, Loader } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function ChatListScreen() {
   const router = useRouter();
@@ -74,12 +75,21 @@ export default function ChatListScreen() {
         data={conversations}
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListHeaderComponent={
           <View style={{ marginBottom: spacing.md }}>
             <Button
               label="Message support"
               variant="outline"
+              size="md"
+              icon="headset-outline"
               onPress={messageSupport}
               loading={startingSupport}
             />
@@ -95,23 +105,39 @@ export default function ChatListScreen() {
         renderItem={({ item }) => {
           const last = item.messages?.[0];
           const unread = item._count?.messages ?? 0;
+          const isSupport = item.targetType === 'ADMIN';
           return (
             <TouchableOpacity
               style={styles.row}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Conversation with ${titleFor(item)}`}
               onPress={() =>
                 router.push({ pathname: '/conversation/[id]', params: { id: item.id } })
               }
             >
-              <View style={styles.avatar}>
+              <View style={[styles.avatar, isSupport && styles.avatarSupport]}>
                 <Ionicons
-                  name={item.targetType === 'ADMIN' ? 'headset' : 'storefront'}
+                  name={isSupport ? 'headset' : 'storefront'}
                   size={20}
-                  color={colors.muted}
+                  color={isSupport ? colors.primaryDark : colors.muted}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{titleFor(item)}</Text>
-                <Text style={styles.preview} numberOfLines={1}>
+                <View style={styles.rowHead}>
+                  <Text style={[styles.rowTitle, unread > 0 && styles.rowTitleUnread]}>
+                    {titleFor(item)}
+                  </Text>
+                  {last ? (
+                    <Text style={styles.time}>
+                      {formatDistanceToNowStrict(new Date(last.createdAt), { addSuffix: false })}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text
+                  style={[styles.preview, unread > 0 && styles.previewUnread]}
+                  numberOfLines={1}
+                >
                   {last?.content ?? 'No messages yet'}
                 </Text>
               </View>
@@ -130,7 +156,13 @@ export default function ChatListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  title: { fontSize: 24, fontWeight: '700', paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  title: {
+    fontSize: 24,
+    fontFamily: fonts.bold,
+    color: colors.text,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   list: { padding: spacing.lg },
   row: {
     flexDirection: 'row',
@@ -138,18 +170,24 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderLight,
+    minHeight: 68,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.card,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.borderLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
-  preview: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  avatarSupport: { backgroundColor: colors.primaryTint },
+  rowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rowTitle: { fontSize: 15, fontFamily: fonts.semibold, color: colors.text },
+  rowTitleUnread: { fontFamily: fonts.bold },
+  time: { fontSize: 11.5, color: colors.subtle, fontFamily: fonts.regular },
+  preview: { fontSize: 13, color: colors.muted, marginTop: 2, fontFamily: fonts.regular },
+  previewUnread: { color: colors.body, fontFamily: fonts.medium },
   badge: {
     minWidth: 22,
     height: 22,
@@ -159,5 +197,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  badgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  badgeText: { color: colors.primaryText, fontSize: 12, fontFamily: fonts.bold },
 });

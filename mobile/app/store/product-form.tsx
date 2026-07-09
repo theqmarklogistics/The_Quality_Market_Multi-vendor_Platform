@@ -31,7 +31,7 @@ import {
 import { getCategories } from '@/api/products';
 import { Button, Field, Loader } from '@/components/ui';
 import { PRODUCT_CATEGORIES } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const MAX_IMAGES = 4;
 const AI_MAX_BYTES = 3 * 1024 * 1024; // base64 overhead pushes larger images past limits
@@ -228,7 +228,7 @@ export default function ProductFormScreen() {
       <View style={styles.imageRow}>
         {existingImages.map((url) => (
           <View key={url} style={styles.imageBox}>
-            <Image source={{ uri: url }} style={styles.image} />
+            <Image source={{ uri: url }} style={styles.image} alt="Product image" />
             <TouchableOpacity style={styles.imageRemove} onPress={() => removeExisting(url)}>
               <Ionicons name="close" size={14} color="#fff" />
             </TouchableOpacity>
@@ -236,7 +236,7 @@ export default function ProductFormScreen() {
         ))}
         {newImages.map((f) => (
           <View key={f.uri} style={styles.imageBox}>
-            <Image source={{ uri: f.uri }} style={styles.image} />
+            <Image source={{ uri: f.uri }} style={styles.image} alt="Product image" />
             <TouchableOpacity style={styles.imageRemove} onPress={() => removeNew(f.uri)}>
               <Ionicons name="close" size={14} color="#fff" />
             </TouchableOpacity>
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg },
 
-  sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm },
+  sectionLabel: { fontSize: 13, fontFamily: fonts.bold, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm },
   fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6 },
   input: {
     borderWidth: 1,
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   originChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  originText: { fontSize: 13, color: colors.muted, fontWeight: '600' },
+  originText: { fontSize: 13, color: colors.muted, fontFamily: fonts.semibold },
   originTextActive: { color: colors.primaryText },
 
   approvalNote: { fontSize: 12, color: colors.subtle, marginTop: spacing.sm, textAlign: 'center' },
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  modalTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text },
   catRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -508,5 +508,5 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   catText: { fontSize: 15, color: colors.text },
-  catTextActive: { color: colors.success, fontWeight: '700' },
+  catTextActive: { color: colors.success, fontFamily: fonts.bold },
 });

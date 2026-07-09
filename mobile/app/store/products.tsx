@@ -24,7 +24,7 @@ import {
   type ApprovalStatus,
 } from '@/api/store';
 import { EmptyState, Loader, Money } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const FILTERS: { label: string; value: ApprovalStatus | '' }[] = [
   { label: 'All', value: '' },
@@ -234,6 +234,7 @@ export default function SellerProductsScreen() {
                   source={{ uri: item.images?.[0] }}
                   style={styles.thumb}
                   resizeMode="cover"
+                  alt={item.name}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
@@ -315,7 +316,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: spacing.md,
   },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  addBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 15 },
 
   searchRow: {
     flexDirection: 'row',
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+  filterText: { fontSize: 12, color: colors.muted, fontFamily: fonts.semibold },
   filterTextActive: { color: colors.primaryText },
 
   count: { fontSize: 12, color: colors.subtle, marginTop: spacing.md },
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, overflow: 'hidden' },
   cardMain: { flexDirection: 'row', gap: spacing.md, padding: spacing.md },
   thumb: { width: 64, height: 64, borderRadius: radius.sm, backgroundColor: colors.card },
-  name: { fontSize: 15, fontWeight: '700', color: colors.text },
+  name: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 2 },
   price: { fontSize: 14 },
   qty: { fontSize: 12, color: colors.muted },
@@ -353,7 +354,7 @@ const styles = StyleSheet.create({
   badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   inBadge: { backgroundColor: '#dcfce7' },
   outBadge: { backgroundColor: '#fee2e2' },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  badgeText: { fontSize: 10, fontFamily: fonts.bold },
   rejectNote: { fontSize: 11, color: colors.danger, marginTop: 6 },
 
   actions: {
@@ -369,5 +370,5 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 11,
   },
-  actionText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  actionText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.text },
 });

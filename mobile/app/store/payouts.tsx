@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { getPayouts, type Payout } from '@/api/store';
 import { EmptyState, Loader, Money } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function SellerPayoutsScreen() {
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
   },
-  period: { fontSize: 14, fontWeight: '600', color: colors.text },
+  period: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },
   paidBadge: { backgroundColor: '#dcfce7' },
   pendingBadge: { backgroundColor: '#fef3c7' },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  badgeText: { fontSize: 10, fontFamily: fonts.bold },
   notes: { fontSize: 12, color: colors.muted, marginTop: 6 },
   paidAt: { fontSize: 11, color: colors.subtle, marginTop: 2 },
   amount: { fontSize: 16 },

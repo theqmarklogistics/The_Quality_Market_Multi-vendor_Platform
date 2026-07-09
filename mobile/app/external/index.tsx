@@ -33,7 +33,7 @@ import { useMyRole, canAccessExternalSeller } from '@/hooks/useMyRole';
 import { EmptyState, Loader, Money } from '@/components/ui';
 import { formatPrice } from '@/constants';
 import type { PaymentConfig } from '@/api/types';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const DELIVERY_BADGE: Record<string, { bg: string; fg: string }> = {
   PENDING_INTAKE: { bg: '#f1f5f9', fg: '#475569' },
@@ -301,6 +301,7 @@ export default function ExternalDashboardScreen() {
                 <Image
                   source={{ uri: qrUrl(trackingLink(labelView.orderId, labelView.trackingToken)) }}
                   style={styles.qr}
+                  alt="Tracking QR code"
                 />
                 <Text style={styles.labelTracking}>{labelView.orderId}</Text>
                 <View style={styles.labelDetails}>
@@ -361,7 +362,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   creditText: { flex: 1, fontSize: 13, color: '#166534', lineHeight: 19 },
-  creditAmount: { fontWeight: '800' },
+  creditAmount: { fontFamily: fonts.bold },
 
   momoBanner: {
     borderWidth: 1,
@@ -372,20 +373,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   momoText: { fontSize: 13, color: colors.muted, lineHeight: 19 },
-  momoBold: { fontWeight: '800', color: colors.text },
+  momoBold: { fontFamily: fonts.bold, color: colors.text },
 
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.md },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
-  recipient: { fontSize: 15, fontWeight: '700', color: colors.text },
+  recipient: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   sector: { fontSize: 12, color: colors.muted, marginTop: 2 },
   badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  badgeText: { fontSize: 10, fontFamily: fonts.bold },
   pkg: { fontSize: 13, color: colors.muted, marginTop: spacing.sm },
 
   feeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm },
   feeText: { fontSize: 14, color: colors.text },
   feeAmount: { fontSize: 14 },
-  otp: { fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: 2 },
+  otp: { fontSize: 13, fontFamily: fonts.bold, color: colors.text, letterSpacing: 2 },
   savings: { fontSize: 12, color: colors.success, marginTop: 4 },
 
   actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
@@ -400,7 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 9,
   },
-  actionText: { fontSize: 13, fontWeight: '600', color: colors.text },
+  actionText: { fontSize: 13, fontFamily: fonts.semibold, color: colors.text },
 
   proofBtn: {
     flexDirection: 'row',
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     marginTop: spacing.sm,
   },
-  proofBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  proofBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
 
   footer: {
     position: 'absolute',
@@ -433,7 +434,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingVertical: 15,
   },
-  bookBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  bookBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 15 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
@@ -445,13 +446,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  modalTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text },
   qr: { width: 200, height: 200, marginBottom: spacing.md },
-  labelTracking: { fontSize: 16, fontWeight: '800', color: colors.text, letterSpacing: 1, marginBottom: spacing.lg },
+  labelTracking: { fontSize: 16, fontFamily: fonts.bold, color: colors.text, letterSpacing: 1, marginBottom: spacing.lg },
   labelDetails: { alignSelf: 'stretch', gap: 8, marginBottom: spacing.lg },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md },
   labelRowLabel: { fontSize: 13, color: colors.muted },
-  labelRowValue: { fontSize: 13, fontWeight: '700', color: colors.text, flexShrink: 1, textAlign: 'right' },
+  labelRowValue: { fontSize: 13, fontFamily: fonts.bold, color: colors.text, flexShrink: 1, textAlign: 'right' },
   labelShare: {
     alignSelf: 'stretch',
     flexDirection: 'row',
@@ -463,7 +464,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: 12,
   },
-  labelShareText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  labelShareText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
   labelPdf: {
     alignSelf: 'stretch',
     flexDirection: 'row',
@@ -475,5 +476,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: spacing.sm,
   },
-  labelPdfText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  labelPdfText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
 });

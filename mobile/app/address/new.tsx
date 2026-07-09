@@ -9,7 +9,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { addAddress } from '@/api/addresses';
 import { Button, Field } from '@/components/ui';
 import { KIGALI_SECTORS } from '@/constants';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function NewAddressScreen() {
   const router = useRouter();
@@ -142,24 +142,33 @@ export default function NewAddressScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg },
-  fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6 },
+  fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6, fontFamily: fonts.medium },
   row: { flexDirection: 'row', gap: spacing.md },
   flex: { flex: 1 },
   chips: { gap: 8, paddingBottom: spacing.md },
-  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.full,
+    paddingHorizontal: 14,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 13, color: colors.text },
-  chipTextActive: { color: colors.primaryText, fontWeight: '600' },
+  chipText: { fontSize: 13, color: colors.body, fontFamily: fonts.medium },
+  chipTextActive: { color: colors.primaryText, fontFamily: fonts.semibold },
   pinBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
+    minHeight: 50,
     marginTop: spacing.sm,
   },
-  pinBtnDone: { borderColor: colors.success, backgroundColor: '#f0fff4' },
-  pinText: { fontSize: 14, color: colors.text, flex: 1 },
+  pinBtnDone: { borderColor: colors.primaryBorder, backgroundColor: colors.primarySoft },
+  pinText: { fontSize: 14, color: colors.text, flex: 1, fontFamily: fonts.medium },
 });

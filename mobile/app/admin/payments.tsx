@@ -29,7 +29,7 @@ import {
 } from '@/api/admin';
 import { useMyRole, canAccessAdmin } from '@/hooks/useMyRole';
 import { EmptyState, Loader, Money } from '@/components/ui';
-import { colors, radius, spacing } from '@/theme';
+import { colors, fonts, radius, spacing } from '@/theme';
 
 const FILTERS: { label: string; value: ProofStatus }[] = [
   { label: 'Submitted', value: 'SUBMITTED' },
@@ -178,7 +178,7 @@ export default function PaymentReviewScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => open(item)} activeOpacity={0.85}>
             {item.paymentProofUrl ? (
-              <Image source={{ uri: item.paymentProofUrl }} style={styles.thumb} />
+              <Image source={{ uri: item.paymentProofUrl }} style={styles.thumb} alt="Payment proof" />
             ) : (
               <View style={[styles.thumb, styles.thumbEmpty]}>
                 <Ionicons name="image-outline" size={20} color={colors.subtle} />
@@ -240,7 +240,7 @@ export default function PaymentReviewScreen() {
                     activeOpacity={0.9}
                     onPress={() => Linking.openURL(selected.paymentProofUrl!)}
                   >
-                    <Image source={{ uri: selected.paymentProofUrl }} style={styles.proofImage} resizeMode="contain" />
+                    <Image source={{ uri: selected.paymentProofUrl }} style={styles.proofImage} resizeMode="contain" alt="Payment proof" />
                     <View style={styles.proofOpen}>
                       <Ionicons name="open-outline" size={14} color={colors.muted} />
                       <Text style={styles.proofOpenText}>Tap to open full image</Text>
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   filters: { flexDirection: 'row', gap: spacing.sm },
   filterChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
   filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+  filterText: { fontSize: 12, color: colors.muted, fontFamily: fonts.semibold },
   filterTextActive: { color: colors.primaryText },
   count: { fontSize: 12, color: colors.subtle, marginTop: spacing.md },
 
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   },
   thumb: { width: 52, height: 52, borderRadius: radius.sm, backgroundColor: colors.card },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center', gap: 4 },
-  customer: { fontSize: 15, fontWeight: '700', color: colors.text },
+  customer: { fontSize: 15, fontFamily: fonts.bold, color: colors.text },
   sub: { fontSize: 12, color: colors.muted, marginTop: 2 },
   method: { fontSize: 11, color: colors.subtle, marginTop: 2, textTransform: 'capitalize' },
   cardRight: { alignItems: 'flex-end', flexDirection: 'row', gap: 4 },
@@ -351,14 +351,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  modalTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text },
 
   summaryRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
-  detailValue: { fontSize: 16, fontWeight: '700', color: colors.text },
+  detailValue: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
   detailSub: { fontSize: 13, color: colors.muted, marginTop: 2, textTransform: 'capitalize' },
   itemsLine: { fontSize: 13, color: colors.muted, marginTop: spacing.md, lineHeight: 19 },
 
-  proofLabel: { fontSize: 11, fontWeight: '700', color: colors.subtle, textTransform: 'uppercase', letterSpacing: 1, marginTop: spacing.lg, marginBottom: spacing.sm },
+  proofLabel: { fontSize: 11, fontFamily: fonts.bold, color: colors.subtle, textTransform: 'uppercase', letterSpacing: 1, marginTop: spacing.lg, marginBottom: spacing.sm },
   proofImage: {
     width: '100%',
     height: 280,
@@ -389,8 +389,8 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   rejectBtn: { backgroundColor: colors.danger },
   approveBtn: { backgroundColor: colors.success },
-  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  actionBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
 
   statusPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: spacing.lg },
-  statusPillText: { fontSize: 14, fontWeight: '600', color: colors.text },
+  statusPillText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
 });
