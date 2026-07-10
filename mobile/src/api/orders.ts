@@ -12,6 +12,24 @@ export function getOrders(): Promise<{ orders: Order[] }> {
   return apiGet<{ orders: Order[] }>('/api/orders');
 }
 
+// Checkout-time Kigali Pooled Delivery fee estimate. Distance comes from the
+// pinned checkout point when provided, else the saved address location.
+export interface PoolQuote {
+  fee: number;
+  chargeableKg: number;
+  distanceKm: number | null;
+  basis: 'formula' | 'flat';
+}
+
+export function getPoolQuote(payload: {
+  addressId: string;
+  items: { id: string; quantity: number }[];
+  lat?: number;
+  lng?: number;
+}): Promise<PoolQuote> {
+  return apiPost<PoolQuote>('/api/delivery/pool-quote', payload);
+}
+
 // Local file (from expo-image-picker) to upload as the payment proof.
 export interface ProofFile {
   uri: string;

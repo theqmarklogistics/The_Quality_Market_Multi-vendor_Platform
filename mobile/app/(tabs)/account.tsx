@@ -16,11 +16,25 @@ import {
   canAccessExternalSeller,
   canAccessOps,
   canAccessAdmin,
+  canAccessFinancial,
+  canAccessWarehouse,
   resetRoleCache,
 } from '@/hooks/useMyRole';
+import { SignedOutGate } from '@/components/SignedOutGate';
 import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
 export default function AccountScreen() {
+  return (
+    <SignedOutGate
+      title="You're browsing as a guest"
+      subtitle="Sign in or create a free account to place orders, track deliveries and chat with support."
+    >
+      <AccountScreenInner />
+    </SignedOutGate>
+  );
+}
+
+function AccountScreenInner() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const router = useRouter();
@@ -43,7 +57,7 @@ export default function AccountScreen() {
       await unregisterCurrentPush();
       resetRoleCache();
       await signOut();
-      router.replace('/(auth)/sign-in');
+      router.replace('/(tabs)');
     } finally {
       setSigningOut(false);
     }
@@ -67,6 +81,17 @@ export default function AccountScreen() {
               {user?.primaryEmailAddress?.emailAddress}
             </Text>
           </View>
+        </View>
+
+        {/* Public rider departure schedule — available to everyone */}
+        <View style={{ marginTop: spacing.lg }}>
+          <Shortcut
+            icon="calendar"
+            iconBg={colors.info}
+            title="Rider departure schedule"
+            subtitle="When riders leave each hub along each corridor"
+            onPress={() => router.push('/schedule')}
+          />
         </View>
 
         {/* Role shortcuts */}
@@ -117,6 +142,71 @@ export default function AccountScreen() {
               title="Rider console"
               subtitle="Your route, stops & live tracking"
               onPress={() => router.push('/rider')}
+            />
+          ) : null}
+        </View>
+
+        {/* Full web dashboards — every web feature, embedded in the app */}
+        {(canAccessAdmin(role) ||
+          canAccessOps(role) ||
+          canAccessFinancial(role) ||
+          canAccessWarehouse(role) ||
+          canAccessSeller(role)) && <Text style={styles.groupLabel}>Full dashboards</Text>}
+
+        <View style={{ gap: spacing.sm }}>
+          {canAccessAdmin(role) ? (
+            <Shortcut
+              icon="globe"
+              iconBg={colors.ink}
+              title="Admin — full console"
+              subtitle="Orders, coupons, returns, payouts, invoices, users, riders, hubs & corridors, banners, newsletter, categories, commissions, shipping, audit"
+              onPress={() =>
+                router.push({ pathname: '/web-dashboard', params: { path: '/admin', title: 'Admin console' } })
+              }
+            />
+          ) : null}
+          {canAccessOps(role) ? (
+            <Shortcut
+              icon="map"
+              iconBg={colors.primaryDark}
+              title="Logistics — dispatch board"
+              subtitle="Full pooling, corridors, batching & live dispatch"
+              onPress={() =>
+                router.push({ pathname: '/web-dashboard', params: { path: '/logistics', title: 'Logistics' } })
+              }
+            />
+          ) : null}
+          {canAccessFinancial(role) ? (
+            <Shortcut
+              icon="cash"
+              iconBg={colors.info}
+              title="Financial operations"
+              subtitle="Revenue, escrow, payouts & reconciliation"
+              onPress={() =>
+                router.push({ pathname: '/web-dashboard', params: { path: '/financial', title: 'Financial' } })
+              }
+            />
+          ) : null}
+          {canAccessWarehouse(role) ? (
+            <Shortcut
+              icon="cube"
+              iconBg={colors.primary}
+              title="Warehouse dashboard"
+              subtitle="Stock intake & warehouse management"
+              onPress={() =>
+                router.push({ pathname: '/web-dashboard', params: { path: '/warehouse', title: 'Warehouse' } })
+              }
+            />
+          ) : null}
+          {canAccessSeller(role) ? (
+            <Shortcut
+              icon="storefront"
+              iconBg={colors.success}
+              title="Store — full dashboard"
+              subtitle="Everything in the web seller console, incl. chat"
+              onPress={() =>
+                router.push({ pathname: '/web-dashboard', params: { path: '/store', title: 'Store dashboard' } })
+              }
             />
           ) : null}
         </View>

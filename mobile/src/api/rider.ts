@@ -44,6 +44,15 @@ export function getRiderAssignment(): Promise<RiderAssignment> {
   return apiGet<RiderAssignment>('/api/delivery/rider/assignment');
 }
 
+// Scan a package QR (or type its code) → assign the package to this rider.
+export function scanAssignPackage(code: string): Promise<{
+  success: boolean;
+  corridorId: string;
+  stop: { orderId: string; recipientName: string | null; sector: string | null; landmarkAddress: string | null };
+}> {
+  return apiPost('/api/delivery/rider/scan', { code });
+}
+
 // POST a live GPS tick. The backend persists a last-known snapshot and fans the
 // update out to the corridor/track/logistics rooms. Client throttles to ~10s.
 export function postRiderLocation(

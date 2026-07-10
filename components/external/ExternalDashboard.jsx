@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { PackagePlusIcon, RefreshCwIcon, CopyIcon, CheckIcon, MapPinIcon, FileTextIcon, UploadIcon, Loader2Icon, WalletIcon } from "lucide-react";
+import DeliverySchedule from "./DeliverySchedule";
 
 const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "RWF";
@@ -160,6 +161,13 @@ export default function ExternalDashboard() {
                     })}
                 </div>
             )}
+
+            {/* Public rider departure schedule — plan drop-offs around it */}
+            <div className="mt-10">
+                <h2 className="text-lg font-semibold text-slate-800 mb-1">Rider departure schedule</h2>
+                <p className="text-sm text-slate-500 mb-4">Drop packages at the hub before a departure to catch that corridor run.</p>
+                <DeliverySchedule />
+            </div>
         </div>
     );
 }

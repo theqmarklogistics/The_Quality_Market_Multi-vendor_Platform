@@ -20,7 +20,8 @@
         "EXPO_PUBLIC_API_URL": "https://www.thequalitymarket.com",
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsudGhlcXVhbGl0eW1hcmtldC5jb20k",
         "EXPO_PUBLIC_CURRENCY_SYMBOL": "RWF",
-        "EXPO_PUBLIC_SOCKET_ENABLED": "true"
+        "EXPO_PUBLIC_SOCKET_ENABLED": "true",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDR3m62R772Ouf5KILEl6PALznX9T67QxA"
       },
       "android": {
         "buildType": "apk"
@@ -30,7 +31,14 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.thequalitymarket.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsudGhlcXVhbGl0eW1hcmtldC5jb20k",
+        "EXPO_PUBLIC_CURRENCY_SYMBOL": "RWF",
+        "EXPO_PUBLIC_SOCKET_ENABLED": "true",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDR3m62R772Ouf5KILEl6PALznX9T67QxA"
+      }
     }
   },
   "submit": {

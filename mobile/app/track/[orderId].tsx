@@ -205,6 +205,13 @@ export default function TrackScreen() {
           <View style={styles.otpBox}>
             <Text style={styles.otpLabel}>Show this code to your rider</Text>
             <Text style={styles.otp}>{data.deliveryOtp}</Text>
+            <View style={styles.otpWarn}>
+              <Ionicons name="warning-outline" size={16} color="#b45309" />
+              <Text style={styles.otpWarnText}>
+                Only give this code to the rider AFTER the package is in your hands. Sharing it
+                earlier confirms the delivery and releases payment.
+              </Text>
+            </View>
           </View>
         ) : null}
 
@@ -312,6 +319,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   otpLabel: { fontSize: 13, color: colors.muted, fontFamily: fonts.medium },
+  otpWarn: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fcd34d',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  otpWarnText: { flex: 1, fontSize: 12, color: '#92400e', fontFamily: fonts.medium, lineHeight: 17 },
   otp: {
     fontSize: 32,
     fontFamily: fonts.bold,

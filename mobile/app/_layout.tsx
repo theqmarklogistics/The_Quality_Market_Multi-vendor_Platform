@@ -51,13 +51,15 @@ function InitialLayout() {
     Outfit_700Bold,
   });
 
+  // Guests may browse the shop freely — the app opens on the storefront, not the
+  // sign-in wall. Individual screens that need an account (checkout, orders, chat,
+  // consoles) gate themselves with <SignedOutGate />. We only bounce signed-in
+  // users out of the auth screens.
   useEffect(() => {
     if (!isLoaded) return;
     const inAuthGroup = segments[0] === '(auth)';
     if (isSignedIn && inAuthGroup) {
       router.replace('/(tabs)');
-    } else if (!isSignedIn && !inAuthGroup) {
-      router.replace('/(auth)/sign-in');
     }
   }, [isLoaded, isSignedIn, segments, router]);
 
@@ -90,6 +92,8 @@ function InitialLayout() {
         <Stack.Screen name="address/new" options={{ title: 'New address', presentation: 'modal' }} />
         <Stack.Screen name="order-confirmation" options={{ title: 'Order placed', headerBackVisible: false }} />
         <Stack.Screen name="track/[orderId]" options={{ title: 'Track delivery' }} />
+        <Stack.Screen name="schedule" options={{ title: 'Delivery schedule' }} />
+        <Stack.Screen name="web-dashboard" options={{ title: 'Dashboard' }} />
         <Stack.Screen name="conversation/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="rider/index" options={{ title: 'Rider console' }} />
         <Stack.Screen name="store/index" options={{ title: 'Seller console' }} />

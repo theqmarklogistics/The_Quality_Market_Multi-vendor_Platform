@@ -33,7 +33,7 @@ export async function POST(request) {
         // (throttled, best-effort — replaces the old expiry cron).
         await maybeSweepExpiredOrders();
 
-        const { items, addressId, paymentMethod: selectedPaymentMethod, couponCode, deliveryType: rawDeliveryType, landmarkAddress: rawLandmark, recipientLat: rawLat, recipientLng: rawLng } = await request.json();
+        const { items, addressId, paymentMethod: selectedPaymentMethod, couponCode, deliveryType: rawDeliveryType, landmarkAddress: rawLandmark, recipientLat: rawLat, recipientLng: rawLng, contactPhone: rawContactPhone } = await request.json();
 
         if(!items || !addressId || !selectedPaymentMethod || !Array.isArray(items) || items.length === 0){
             return NextResponse.json({ error: "Missing order details" }, { status: 400 });
@@ -63,6 +63,13 @@ export async function POST(request) {
 
         if(!address){
             return NextResponse.json({ error: "Invalid address" }, { status: 400 });
+        }
+
+        // A reachable phone number is mandatory at checkout (falls back to the
+        // saved address phone when the customer doesn't type a new one).
+        const contactPhone = (typeof rawContactPhone === 'string' ? rawContactPhone.trim() : '') || (address.phone || '').trim();
+        if (!/^\+?\d[\d\s-]{6,17}$/.test(contactPhone)) {
+            return NextResponse.json({ error: "A valid phone number is required at checkout." }, { status: 400 });
         }
 
         let coupon = null;
@@ -309,7 +316,7 @@ export async function POST(request) {
                         "isPaid", "isCouponUsed", coupon,
                         "invoiceRequested", "paymentProofStatus",
                         "deliveryType", "landmarkAddress", "deliveryOtp", "deliveryStatus", "escrowStatus",
-                        "recipientLat", "recipientLng",
+                        "contactPhone", "recipientLat", "recipientLng",
                         "createdAt", "updatedAt"
                     ) VALUES (
                         ${orderId}, ${userId}, ${storeId}, ${addressId},
@@ -321,7 +328,7 @@ export async function POST(request) {
                         false, 'NOT_SUBMITTED'::"PaymentProofStatus",
                         ${deliveryType}::"DeliveryType", ${landmarkAddress}, ${deliveryOtp},
                         ${poolDeliveryStatus}::"PoolDeliveryStatus", ${escrowStatus}::"EscrowStatus",
-                        ${recipientLat}, ${recipientLng},
+                        ${contactPhone}, ${recipientLat}, ${recipientLng},
                         ${now}, ${now}
                     )
                 `;

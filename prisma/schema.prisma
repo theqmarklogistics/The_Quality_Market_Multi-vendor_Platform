@@ -30,6 +30,7 @@ model User {
     returns     Return[]
     riderProfile       RiderProfile?
     assignedCorridors  DeliveryCorridor[]        @relation("CorridorRider")
+    corridorSchedules  CorridorSchedule[]        @relation("ScheduleRider")
     pushTokens         PushToken[]
 }
 
@@ -219,6 +220,8 @@ model Order {
     escrowStatus      EscrowStatus       @default(NOT_HELD)
     deliveryFeeShare  Float?
     corridorId        String?
+    // Contact phone confirmed at checkout (may differ from the saved address phone)
+    contactPhone      String?
     // Realtime tracking: customer pinned/live location (kept on the order, not the saved Address)
     recipientLat      Float?
     recipientLng      Float?
@@ -323,6 +326,9 @@ model Address {
     district  String?
     // Kigali sector for zone-based shipping (Zone A/B/C)
     sector    String?
+    // Village-level detail (umudugudu) — used to geocode an approximate location
+    // when the customer hasn't shared/pinned GPS coordinates.
+    village   String?
     createdAt DateTime @default(now())
 
     // Relations
@@ -642,6 +648,60 @@ model RiderProfile {
     updatedAt   DateTime @updatedAt
 
     user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Physical drop-off / dispatch hub. Admin-managed; corridors depart from a hub.
+model DeliveryHub {
+    id        String   @id @default(cuid())
+    name      String
+    sector    String?
+    landmark  String?
+    latitude  Float?
+    longitude Float?
+    isActive  Boolean  @default(true)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    corridorRoutes CorridorRoute[]
+}
+
+// Admin-registered corridor (a named route/area served from a hub). These are the
+// building blocks for the public rider schedule; daily DeliveryCorridor runs are
+// still created on the dispatch board.
+model CorridorRoute {
+    id          String   @id @default(cuid())
+    name        String
+    hubId       String
+    description String?
+    // Areas/sectors this corridor passes through (free-form labels)
+    areas       String[] @default([])
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    hub       DeliveryHub        @relation(fields: [hubId], references: [id], onDelete: Cascade)
+    schedules CorridorSchedule[]
+
+    @@index([hubId, isActive])
+}
+
+// Recurring public schedule entry: a rider departs a hub along a corridor on a
+// weekday at a set time. Shown publicly so senders know when to drop packages.
+model CorridorSchedule {
+    id              String   @id @default(cuid())
+    corridorRouteId String
+    // 0 = Sunday … 6 = Saturday
+    dayOfWeek       Int
+    departTime      String   // "HH:mm" 24h local time
+    riderId         String?
+    isActive        Boolean  @default(true)
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    corridorRoute CorridorRoute @relation(fields: [corridorRouteId], references: [id], onDelete: Cascade)
+    rider         User?         @relation("ScheduleRider", fields: [riderId], references: [id])
+
+    @@index([corridorRouteId, dayOfWeek])
 }
 
 // Admin-configurable hero/banner slots ("main" | "card1" | "card2")

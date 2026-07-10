@@ -2,6 +2,7 @@
 import Banner from "@/components/Banner";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import BackButton from "@/components/BackButton";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProducts } from "@/lib/features/product/productSlice";
 import { Suspense, useEffect } from "react";
@@ -42,6 +43,9 @@ export default function PublicLayout({ children }) {
             <Suspense fallback={<div className="h-20" />}>
                 <Navbar />
             </Suspense>
+            <div className="mx-6 md:mx-16 lg:mx-32 mt-4 empty:hidden">
+                <BackButton />
+            </div>
             {children}
             <Footer />
         </>

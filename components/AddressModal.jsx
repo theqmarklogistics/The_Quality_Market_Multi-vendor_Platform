@@ -19,6 +19,7 @@ const AddressModal = ({ setShowAddressModal }) => {
         email: '',
         street: '',
         sector: '',
+        village: '',
         city: '',
         state: '',
         zip: '',
@@ -63,12 +64,16 @@ const AddressModal = ({ setShowAddressModal }) => {
     };
 
     const hasLocation = address.latitude != null && address.longitude != null;
+    const hasVillage = address.village.trim().length > 0;
+    const canSave = hasLocation || hasVillage;
 
     const handleSubmit = async (e) => {
         e.preventDefault()
 
-        if (!hasLocation) {
-            toast.error('Please pin your location before saving.');
+        // Either an exact pin OR a village-level description is required — the
+        // village lets us locate the customer approximately when GPS isn't shared.
+        if (!canSave) {
+            toast.error('Pin your location, or fill in your village (umudugudu) so we can locate you.');
             return;
         }
 
@@ -104,6 +109,7 @@ const AddressModal = ({ setShowAddressModal }) => {
                     <option value="">Sector (Kigali) — optional</option>
                     {KIGALI_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                <input name="village" onChange={handleAddressChange} value={address.village} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Village (umudugudu) — required if you don't pin your location" />
                 <div className="flex gap-4">
                     <input name="city" onChange={handleAddressChange} value={address.city} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="District" required />
                     <input name="state" onChange={handleAddressChange} value={address.state} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Province" required />
@@ -134,10 +140,10 @@ const AddressModal = ({ setShowAddressModal }) => {
                     </button>
                     {hasLocation
                         ? <p className="text-[11px] text-slate-400">{address.latitude.toFixed(5)}, {address.longitude.toFixed(5)}</p>
-                        : <p className="text-[11px] text-slate-400">Required — lets us measure delivery distance and route your rider.</p>}
+                        : <p className="text-[11px] text-slate-400">Best option — lets us measure delivery distance exactly. No pin? Provide your village above instead.</p>}
                 </div>
 
-                <button disabled={!hasLocation} className="bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">SAVE ADDRESS</button>
+                <button disabled={!canSave} className="bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">SAVE ADDRESS</button>
             </div>
             <XIcon size={30} className="absolute top-5 right-5 text-slate-500 hover:text-slate-700 cursor-pointer" onClick={() => setShowAddressModal(false)} />
         </form>

@@ -210,7 +210,8 @@ const OrderItem = ({ order, onProofUploaded }) => {
                 <td className="text-left max-md:hidden">
                     <p>{order.address.name}, {order.address.street},</p>
                     <p>{order.address.city}, {order.address.state}, {order.address.zip}, {order.address.country},</p>
-                    <p>{order.address.phone}</p>
+                    <p>{order.contactPhone || order.address.phone}</p>
+                    {order.address.email && <p className="text-xs text-slate-400 break-all">{order.address.email}</p>}
                 </td>
 
                 <td className="text-left space-y-2 text-sm max-md:hidden">
@@ -256,7 +257,8 @@ const OrderItem = ({ order, onProofUploaded }) => {
                 <td colSpan={5}>
                     <p>{order.address.name}, {order.address.street}</p>
                     <p>{order.address.city}, {order.address.state}, {order.address.zip}, {order.address.country}</p>
-                    <p>{order.address.phone}</p>
+                    <p>{order.contactPhone || order.address.phone}</p>
+                    {order.address.email && <p className="text-xs text-slate-400 break-all">{order.address.email}</p>}
                     <br />
                     <div className="flex items-center">
                         <span className='text-center mx-auto px-6 py-1.5 rounded bg-green-100 text-green-700' >

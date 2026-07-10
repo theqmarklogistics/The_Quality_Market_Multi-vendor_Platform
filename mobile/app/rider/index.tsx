@@ -19,9 +19,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useRouter } from 'expo-router';
 import {
   confirmDeliveryWithPhoto,
   getRiderAssignment,
+  scanAssignPackage,
   setStopStatus,
   verifyDeliveryOtp,
   type RiderCorridor,
@@ -64,6 +67,7 @@ const STATUS_BADGE: Record<string, { bg: string; fg: string }> = {
 };
 
 export default function RiderConsoleScreen() {
+  const router = useRouter();
   const { role, loading: roleLoading } = useMyRole();
 
   const [corridor, setCorridor] = useState<RiderCorridor | null>(null);
@@ -76,6 +80,11 @@ export default function RiderConsoleScreen() {
 
   const [otpModal, setOtpModal] = useState<{ orderId: string } | null>(null);
   const [otpInput, setOtpInput] = useState('');
+  const [scanCode, setScanCode] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const scannedOnce = useRef(false);
   const [failModal, setFailModal] = useState<{ orderId: string } | null>(null);
   const [failReason, setFailReason] = useState(FAILURE_REASONS[0]);
   const [failNote, setFailNote] = useState('');
@@ -254,18 +263,114 @@ export default function RiderConsoleScreen() {
       />
     );
   }
+  const assignByCode = async (raw?: string) => {
+    const code = (raw ?? scanCode).trim();
+    if (!code) {
+      Alert.alert('Package code needed', 'Scan the QR on the label or type the package code.');
+      return;
+    }
+    setAssigning(true);
+    try {
+      const res = await scanAssignPackage(code);
+      setScanCode('');
+      Alert.alert(
+        'Package assigned',
+        res.stop?.recipientName ? `Assigned to you — ${res.stop.recipientName}.` : 'Assigned to you.',
+      );
+      await load({ silent: true });
+    } catch (err: any) {
+      Alert.alert('Could not assign', err?.message ?? 'Try again.');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const openScanner = async () => {
+    if (!cameraPermission?.granted) {
+      const res = await requestCameraPermission();
+      if (!res.granted) {
+        Alert.alert('Camera needed', 'Allow camera access to scan package QR codes, or type the code instead.');
+        return;
+      }
+    }
+    scannedOnce.current = false;
+    setScannerOpen(true);
+  };
+
+  const onQrScanned = ({ data }: { data: string }) => {
+    if (scannedOnce.current) return;
+    scannedOnce.current = true;
+    setScannerOpen(false);
+    assignByCode(data);
+  };
+
+  const scanAssignBox = (
+    <View style={styles.scanBox}>
+      <Text style={styles.scanTitle}>Scan a package</Text>
+      <Text style={styles.scanSub}>
+        Scan the QR on the package label (or type its code) to be assigned to it.
+      </Text>
+      <TouchableOpacity style={styles.scanCameraBtn} onPress={openScanner} disabled={assigning}>
+        <Ionicons name="qr-code-outline" size={18} color="#fff" />
+        <Text style={styles.scanBtnText}>Scan QR with camera</Text>
+      </TouchableOpacity>
+      <View style={styles.scanRow}>
+        <TextInput
+          style={styles.scanInput}
+          placeholder="ord_…"
+          placeholderTextColor={colors.subtle}
+          autoCapitalize="none"
+          value={scanCode}
+          onChangeText={setScanCode}
+        />
+        <TouchableOpacity style={styles.scanBtn} onPress={() => assignByCode()} disabled={assigning}>
+          {assigning ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.scanBtnText}>Assign</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+      <TouchableOpacity style={styles.recordBtn} onPress={() => router.push('/external/book')}>
+        <Ionicons name="add-circle-outline" size={16} color={colors.primaryDark} />
+        <Text style={styles.recordText}>Record a new delivery</Text>
+      </TouchableOpacity>
+
+      {/* Camera QR scanner */}
+      <Modal visible={scannerOpen} animationType="slide" onRequestClose={() => setScannerOpen(false)}>
+        <View style={styles.scannerWrap}>
+          <CameraView
+            style={{ flex: 1 }}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            onBarcodeScanned={onQrScanned}
+          />
+          <View style={styles.scannerOverlay} pointerEvents="box-none">
+            <Text style={styles.scannerHint}>Point the camera at the QR code on the label</Text>
+            <TouchableOpacity style={styles.scannerClose} onPress={() => setScannerOpen(false)}>
+              <Ionicons name="close" size={20} color="#fff" />
+              <Text style={styles.scanBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+
   if (!corridor) {
     return (
-      <View style={styles.center}>
+      <ScrollView contentContainerStyle={styles.center}>
         <Ionicons name="cube-outline" size={44} color={colors.subtle} />
         <Text style={styles.emptyTitle}>No route assigned yet</Text>
         <Text style={styles.emptySub}>
-          When dispatch assigns you a corridor for today, it will appear here.
+          When dispatch assigns you a corridor for today, it will appear here — or assign
+          yourself by scanning a package.
         </Text>
+        {scanAssignBox}
         <TouchableOpacity onPress={() => load()} style={styles.refreshBtn}>
           <Text style={styles.refreshText}>Refresh</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -294,6 +399,9 @@ export default function RiderConsoleScreen() {
             {corridor.status === 'IN_TRANSIT' ? 'Dispatched' : corridor.status}
           </Text>
         </View>
+
+        {/* Scan a package to add it to this route / record a walk-up delivery */}
+        <View style={{ paddingHorizontal: spacing.lg }}>{scanAssignBox}</View>
 
         {/* Map */}
         {!MAPS_ENABLED ? (
@@ -554,6 +662,85 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 13, color: colors.muted, textAlign: 'center' },
   refreshBtn: { marginTop: spacing.md },
   refreshText: { color: colors.success, fontFamily: fonts.semibold, textDecorationLine: 'underline' },
+
+  scanBox: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+    gap: 6,
+  },
+  scanTitle: { fontSize: 15, fontFamily: fonts.semibold, color: colors.text },
+  scanSub: { fontSize: 12, color: colors.muted, lineHeight: 17 },
+  scanRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  scanInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.text,
+    fontFamily: fonts.regular,
+  },
+  scanBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  scanBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 14 },
+  recordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    minHeight: 40,
+  },
+  recordText: { color: colors.primaryDark, fontFamily: fonts.semibold, fontSize: 13.5 },
+  scanCameraBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.ink,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    marginTop: spacing.sm,
+  },
+  scannerWrap: { flex: 1, backgroundColor: '#000' },
+  scannerOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  scannerHint: {
+    color: '#fff',
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 4,
+  },
+  scannerClose: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15,23,42,0.85)',
+    borderRadius: radius.full,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
 
   header: {
     backgroundColor: '#0f172a',

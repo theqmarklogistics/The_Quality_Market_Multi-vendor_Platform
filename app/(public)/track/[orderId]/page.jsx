@@ -252,6 +252,12 @@ function TrackOrderPageInner() {
                     <div className="rounded-3xl border-2 border-green-300 bg-green-50 p-6 text-center shadow-sm">
                         <p className="text-xs font-semibold uppercase tracking-widest text-green-600 mb-2">Your Delivery Code</p>
                         <p className="text-5xl font-black tracking-[0.3em] text-green-800">{trackData.deliveryOtp}</p>
+                        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-left">
+                            <AlertTriangleIcon size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-xs text-amber-800">
+                                <span className="font-semibold">Important:</span> only give this code to the rider <span className="font-semibold">after the package is in your hands</span>. Sharing it earlier — in person, by phone or by message — confirms the delivery and releases payment, even if you never received it.
+                            </p>
+                        </div>
                         <p className="mt-3 text-sm text-slate-600">Show this code to the rider at your door to confirm delivery.</p>
                         <p className="mt-1 text-xs text-slate-400">The order cannot be marked complete without this code.</p>
                     </div>

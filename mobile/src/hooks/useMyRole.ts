@@ -85,3 +85,13 @@ export function canAccessAdmin(role: UserRole | null): boolean {
 export function canAccessOps(role: UserRole | null): boolean {
   return role === 'ADMIN' || role === 'LOGISTICS_MANAGER';
 }
+
+// Who sees the Financial operations dashboard shortcut (mirrors /financial).
+export function canAccessFinancial(role: UserRole | null): boolean {
+  return role === 'ADMIN' || role === 'FINANCIAL_OPERATIONAL';
+}
+
+// Who sees the Warehouse dashboard shortcut (mirrors /warehouse).
+export function canAccessWarehouse(role: UserRole | null): boolean {
+  return role === 'ADMIN' || role === 'WAREHOUSE_KEEPER';
+}

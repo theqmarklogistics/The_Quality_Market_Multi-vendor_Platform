@@ -21,6 +21,7 @@ import { createConversation } from '@/api/chat';
 import type { Order } from '@/api/types';
 import { Badge, Button, EmptyState, Loader, Money } from '@/components/ui';
 import { RatingModal } from '@/components/RatingModal';
+import { SignedOutGate } from '@/components/SignedOutGate';
 import { formatPrice } from '@/constants';
 import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
@@ -33,6 +34,17 @@ const statusTone: Record<string, 'warning' | 'info' | 'brand' | 'success' | 'neu
 };
 
 export default function OrdersScreen() {
+  return (
+    <SignedOutGate
+      title="Sign in to see your orders"
+      subtitle="Your orders, delivery tracking and payment proofs live here once you're signed in."
+    >
+      <OrdersScreenInner />
+    </SignedOutGate>
+  );
+}
+
+function OrdersScreenInner() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);

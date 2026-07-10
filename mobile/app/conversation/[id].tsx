@@ -18,9 +18,18 @@ import { format } from 'date-fns';
 import { getMessages, sendMessage, type Message } from '@/api/chat';
 import { useRealtimeRoom } from '@/realtime/useRealtimeRoom';
 import { Loader } from '@/components/ui';
+import { SignedOutGate } from '@/components/SignedOutGate';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function ChatRoomScreen() {
+  return (
+    <SignedOutGate title="Sign in to chat">
+      <ChatRoomScreenInner />
+    </SignedOutGate>
+  );
+}
+
+function ChatRoomScreenInner() {
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
   const { user } = useUser();
 

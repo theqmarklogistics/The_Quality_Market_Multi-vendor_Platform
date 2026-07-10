@@ -1,5 +1,6 @@
-// Add a delivery address. The backend requires a pinned lat/long, so this screen
-// captures the device location (expo-location) before allowing save.
+// Add a delivery address. A pinned lat/long is preferred (exact routing), but a
+// customer who won't share their location can instead describe it down to the
+// village (umudugudu) — the backend geocodes that into an approximate point.
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -24,6 +25,7 @@ export default function NewAddressScreen() {
   const [zip, setZip] = useState('0000');
   const [country, setCountry] = useState('Rwanda');
   const [sector, setSector] = useState<string | null>(null);
+  const [village, setVillage] = useState('');
 
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pinning, setPinning] = useState(false);
@@ -49,8 +51,11 @@ export default function NewAddressScreen() {
   };
 
   const onSave = async () => {
-    if (!coords) {
-      Alert.alert('Pin required', 'Please pin your location before saving.');
+    if (!coords && !village.trim()) {
+      Alert.alert(
+        'Location needed',
+        'Pin your current location, or fill in your village (umudugudu) so we can locate you approximately.',
+      );
       return;
     }
     if (!name || !phone || !street) {
@@ -69,8 +74,9 @@ export default function NewAddressScreen() {
         zip,
         country,
         sector: sector ?? undefined,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
+        village: village.trim() || undefined,
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
       });
       router.back();
     } catch (err: any) {
@@ -99,6 +105,12 @@ export default function NewAddressScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      <Field
+        label="Village (umudugudu) — required if you don't pin your location"
+        value={village}
+        onChangeText={setVillage}
+      />
 
       <View style={styles.row}>
         <View style={styles.flex}>
@@ -133,7 +145,12 @@ export default function NewAddressScreen() {
       </TouchableOpacity>
 
       <View style={{ marginTop: spacing.lg }}>
-        <Button label="Save address" onPress={onSave} loading={saving} disabled={!coords} />
+        <Button
+          label="Save address"
+          onPress={onSave}
+          loading={saving}
+          disabled={!coords && !village.trim()}
+        />
       </View>
     </ScrollView>
   );

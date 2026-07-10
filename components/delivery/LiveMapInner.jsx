@@ -1,51 +1,28 @@
 'use client'
-import { useEffect, useMemo } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { loadGoogleMaps, createHtmlMarker } from "@/lib/googleMapsLoader";
 import { KIGALI_HUB } from "@/lib/deliveryEta";
 
-// Custom HTML markers — avoids Leaflet's default PNG icon path breaking under the bundler.
-const makeIcon = (bg, glyph, ring = false) =>
-    L.divIcon({
-        className: "tqm-map-pin",
-        html: `<div style="
-            background:${bg};
-            width:30px;height:30px;border-radius:50% 50% 50% 0;
-            transform:rotate(-45deg);
-            border:2px solid #fff;
-            box-shadow:0 2px 6px rgba(0,0,0,.35);
-            display:flex;align-items:center;justify-content:center;
-            ${ring ? 'animation:tqmPulse 1.5s infinite;' : ''}
-        "><span style="transform:rotate(45deg);font-size:14px;line-height:1;">${glyph}</span></div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-        popupAnchor: [0, -28],
-    });
+// Branded teardrop pin (same HTML as the old Leaflet divIcon).
+const pinHtml = (bg, glyph, ring = false) => `<div style="
+    background:${bg};
+    width:30px;height:30px;border-radius:50% 50% 50% 0;
+    transform:rotate(-45deg);
+    border:2px solid #fff;
+    box-shadow:0 2px 6px rgba(0,0,0,.35);
+    display:flex;align-items:center;justify-content:center;
+    ${ring ? 'animation:tqmPulse 1.5s infinite;' : ''}
+"><span style="transform:rotate(45deg);font-size:14px;line-height:1;">${glyph}</span></div>`;
 
-const RIDER_ICON = makeIcon("#16a34a", "🛵", true);
-const CUSTOMER_ICON = makeIcon("#dc2626", "📍");
-const HUB_ICON = makeIcon("#0f172a", "🏬");
-const STOP_ICON = makeIcon("#64748b", "•");
-
-function FitBounds({ points }) {
-    const map = useMap();
-    useEffect(() => {
-        const valid = points.filter((p) => p && p.lat != null && p.lng != null);
-        if (valid.length === 0) return;
-        if (valid.length === 1) {
-            map.setView([valid[0].lat, valid[0].lng], 15);
-            return;
-        }
-        const bounds = L.latLngBounds(valid.map((p) => [p.lat, p.lng]));
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-    }, [points, map]);
-    return null;
-}
+const RIDER_PIN = pinHtml("#16a34a", "🛵", true);
+const CUSTOMER_PIN = pinHtml("#dc2626", "📍");
+const HUB_PIN = pinHtml("#0f172a", "🏬");
+const STOP_PIN = pinHtml("#64748b", "•");
 
 /**
- * Shared live map. Renders OpenStreetMap tiles with optional hub, rider, customer
- * and corridor-stop markers. All position props are {lat,lng} or null.
+ * Shared live map on Google Maps. Renders optional hub, rider, customer and
+ * corridor-stop markers plus the (road or sketched) route. All position props
+ * are {lat,lng} or null — same contract as the old Leaflet version.
  */
 export default function LiveMapInner({
     riderPos = null,
@@ -57,7 +34,16 @@ export default function LiveMapInner({
     routeGeometry = null,
     height = 320,
 }) {
-    // Normalise to a single list of rider pins (supports both single + multi-rider callers).
+    const containerRef = useRef(null);
+    const mapRef = useRef(null);
+    const mapsRef = useRef(null);
+    const markersRef = useRef([]);
+    const linesRef = useRef([]);
+    const infoRef = useRef(null);
+    const [ready, setReady] = useState(false);
+    const [failed, setFailed] = useState(false);
+
+    // Normalise to a single list of rider pins (supports single + multi-rider callers).
     const riderPins = useMemo(() => {
         const list = Array.isArray(riders) ? riders.filter((r) => r && r.lat != null && r.lng != null) : [];
         if (riderPos && riderPos.lat != null && riderPos.lng != null) {
@@ -67,72 +53,134 @@ export default function LiveMapInner({
     }, [riders, riderPos]);
 
     const fitPoints = useMemo(
-        () => [hub, customerPos, ...riderPins, ...stops].filter(Boolean),
+        () => [hub, customerPos, ...riderPins, ...stops].filter((p) => p && p.lat != null && p.lng != null),
         [hub, customerPos, riderPins, stops]
     );
 
-    // A real road route (from OSRM) takes precedence over the straight-line corridor sketch.
+    // A real road route (from OSRM, [lat,lng] pairs) beats the straight-line sketch.
     const roadLine = useMemo(
         () => (Array.isArray(routeGeometry) && routeGeometry.length > 1 ? routeGeometry : null),
         [routeGeometry]
     );
 
-    const routeLine = useMemo(() => {
+    const sketchLine = useMemo(() => {
         if (!showRoute || roadLine) return null;
         const ordered = [...stops]
             .filter((s) => s.lat != null && s.lng != null)
             .sort((a, b) => (a.stopSequence ?? 0) - (b.stopSequence ?? 0));
-        const pts = [hub, ...ordered].filter(Boolean).map((p) => [p.lat, p.lng]);
+        const pts = [hub, ...ordered].filter(Boolean).map((p) => ({ lat: p.lat, lng: p.lng }));
         return pts.length > 1 ? pts : null;
     }, [showRoute, stops, hub, roadLine]);
 
-    const center = riderPins[0] || customerPos || hub;
+    // Init the map once.
+    useEffect(() => {
+        let cancelled = false;
+        loadGoogleMaps()
+            .then((maps) => {
+                if (cancelled || !containerRef.current || mapRef.current) return;
+                mapsRef.current = maps;
+                const center = riderPins[0] || customerPos || hub || KIGALI_HUB;
+                mapRef.current = new maps.Map(containerRef.current, {
+                    center: { lat: center.lat, lng: center.lng },
+                    zoom: 14,
+                    scrollwheel: false,
+                    mapTypeControl: false,
+                    streetViewControl: false,
+                    fullscreenControl: false,
+                    clickableIcons: false,
+                });
+                infoRef.current = new maps.InfoWindow();
+                setReady(true);
+            })
+            .catch(() => setFailed(true));
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    // position+z-index:0 traps Leaflet's internal z-indexes (panes/controls go up to
-    // 1000) in their own stacking context, so they never paint over modals/overlays.
+    // Sync markers + route lines whenever inputs change (small counts — rebuild is fine).
+    useEffect(() => {
+        const maps = mapsRef.current;
+        const map = mapRef.current;
+        if (!ready || !maps || !map) return;
+
+        markersRef.current.forEach((m) => m.setMap(null));
+        markersRef.current = [];
+        linesRef.current.forEach((l) => l.setMap(null));
+        linesRef.current = [];
+
+        const openInfo = (position, text) => {
+            infoRef.current.setContent(`<div style="font: 13px sans-serif; color:#0f172a; padding:2px 4px;">${text}</div>`);
+            infoRef.current.setPosition(position);
+            infoRef.current.open({ map });
+        };
+
+        const addPin = (pos, html, label) => {
+            const marker = createHtmlMarker(maps, map, pos, html, {
+                title: label,
+                onClick: () => openInfo(pos, label),
+            });
+            markersRef.current.push(marker);
+        };
+
+        if (roadLine) {
+            linesRef.current.push(new maps.Polyline({
+                map,
+                path: roadLine.map(([lat, lng]) => ({ lat, lng })),
+                strokeColor: "#16a34a",
+                strokeWeight: 4,
+                strokeOpacity: 0.8,
+            }));
+        }
+        if (sketchLine) {
+            // Dashed sketch: transparent stroke + repeated dash symbol.
+            linesRef.current.push(new maps.Polyline({
+                map,
+                path: sketchLine,
+                strokeOpacity: 0,
+                icons: [{
+                    icon: { path: "M 0,-1 0,1", strokeOpacity: 0.7, strokeColor: "#16a34a", strokeWeight: 3, scale: 3 },
+                    offset: "0",
+                    repeat: "16px",
+                }],
+            }));
+        }
+
+        if (hub && hub.lat != null && hub.lng != null) addPin(hub, HUB_PIN, "Pickup hub");
+        stops.forEach((s, i) => {
+            if (s.lat != null && s.lng != null) {
+                addPin({ lat: s.lat, lng: s.lng }, STOP_PIN, s.label || `Stop ${s.stopSequence ?? i + 1}`);
+            }
+        });
+        if (customerPos && customerPos.lat != null && customerPos.lng != null) {
+            addPin(customerPos, CUSTOMER_PIN, "Delivery location");
+        }
+        riderPins.forEach((r) => addPin({ lat: r.lat, lng: r.lng }, RIDER_PIN, r.label || "Rider"));
+
+        // Fit to everything visible (mirrors the Leaflet FitBounds behaviour).
+        if (fitPoints.length === 1) {
+            map.setCenter({ lat: fitPoints[0].lat, lng: fitPoints[0].lng });
+            map.setZoom(15);
+        } else if (fitPoints.length > 1) {
+            const bounds = new maps.LatLngBounds();
+            fitPoints.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+            map.fitBounds(bounds, 40);
+            const capZoom = maps.event.addListenerOnce(map, "idle", () => {
+                if (map.getZoom() > 16) map.setZoom(16);
+            });
+            return () => maps.event.removeListener(capZoom);
+        }
+    }, [ready, hub, stops, customerPos, riderPins, roadLine, sketchLine, fitPoints]);
+
     return (
         <div style={{ height, width: "100%", borderRadius: 16, overflow: "hidden", position: "relative", zIndex: 0 }}>
             <style>{`@keyframes tqmPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.5)}70%{box-shadow:0 0 0 12px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}`}</style>
-            <MapContainer
-                center={[center.lat, center.lng]}
-                zoom={14}
-                scrollWheelZoom={false}
-                style={{ height: "100%", width: "100%" }}
-            >
-                <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {roadLine && (
-                    <Polyline positions={roadLine} pathOptions={{ color: "#16a34a", weight: 4, opacity: 0.8 }} />
-                )}
-                {routeLine && (
-                    <Polyline positions={routeLine} pathOptions={{ color: "#16a34a", weight: 3, dashArray: "6 8", opacity: 0.7 }} />
-                )}
-                {hub && (
-                    <Marker position={[hub.lat, hub.lng]} icon={HUB_ICON}>
-                        <Popup>Pickup hub</Popup>
-                    </Marker>
-                )}
-                {stops.map((s, i) =>
-                    s.lat != null && s.lng != null ? (
-                        <Marker key={s.id || i} position={[s.lat, s.lng]} icon={STOP_ICON}>
-                            <Popup>{s.label || `Stop ${s.stopSequence ?? i + 1}`}</Popup>
-                        </Marker>
-                    ) : null
-                )}
-                {customerPos && (
-                    <Marker position={[customerPos.lat, customerPos.lng]} icon={CUSTOMER_ICON}>
-                        <Popup>Delivery location</Popup>
-                    </Marker>
-                )}
-                {riderPins.map((r, i) => (
-                    <Marker key={r.id || `rider-${i}`} position={[r.lat, r.lng]} icon={RIDER_ICON}>
-                        <Popup>{r.label || "Rider"}</Popup>
-                    </Marker>
-                ))}
-                <FitBounds points={fitPoints} />
-            </MapContainer>
+            {failed ? (
+                <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400 text-sm">
+                    Map unavailable
+                </div>
+            ) : (
+                <div ref={containerRef} style={{ height: "100%", width: "100%" }} />
+            )}
         </div>
     );
 }

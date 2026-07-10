@@ -278,11 +278,19 @@ export default function ExternalDashboardScreen() {
         )}
       </ScrollView>
 
-      {/* Book CTA */}
+      {/* Book CTA + public departure schedule */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.bookBtn} onPress={() => router.push('/external/book')} activeOpacity={0.85}>
           <Ionicons name="add-circle-outline" size={18} color="#fff" />
           <Text style={styles.bookBtnText}>Book a delivery</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.scheduleLink}
+          onPress={() => router.push('/schedule')}
+          accessibilityRole="button"
+        >
+          <Ionicons name="calendar-outline" size={14} color={colors.primaryDark} />
+          <Text style={styles.scheduleLinkText}>Rider departure schedule</Text>
         </TouchableOpacity>
       </View>
 
@@ -435,6 +443,15 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   bookBtnText: { color: '#fff', fontFamily: fonts.bold, fontSize: 15 },
+  scheduleLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: spacing.sm + 2,
+    minHeight: 32,
+  },
+  scheduleLinkText: { color: colors.primaryDark, fontFamily: fonts.semibold, fontSize: 13 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { backgroundColor: colors.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
