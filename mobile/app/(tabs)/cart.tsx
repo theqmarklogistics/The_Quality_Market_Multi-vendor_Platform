@@ -22,7 +22,7 @@ import {
   deleteItemFromCart,
   persistCart,
 } from '@/store/cartSlice';
-import { unitPrice } from '@/lib/pricing';
+import { unitPrice, isWholesaleApplied } from '@/lib/pricing';
 import { formatPrice } from '@/constants';
 import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
@@ -144,6 +144,7 @@ export default function CartScreen() {
               </View>
             );
           }
+          const wholesale = isWholesaleApplied(p, qty);
           return (
             <View style={styles.line}>
               <Image source={{ uri: p.images?.[0] }} style={styles.thumb} alt={p.name} />
@@ -151,7 +152,22 @@ export default function CartScreen() {
                 <Text style={styles.name} numberOfLines={2}>
                   {p.name}
                 </Text>
-                <Text style={styles.unit}>{formatPrice(unitPrice(p, qty))} each</Text>
+                <View style={styles.unitRow}>
+                  <Text style={styles.unit}>{formatPrice(unitPrice(p, qty))} each</Text>
+                  {wholesale ? (
+                    <>
+                      <Text style={styles.unitStrike}>{formatPrice(p.price)}</Text>
+                      <View style={styles.wholesaleBadge}>
+                        <Text style={styles.wholesaleBadgeText}>Wholesale</Text>
+                      </View>
+                    </>
+                  ) : null}
+                </View>
+                {!wholesale && p.wholesalePrice && p.wholesaleMinQty ? (
+                  <Text style={styles.wholesaleHint}>
+                    Buy {p.wholesaleMinQty}+ for {formatPrice(p.wholesalePrice)} each
+                  </Text>
+                ) : null}
                 <View style={styles.stepperRow}>
                   <View style={styles.stepper}>
                     <TouchableOpacity
@@ -231,7 +247,22 @@ const styles = StyleSheet.create({
   thumb: { width: 68, height: 68, borderRadius: radius.md, backgroundColor: colors.card },
   lineBody: { flex: 1, gap: 3 },
   name: { fontSize: 14, color: colors.text, fontFamily: fonts.medium, lineHeight: 19 },
+  unitRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   unit: { fontSize: 12, color: colors.muted, fontFamily: fonts.regular },
+  unitStrike: {
+    fontSize: 11,
+    color: colors.subtle,
+    fontFamily: fonts.regular,
+    textDecorationLine: 'line-through',
+  },
+  wholesaleBadge: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.full,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+  },
+  wholesaleBadgeText: { fontSize: 10, color: colors.successDeep, fontFamily: fonts.semibold },
+  wholesaleHint: { fontSize: 11, color: colors.successDeep, fontFamily: fonts.medium, marginTop: 1 },
   unavailable: { flex: 1, color: colors.muted, fontStyle: 'italic', fontFamily: fonts.regular },
   stepperRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   stepper: {

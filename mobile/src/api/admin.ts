@@ -190,9 +190,20 @@ export interface PoolableOrder {
   recipientPhone: string | null;
   sector: string | null;
   landmarkAddress: string | null;
+  isExternalDelivery: boolean;
+  packageDescription: string | null;
+  // Unpaid external bookings can be intaken/sorted but the batcher holds them
+  // out of routing until paid.
+  paymentPending: boolean;
 }
 
 // Un-corridored Kigali pooled orders awaiting batching (what the batcher draws from).
 export function listPoolableOrders(): Promise<{ orders: PoolableOrder[] }> {
   return apiGet<{ orders: PoolableOrder[] }>('/api/logistics/orders/poolable');
+}
+
+// Mark a package sorted at the hub (PENDING_INTAKE → SORTING) so the batcher can
+// sweep it into a corridor.
+export function markOrderIntake(orderId: string): Promise<{ success: boolean }> {
+  return apiPost<{ success: boolean }>(`/api/logistics/orders/${orderId}/intake`, {});
 }

@@ -44,3 +44,8 @@ next-env.d.ts
 
 # IDE
 .idea/
+
+# Local AI tooling
+.agents/
+.claude/
+.mcp.json

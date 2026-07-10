@@ -13,6 +13,7 @@ export default clerkMiddleware({
     '/api/banner',
     '/api/newsletter/unsubscribe',
     '/api/delivery/external/quote',
+    '/api/delivery/schedule',
   ],
 });
 

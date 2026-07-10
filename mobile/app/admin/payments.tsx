@@ -113,6 +113,12 @@ export default function PaymentReviewScreen() {
 
   const confirmReview = (status: 'APPROVED' | 'REJECTED') => {
     if (status === 'APPROVED') {
+      // Reviewing the proof is mandatory — an order without a submitted proof
+      // can never be marked as received (the backend enforces this too).
+      if (!selected?.paymentProofUrl) {
+        Alert.alert('No proof submitted', 'A payment proof must be submitted and reviewed before marking this payment as received.');
+        return;
+      }
       Alert.alert('Approve payment?', 'This marks the order as paid.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Approve', onPress: () => review('APPROVED') },

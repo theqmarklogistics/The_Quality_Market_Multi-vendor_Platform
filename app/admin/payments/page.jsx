@@ -23,6 +23,9 @@ export default function AdminPayments() {
     const [page, setPage] = useState(1)
     const [pages, setPages] = useState(1)
     const [proofStatus, setProofStatus] = useState('SUBMITTED')
+    // Reviewing the proof is mandatory before a payment can be marked received:
+    // track which proofs the admin actually opened this session.
+    const [viewedProofs, setViewedProofs] = useState(() => new Set())
 
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF'
 
@@ -105,6 +108,7 @@ export default function AdminPayments() {
                                             href={order.paymentProofUrl}
                                             target="_blank"
                                             rel="noreferrer"
+                                            onClick={() => setViewedProofs(prev => new Set(prev).add(order.id))}
                                             className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline border border-blue-100 bg-blue-50 px-3 py-1.5 rounded-lg"
                                         >
                                             View Proof ↗
@@ -114,10 +118,12 @@ export default function AdminPayments() {
                                 <p className="text-xs text-slate-400 mb-3">{new Date(order.createdAt).toLocaleString()}</p>
 
                                 {proofStatus === 'SUBMITTED' && (
-                                    <div className="flex gap-3">
+                                    <div className="flex flex-wrap items-center gap-3">
                                         <button
                                             onClick={() => toast.promise(reviewProof(order.id, 'APPROVED'), { loading: 'Approving…', success: 'Approved', error: e => e.message })}
-                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition"
+                                            disabled={!viewedProofs.has(order.id)}
+                                            title={!viewedProofs.has(order.id) ? 'Open "View Proof" first — reviewing the proof is mandatory' : undefined}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
                                         >
                                             Mark Received
                                         </button>

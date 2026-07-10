@@ -16,9 +16,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { getConversations, createConversation, type Conversation } from '@/api/chat';
 import { Button, EmptyState, Loader } from '@/components/ui';
+import { SignedOutGate } from '@/components/SignedOutGate';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function ChatListScreen() {
+  return (
+    <SignedOutGate
+      title="Sign in to message us"
+      subtitle="Chat with support and sellers about your orders once you're signed in."
+    >
+      <ChatListScreenInner />
+    </SignedOutGate>
+  );
+}
+
+function ChatListScreenInner() {
   const router = useRouter();
   const { user } = useUser();
   const [conversations, setConversations] = useState<Conversation[]>([]);

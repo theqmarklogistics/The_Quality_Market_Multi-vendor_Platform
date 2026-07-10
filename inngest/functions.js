@@ -5,6 +5,15 @@ import resend from "@/configs/resend";
 const FROM = process.env.RESEND_FROM_EMAIL || 'noreply@thequalitymarket.com';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://thequalitymarket.com';
 
+// Brand header injected at the top of every email so all outgoing mail carries
+// the company logo.
+const BRAND_HEADER = `
+    <div style="text-align: center; padding-bottom: 16px; margin-bottom: 24px; border-bottom: 2px solid #16a34a;">
+        <img src="${APP_URL}/the-quality-market-logo.png" alt="The Quality Market" width="56" height="56" style="display: inline-block; object-fit: contain;" />
+        <p style="color: #0f172a; font-size: 15px; font-weight: 700; margin: 6px 0 0;">The Quality Market</p>
+    </div>
+`;
+
 // Send an email via Resend, swallowing the daily-cap / rate-limit error.
 // Inngest retries failed steps, but a 429 from Resend is unlikely to recover
 // within the same day, so we log and move on rather than retry-burn steps.
@@ -156,6 +165,7 @@ export const onChatMessageCreated = inngest.createFunction(
             const subject = `${senderName} sent you a message — The Quality Market`;
             const html = `
                 <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+                    ${BRAND_HEADER}
                     <h2 style="color: #1e293b;">${senderName} sent you a message</h2>
                     <p style="color: #64748b;">${String(message.content || '').slice(0, 280)}</p>
                     <a href="${APP_URL}/chat?c=${conversationId}"
@@ -217,6 +227,7 @@ export const onPaymentProofSubmitted = inngest.createFunction(
             const subject = `New payment proof uploaded — order #${order.id.slice(0, 8)}`;
             const html = `
                 <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+                    ${BRAND_HEADER}
                     <h2 style="color: #1e293b;">Payment proof needs review</h2>
                     <p style="color: #64748b;">Order <strong>#${order.id.slice(0, 8)}</strong> — RWF ${Number(order.total || 0).toLocaleString()}</p>
                     <p style="color: #64748b;">Buyer: ${buyer?.name || 'Unknown'} (${buyer?.email || 'n/a'})</p>
@@ -267,6 +278,7 @@ export const onProductModerationUpdated = inngest.createFunction(
                 : `Your product "${product.name}" was rejected`;
             const html = `
                 <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+                    ${BRAND_HEADER}
                     <h2 style="color: ${isApproved ? '#16a34a' : '#ef4444'};">
                         ${isApproved ? 'Product approved' : 'Product rejected'}
                     </h2>
@@ -321,6 +333,7 @@ export const onPaymentProofReviewed = inngest.createFunction(
                 : `Payment proof needs attention — order #${order.id.slice(0, 8)}`;
             const html = `
                 <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+                    ${BRAND_HEADER}
                     <h2 style="color: ${isApproved ? '#16a34a' : '#ef4444'};">
                         ${isApproved ? 'Payment confirmed ✅' : 'Payment rejected ⚠️'}
                     </h2>

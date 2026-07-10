@@ -243,8 +243,8 @@ export default function StoreOrders() {
                         <div className="mb-4">
                             <h3 className="font-semibold mb-2">Customer</h3>
                             <p><span className="text-green-700">Name:</span> {selectedOrder.user?.name}</p>
-                            <p><span className="text-green-700">Email:</span> {selectedOrder.user?.email}</p>
-                            <p><span className="text-green-700">Phone:</span> {selectedOrder.address?.phone}</p>
+                            <p><span className="text-green-700">Email:</span> {(selectedOrder.user?.email || selectedOrder.address?.email) ? <a className="text-blue-600 hover:underline" href={`mailto:${selectedOrder.user?.email || selectedOrder.address?.email}`}>{selectedOrder.user?.email || selectedOrder.address?.email}</a> : '—'}</p>
+                            <p><span className="text-green-700">Phone:</span> {(selectedOrder.contactPhone || selectedOrder.address?.phone) ? <a className="text-blue-600 hover:underline" href={`tel:${selectedOrder.contactPhone || selectedOrder.address?.phone}`}>{selectedOrder.contactPhone || selectedOrder.address?.phone}</a> : '—'}</p>
                             <p><span className="text-green-700">Address:</span> {[selectedOrder.address?.street, selectedOrder.address?.city, selectedOrder.address?.state, selectedOrder.address?.zip, selectedOrder.address?.country].filter(Boolean).join(', ')}</p>
                         </div>
 

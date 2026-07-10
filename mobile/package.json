@@ -21,6 +21,7 @@
     "date-fns": "^4.1.0",
     "expo": "~56.0.15",
     "expo-asset": "^56.0.17",
+    "expo-camera": "~56.0.8",
     "expo-constants": "^56.0.18",
     "expo-dev-client": "~56.0.22",
     "expo-device": "~56.0.4",
@@ -41,6 +42,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
     "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1",
     "react-redux": "^9.2.0",
     "socket.io-client": "^4.8.3"
   },

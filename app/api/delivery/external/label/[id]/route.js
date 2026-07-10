@@ -4,8 +4,10 @@ import React from "react";
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image as PDFImage } from "@react-pdf/renderer";
 import prisma from "@/lib/prisma";
 import authLogistics from "@/middlewares/authLogistics";
+import path from "path";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thequalitymarket.com";
+const LOGO_PATH = path.join(process.cwd(), "public", "the-quality-market-logo.png");
 const BRAND_GREEN = "#16a34a";
 const BRAND_DARK = "#0f172a";
 
@@ -29,16 +31,20 @@ const styles = StyleSheet.create({
 
 function ExternalLabel({ order, senderName }) {
     const recipientAddr = [order.address?.sector, order.address?.city].filter(Boolean).join(", ");
-    const trackUrl = `${APP_URL}/track/${order.id}${order.trackingToken ? `?t=${order.trackingToken}` : ""}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(trackUrl)}`;
+    // QR leads to the public package page (owner info, no confirmation code).
+    const packageUrl = `${APP_URL}/package/${order.id}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(packageUrl)}`;
 
     return (
         <Document>
             <Page size="A5" style={styles.page}>
                 <View style={styles.header}>
-                    <View>
-                        <Text style={styles.brand}>The Quality Market</Text>
-                        <Text style={styles.brandSub}>Delivery service · thequalitymarket.com</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <PDFImage src={LOGO_PATH} style={{ width: 32, height: 32, marginRight: 8 }} />
+                        <View>
+                            <Text style={styles.brand}>The Quality Market</Text>
+                            <Text style={styles.brandSub}>Delivery service · thequalitymarket.com</Text>
+                        </View>
                     </View>
                     <Text style={styles.badge}>EXTERNAL · KIGALI POOL</Text>
                 </View>
@@ -73,7 +79,7 @@ function ExternalLabel({ order, senderName }) {
 
                 <View style={styles.qrWrapper}>
                     <PDFImage style={styles.qrImage} src={qrUrl} />
-                    <Text style={styles.qrCaption}>Scan to track this delivery</Text>
+                    <Text style={styles.qrCaption}>Scan for package details (owner &amp; destination)</Text>
                 </View>
 
                 <Text style={styles.footer}>The Quality Market — Kigali Pooled Delivery (external)</Text>

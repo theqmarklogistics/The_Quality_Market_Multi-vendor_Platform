@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from "react"
 import axios from "axios"
 import toast from "react-hot-toast"
 import Pagination from "@/components/Pagination"
-import { ShoppingBagIcon, SearchIcon, XIcon } from "lucide-react"
+import { ShoppingBagIcon, SearchIcon, XIcon, PhoneIcon, MailIcon, MessageCircleIcon } from "lucide-react"
+import Link from "next/link"
 
 const ORDER_STATUSES = ['', 'ORDER_PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'OTHER']
 
@@ -154,6 +155,7 @@ export default function AdminOrders() {
                             <thead className="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
                                 <tr>
                                     <th className="px-4 py-3">Customer</th>
+                                    <th className="px-4 py-3">Contact</th>
                                     <th className="px-4 py-3">Store</th>
                                     <th className="px-4 py-3">Total</th>
                                     <th className="px-4 py-3">Payment</th>
@@ -164,6 +166,23 @@ export default function AdminOrders() {
                                 {orders.map(order => (
                                     <tr key={order.id} className="hover:bg-gray-50 transition-colors duration-150">
                                         <td className="px-4 py-3">{order.user?.name}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-col gap-1 text-xs">
+                                                {(order.contactPhone || order.address?.phone) && (
+                                                    <a href={`tel:${order.contactPhone || order.address?.phone}`} className="inline-flex items-center gap-1 text-slate-600 hover:text-green-700">
+                                                        <PhoneIcon size={12} /> {order.contactPhone || order.address?.phone}
+                                                    </a>
+                                                )}
+                                                {(order.user?.email || order.address?.email) && (
+                                                    <a href={`mailto:${order.user?.email || order.address?.email}`} className="inline-flex items-center gap-1 text-slate-600 hover:text-green-700 break-all">
+                                                        <MailIcon size={12} /> {order.user?.email || order.address?.email}
+                                                    </a>
+                                                )}
+                                                <Link href="/admin/chat" className="inline-flex items-center gap-1 text-blue-600 hover:underline">
+                                                    <MessageCircleIcon size={12} /> Chat
+                                                </Link>
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3">{order.store?.name}</td>
                                         <td className="px-4 py-3">{currency} {Number(order.total).toLocaleString()}</td>
                                         <td className="px-4 py-3">

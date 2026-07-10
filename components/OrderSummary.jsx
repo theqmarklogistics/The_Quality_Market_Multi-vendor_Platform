@@ -33,6 +33,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     const [landmarkAddress, setLandmarkAddress] = useState('');
     const [pinnedLocation, setPinnedLocation] = useState(null); // {lat,lng} optional checkout pin
     const [pinning, setPinning] = useState(false);
+    // Phone is mandatory at checkout; prefilled from the selected address.
+    const [contactPhone, setContactPhone] = useState('');
+    // Live pooled-delivery fee estimate ({fee, distanceKm, basis} | null)
+    const [poolQuote, setPoolQuote] = useState(null);
+    const [quoting, setQuoting] = useState(false);
 
     const handlePinLocation = () => {
         if (!('geolocation' in navigator)) {
@@ -54,6 +59,40 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     useEffect(() => {
         axios.get('/api/payment-config').then(res => setPaymentConfig(res.data)).catch(() => null)
     }, []);
+
+    // Prefill the checkout phone from the selected address (still editable).
+    useEffect(() => {
+        if (selectedAddress?.phone) setContactPhone(prev => prev || selectedAddress.phone);
+    }, [selectedAddress]);
+
+    // Show the Kigali Pooled Delivery fee up-front: quote whenever the pooled
+    // option, address, or pinned location changes. Uses the pinned checkout point
+    // when shared, otherwise the address's saved/geocoded (village) location.
+    useEffect(() => {
+        let cancelled = false;
+        const quote = async () => {
+            if (deliveryType !== 'KIGALI_POOL' || !selectedAddress || !user) {
+                setPoolQuote(null);
+                return;
+            }
+            setQuoting(true);
+            try {
+                const token = await getToken();
+                const { data } = await axios.post('/api/delivery/pool-quote', {
+                    addressId: selectedAddress.id,
+                    items: (items || []).map(i => ({ id: i.id || i.productId, quantity: i.quantity })),
+                    ...(pinnedLocation && { lat: pinnedLocation.lat, lng: pinnedLocation.lng }),
+                }, { headers: { Authorization: `Bearer ${token}` } });
+                if (!cancelled) setPoolQuote(data);
+            } catch {
+                if (!cancelled) setPoolQuote(null);
+            } finally {
+                if (!cancelled) setQuoting(false);
+            }
+        };
+        quote();
+        return () => { cancelled = true; };
+    }, [deliveryType, selectedAddress, pinnedLocation, items, user, getToken]);
 
     const formatAmount = (amount) => `${currency}${Number(amount || 0).toLocaleString()}`
 
@@ -98,6 +137,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                 return;
             }
 
+            if (!/^\+?\d[\d\s-]{6,17}$/.test(contactPhone.trim())) {
+                toast.error('Please enter a valid phone number — it is required at checkout.');
+                return;
+            }
+
             const token = await getToken();
 
             const orderData = {
@@ -105,6 +149,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                 addressId: selectedAddress.id,
                 paymentMethod: selectedPaymentMethod,
                 couponCode: couponCodeInput,
+                contactPhone: contactPhone.trim(),
                 deliveryType,
                 ...(deliveryType === 'KIGALI_POOL' && { landmarkAddress: landmarkAddress.trim() }),
                 ...(deliveryType === 'KIGALI_POOL' && pinnedLocation && { recipientLat: pinnedLocation.lat, recipientLng: pinnedLocation.lng })
@@ -197,6 +242,22 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                             </button>
                         </div>
                     )}
+
+                    {/* Phone — mandatory at checkout */}
+                    <div className='mt-3'>
+                        <label className='block text-xs font-semibold text-slate-700 mb-1'>
+                            Phone Number <span className='text-red-500'>*</span>
+                        </label>
+                        <input
+                            type="tel"
+                            value={contactPhone}
+                            onChange={e => setContactPhone(e.target.value)}
+                            placeholder='e.g. 078X XXX XXX'
+                            className='w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-green-500'
+                            required
+                        />
+                        <p className='mt-1 text-[11px] text-slate-400'>Required — the rider and support will use this number for your delivery.</p>
+                    </div>
                 </section>
 
                 <section className='border-b border-slate-200 pb-5'>
@@ -285,7 +346,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                             <div className='flex flex-col gap-1 font-medium text-right text-slate-800'>
                                 <p>{formatAmount(totalPrice)}</p>
                                 {deliveryType === 'KIGALI_POOL'
-                                    ? <p className='text-green-700 text-xs'>Pooled (shared route)</p>
+                                    ? (quoting
+                                        ? <p className='text-green-700 text-xs'>Calculating…</p>
+                                        : poolQuote?.fee != null
+                                            ? <p className='text-green-700'>{formatAmount(poolQuote.fee)}</p>
+                                            : <p className='text-green-700 text-xs'>Pooled (shared route)</p>)
                                     : <p>Free in Kigali</p>}
 
                                 {coupon && <p>{`-${formatAmount((coupon.discount / 100) * totalPrice)}`}</p>}
@@ -308,9 +373,19 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                         )}
                     </div>
 
-                    <div className='flex items-center justify-between rounded-2xl bg-slate-900 px-4 py-4 text-white'>
-                        <p className='font-medium'>Total</p>
-                        <p className='text-lg font-semibold'>{coupon ? formatAmount(totalPrice - ((coupon.discount / 100) * totalPrice)) : formatAmount(totalPrice)}</p>
+                    <div className='rounded-2xl bg-slate-900 px-4 py-4 text-white'>
+                        <div className='flex items-center justify-between'>
+                            <p className='font-medium'>Total</p>
+                            <p className='text-lg font-semibold'>
+                                {formatAmount(
+                                    (coupon ? totalPrice - ((coupon.discount / 100) * totalPrice) : totalPrice)
+                                    + (deliveryType === 'KIGALI_POOL' && poolQuote?.fee != null ? poolQuote.fee : 0)
+                                )}
+                            </p>
+                        </div>
+                        {deliveryType === 'KIGALI_POOL' && poolQuote?.fee != null && (
+                            <p className='mt-1 text-[11px] text-white/60'>Includes {formatAmount(poolQuote.fee)} estimated delivery — the final pooled fee can only be lower when your route is shared.</p>
+                        )}
                     </div>
 
                     <button

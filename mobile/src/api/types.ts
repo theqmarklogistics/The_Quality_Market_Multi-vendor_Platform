@@ -61,10 +61,12 @@ export interface Address {
   longitude: number | null;
   district: string | null;
   sector: string | null;
+  village: string | null;
   createdAt: string;
 }
 
-// Fields collected by the add-address form. lat/long are required by the backend.
+// Fields collected by the add-address form. Either a pinned lat/long OR a
+// village-level description is required (the backend geocodes the village).
 export interface AddressInput {
   name: string;
   email: string;
@@ -76,8 +78,9 @@ export interface AddressInput {
   phone: string;
   sector?: string;
   district?: string;
-  latitude: number;
-  longitude: number;
+  village?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Coupon {
@@ -148,4 +151,6 @@ export interface CreateOrderPayload {
   landmarkAddress?: string;
   recipientLat?: number;
   recipientLng?: number;
+  // Mandatory at checkout (server falls back to the address phone if omitted).
+  contactPhone?: string;
 }

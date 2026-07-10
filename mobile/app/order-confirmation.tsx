@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getPaymentConfig } from '@/api/paymentConfig';
 import type { PaymentConfig } from '@/api/types';
 import { Button } from '@/components/ui';
+import { BrandLogo } from '@/components/BrandLogo';
 import { PaymentMethod } from '@/constants';
 import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
@@ -25,6 +26,7 @@ export default function ConfirmationScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <BrandLogo direction="row" size={26} gap={7} showWordmark wordmarkSize={16} style={styles.brand} />
       <View style={styles.iconWrap}>
         <View style={styles.iconCircle}>
           <Ionicons name="checkmark" size={44} color={colors.primaryText} />
@@ -111,7 +113,8 @@ function Step({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  iconWrap: { alignItems: 'center', marginTop: spacing.xl },
+  brand: { alignSelf: 'center', marginTop: spacing.sm, opacity: 0.9 },
+  iconWrap: { alignItems: 'center', marginTop: spacing.lg },
   iconCircle: {
     width: 84,
     height: 84,

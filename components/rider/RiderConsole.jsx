@@ -5,7 +5,8 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import LiveMap from "@/components/delivery/LiveMap";
 import { initializeSocket } from "@/lib/socketClient";
-import { PhoneIcon, NavigationIcon, CheckCircleIcon, XCircleIcon, MapPinIcon, PlayIcon, SquareIcon, PackageIcon, CameraIcon, Loader2Icon } from "lucide-react";
+import Link from "next/link";
+import { PhoneIcon, NavigationIcon, CheckCircleIcon, XCircleIcon, MapPinIcon, PlayIcon, SquareIcon, PackageIcon, CameraIcon, Loader2Icon, QrCodeIcon, PlusIcon } from "lucide-react";
 
 const LOCATION_MIN_MS = 10000;
 
@@ -40,6 +41,12 @@ export default function RiderConsole() {
     const [failReason, setFailReason] = useState(FAILURE_REASONS[0]);
     const [failNote, setFailNote] = useState("");
     const [busy, setBusy] = useState(false);
+    const [scanModal, setScanModal] = useState(false);
+    const [scanInput, setScanInput] = useState("");
+    const [scanning, setScanning] = useState(false);
+    const scanVideoRef = useRef(null);
+    const scanStreamRef = useRef(null);
+    const scanLoopRef = useRef(null);
 
     const watchIdRef = useRef(null);
     const lastPostRef = useRef(0);
@@ -200,6 +207,67 @@ export default function RiderConsole() {
         setFailModal(null);
     };
 
+    // ── Scan a package QR → get assigned to it ─────────────────────────────
+    const submitScan = useCallback(async (code) => {
+        const value = (code || "").trim();
+        if (!value) { toast.error("Scan a QR code or enter the package code."); return; }
+        setBusy(true);
+        try {
+            const { data } = await axios.post("/api/delivery/rider/scan", { code: value }, { headers: await authHeaders() });
+            toast.success(`Package assigned to you${data?.stop?.recipientName ? ` — ${data.stop.recipientName}` : ""}.`);
+            setScanModal(false);
+            setScanInput("");
+            load({ silent: true });
+        } catch (err) {
+            toast.error(err?.response?.data?.error || err.message);
+        } finally { setBusy(false); }
+    }, [authHeaders, load]);
+
+    const stopScanner = useCallback(() => {
+        if (scanLoopRef.current) cancelAnimationFrame(scanLoopRef.current);
+        scanLoopRef.current = null;
+        scanStreamRef.current?.getTracks?.().forEach(t => t.stop());
+        scanStreamRef.current = null;
+        setScanning(false);
+    }, []);
+
+    // Camera QR scanning via the native BarcodeDetector (Android Chrome). Falls
+    // back to manual entry where unsupported (e.g. iOS Safari without the API).
+    const startScanner = useCallback(async () => {
+        if (typeof window === "undefined" || !("BarcodeDetector" in window)) {
+            toast("Camera scanning isn't supported here — type the code instead.", { icon: "⌨️" });
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            scanStreamRef.current = stream;
+            setScanning(true);
+            const video = scanVideoRef.current;
+            if (!video) { stopScanner(); return; }
+            video.srcObject = stream;
+            await video.play();
+            const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+            const tick = async () => {
+                if (!scanStreamRef.current) return;
+                try {
+                    const codes = await detector.detect(video);
+                    if (codes?.length) {
+                        stopScanner();
+                        submitScan(codes[0].rawValue);
+                        return;
+                    }
+                } catch (_) { /* keep scanning */ }
+                scanLoopRef.current = requestAnimationFrame(tick);
+            };
+            scanLoopRef.current = requestAnimationFrame(tick);
+        } catch (_) {
+            toast.error("Could not access the camera — type the code instead.");
+            stopScanner();
+        }
+    }, [stopScanner, submitScan]);
+
+    useEffect(() => () => stopScanner(), [stopScanner]);
+
     const confirmDelivery = async () => {
         if (!/^\d{4}$/.test(otpInput)) { toast.error("Enter the 4-digit code from the customer."); return; }
         setBusy(true);
@@ -237,16 +305,64 @@ export default function RiderConsole() {
 
     const pending = stops.filter(s => !["DELIVERED", "FAILED"].includes(s.deliveryStatus)).length;
 
+    // Scan-a-package modal: live camera QR scan (when supported) + manual entry.
+    const renderScanModal = () => (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4" onClick={() => { stopScanner(); setScanModal(false); }}>
+            <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-slate-800">Scan a package</h3>
+                <p className="text-sm text-slate-500 mt-1">Point the camera at the QR code on the label to assign the package to you.</p>
+
+                <div className={`mt-4 overflow-hidden rounded-2xl bg-slate-900 ${scanning ? "" : "hidden"}`}>
+                    <video ref={scanVideoRef} className="w-full aspect-square object-cover" muted playsInline />
+                </div>
+
+                {!scanning ? (
+                    <button onClick={startScanner} className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-green-600 text-white py-3 text-sm font-semibold hover:bg-green-700">
+                        <CameraIcon size={16} /> Open camera scanner
+                    </button>
+                ) : (
+                    <button onClick={stopScanner} className="mt-3 w-full rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600">Stop camera</button>
+                )}
+
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                    <p className="text-xs text-slate-500 mb-2">Or type the package code / order ID:</p>
+                    <div className="flex gap-2">
+                        <input
+                            value={scanInput}
+                            onChange={e => setScanInput(e.target.value)}
+                            placeholder="ord_…"
+                            className="flex-1 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-green-500"
+                        />
+                        <button disabled={busy} onClick={() => submitScan(scanInput)} className="rounded-xl bg-slate-900 text-white px-4 py-2.5 text-sm font-semibold disabled:opacity-50">
+                            Assign
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     if (loading) return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading your route…</div>;
 
     if (!corridor) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 gap-2">
-                <PackageIcon size={40} className="text-slate-300" />
-                <h2 className="text-lg font-semibold text-slate-700">No route assigned yet</h2>
-                <p className="text-sm text-slate-500">When dispatch assigns you a corridor for today, it will appear here.</p>
-                <button onClick={() => load()} className="mt-3 text-sm text-green-700 underline">Refresh</button>
-            </div>
+            <>
+                <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 gap-2">
+                    <PackageIcon size={40} className="text-slate-300" />
+                    <h2 className="text-lg font-semibold text-slate-700">No route assigned yet</h2>
+                    <p className="text-sm text-slate-500">When dispatch assigns you a corridor for today, it will appear here — or scan a package to assign yourself.</p>
+                    <div className="mt-4 flex flex-col gap-2 w-full max-w-xs">
+                        <button onClick={() => setScanModal(true)} className="flex items-center justify-center gap-2 rounded-2xl bg-green-600 text-white py-3 text-sm font-semibold hover:bg-green-700">
+                            <QrCodeIcon size={16} /> Scan a package
+                        </button>
+                        <Link href="/external/new" className="flex items-center justify-center gap-2 rounded-2xl border border-slate-300 text-slate-700 py-3 text-sm font-semibold hover:border-green-400">
+                            <PlusIcon size={16} /> Record a new delivery
+                        </Link>
+                        <button onClick={() => load()} className="mt-1 text-sm text-green-700 underline">Refresh</button>
+                    </div>
+                </div>
+                {scanModal && renderScanModal()}
+            </>
         );
     }
 
@@ -259,6 +375,14 @@ export default function RiderConsole() {
                 <p className="text-sm text-white/80 mt-0.5">
                     {pending} stop{pending === 1 ? "" : "s"} remaining · {corridor.status === "IN_TRANSIT" ? "Dispatched" : corridor.status}
                 </p>
+                <div className="mt-3 flex gap-2">
+                    <button onClick={() => setScanModal(true)} className="flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-2 text-xs font-semibold hover:bg-white/25">
+                        <QrCodeIcon size={14} /> Scan package
+                    </button>
+                    <Link href="/external/new" className="flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-2 text-xs font-semibold hover:bg-white/25">
+                        <PlusIcon size={14} /> Record delivery
+                    </Link>
+                </div>
             </div>
 
             <div className="px-4 py-4 space-y-4 max-w-xl mx-auto">
@@ -330,6 +454,9 @@ export default function RiderConsole() {
                     </button>
                 </div>
             </div>
+
+            {/* Scan-a-package modal */}
+            {scanModal && renderScanModal()}
 
             {/* OTP modal */}
             {otpModal && (

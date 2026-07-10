@@ -92,6 +92,22 @@ export async function POST(request) {
             return NextResponse.json({ error: "Invalid review status" }, { status: 400 });
         }
 
+        // Payment may only be marked received after reviewing an actually submitted
+        // proof — never approve an order that has no proof on file.
+        const order = await prisma.order.findUnique({
+            where: { id: orderId },
+            select: { paymentProofUrl: true, paymentProofStatus: true }
+        });
+        if (!order) {
+            return NextResponse.json({ error: "Order not found" }, { status: 404 });
+        }
+        if (status === "APPROVED" && (!order.paymentProofUrl || order.paymentProofStatus !== "SUBMITTED")) {
+            return NextResponse.json(
+                { error: "A submitted payment proof must be reviewed before marking this payment as received." },
+                { status: 400 }
+            );
+        }
+
         await prisma.order.update({
             where: { id: orderId },
             data: {

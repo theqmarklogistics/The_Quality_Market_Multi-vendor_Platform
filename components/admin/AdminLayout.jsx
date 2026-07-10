@@ -6,6 +6,7 @@ import Link from "next/link"
 import { ArrowRightIcon } from "lucide-react"
 import AdminNavbar from "./AdminNavbar"
 import AdminSidebar from "./AdminSidebar"
+import BackButton from "../BackButton"
 import { useUser, useAuth  } from "@clerk/nextjs"
 import AdminNotificationWatcher from "./AdminNotificationWatcher"
 
@@ -53,6 +54,7 @@ const AdminLayout = ({ children }) => {
             <div className="flex flex-1 items-start h-full overflow-y-scroll no-scrollbar">
                 <AdminSidebar />
                 <div className="flex-1 h-full p-5 lg:pl-12 lg:pt-12 overflow-y-scroll">
+                    <BackButton className="mb-4" />
                     {children}
                 </div>
             </div>

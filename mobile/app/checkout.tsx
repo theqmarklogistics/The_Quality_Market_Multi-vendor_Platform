@@ -18,9 +18,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAddresses } from '@/api/addresses';
 import { getProduct } from '@/api/products';
 import { verifyCoupon } from '@/api/coupons';
-import { createOrder } from '@/api/orders';
+import { createOrder, getPoolQuote, type PoolQuote } from '@/api/orders';
 import type { Address, Coupon, Product } from '@/api/types';
 import { Button, Loader, Money } from '@/components/ui';
+import { SignedOutGate } from '@/components/SignedOutGate';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { clearCart } from '@/store/cartSlice';
 import { unitPrice } from '@/lib/pricing';
@@ -43,6 +44,17 @@ const paymentIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function CheckoutScreen() {
+  return (
+    <SignedOutGate
+      title="Sign in to check out"
+      subtitle="Your cart is saved — sign in or create an account to place the order."
+    >
+      <CheckoutScreenInner />
+    </SignedOutGate>
+  );
+}
+
+function CheckoutScreenInner() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
@@ -60,6 +72,10 @@ export default function CheckoutScreen() {
   const [landmark, setLandmark] = useState('');
   const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pinning, setPinning] = useState(false);
+  // Mandatory at checkout; prefilled from the selected address, still editable.
+  const [contactPhone, setContactPhone] = useState('');
+  const [poolQuote, setPoolQuote] = useState<PoolQuote | null>(null);
+  const [quoting, setQuoting] = useState(false);
 
   const [payment, setPayment] = useState<PaymentMethod>(PaymentMethod.MTN_MOMO);
 
@@ -100,6 +116,40 @@ export default function CheckoutScreen() {
     });
   }, [ids, products]);
 
+  // Prefill the phone from the selected address.
+  useEffect(() => {
+    const a = addresses.find((x) => x.id === addressId);
+    if (a?.phone) setContactPhone((cur) => cur || a.phone);
+  }, [addressId, addresses]);
+
+  // Live pooled-delivery fee estimate whenever the pooled option / address / pin change.
+  useEffect(() => {
+    let cancelled = false;
+    if (deliveryType !== DeliveryType.KIGALI_POOL || !addressId) {
+      setPoolQuote(null);
+      return;
+    }
+    setQuoting(true);
+    getPoolQuote({
+      addressId,
+      items: ids.map((id) => ({ id, quantity: cartItems[id] })),
+      lat: pin?.latitude,
+      lng: pin?.longitude,
+    })
+      .then((q) => {
+        if (!cancelled) setPoolQuote(q);
+      })
+      .catch(() => {
+        if (!cancelled) setPoolQuote(null);
+      })
+      .finally(() => {
+        if (!cancelled) setQuoting(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deliveryType, addressId, pin, ids, cartItems]);
+
   const subtotal = useMemo(
     () =>
       ids.reduce((sum, id) => {
@@ -111,7 +161,8 @@ export default function CheckoutScreen() {
   );
 
   const discount = coupon ? (subtotal * coupon.discount) / 100 : 0;
-  const estimatedTotal = subtotal - discount;
+  const poolFee = deliveryType === DeliveryType.KIGALI_POOL && poolQuote ? poolQuote.fee : 0;
+  const estimatedTotal = subtotal - discount + poolFee;
 
   const pinLocation = async () => {
     setPinning(true);
@@ -154,6 +205,10 @@ export default function CheckoutScreen() {
       Alert.alert('Landmark required', 'Pooled delivery needs a landmark / directions.');
       return;
     }
+    if (!/^\+?\d[\d\s-]{6,17}$/.test(contactPhone.trim())) {
+      Alert.alert('Phone required', 'Enter a valid phone number — it is required at checkout.');
+      return;
+    }
     setPlacing(true);
     try {
       const { orderIds } = await createOrder({
@@ -161,6 +216,7 @@ export default function CheckoutScreen() {
         addressId,
         paymentMethod: payment,
         couponCode: coupon?.code,
+        contactPhone: contactPhone.trim(),
         deliveryType,
         landmarkAddress:
           deliveryType === DeliveryType.KIGALI_POOL ? landmark.trim() : undefined,
@@ -220,6 +276,18 @@ export default function CheckoutScreen() {
           <Text style={styles.addText}>Add a new address</Text>
         </TouchableOpacity>
 
+        {/* Phone — mandatory at checkout */}
+        <SectionHeading icon="call-outline" title="Phone number (required)" />
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. 078X XXX XXX"
+          placeholderTextColor={colors.subtle}
+          keyboardType="phone-pad"
+          value={contactPhone}
+          onChangeText={setContactPhone}
+        />
+        <Text style={styles.note}>The rider and support will use this number for your delivery.</Text>
+
         {/* Delivery type */}
         <SectionHeading icon="bicycle-outline" title="Delivery method" />
         <OptionRow
@@ -266,6 +334,18 @@ export default function CheckoutScreen() {
                     : 'Pin exact location (optional)'}
               </Text>
             </TouchableOpacity>
+            <View style={styles.quoteBox}>
+              <Ionicons name="bicycle-outline" size={16} color={colors.primaryDark} />
+              <Text style={styles.quoteText}>
+                {quoting
+                  ? 'Calculating delivery fee…'
+                  : poolQuote
+                    ? `Estimated delivery fee: ${formatPrice(poolQuote.fee)}${
+                        poolQuote.distanceKm != null ? ` (~${poolQuote.distanceKm} km)` : ''
+                      } — sharing the route can only make it cheaper.`
+                    : 'Delivery fee is calculated from your address location.'}
+              </Text>
+            </View>
           </View>
         ) : null}
 
@@ -338,11 +418,21 @@ export default function CheckoutScreen() {
             </Text>
           </View>
         ) : null}
+        {poolFee > 0 ? (
+          <View style={styles.sumRow}>
+            <Text style={styles.muted}>Delivery (pooled, est.)</Text>
+            <Text style={styles.sumVal}>{formatPrice(poolFee)}</Text>
+          </View>
+        ) : null}
         <View style={styles.sumRow}>
           <Text style={styles.totalLabel}>Estimated total</Text>
           <Money value={estimatedTotal} style={{ fontSize: 20 }} />
         </View>
-        <Text style={styles.note}>+ delivery fee, calculated by the server.</Text>
+        <Text style={styles.note}>
+          {deliveryType === DeliveryType.KIGALI_POOL && poolQuote
+            ? 'The final pooled delivery fee can only be lower when your route is shared.'
+            : '+ delivery fee, calculated by the server.'}
+        </Text>
         <Button label="Place order" icon="bag-check-outline" onPress={placeOrder} loading={placing} />
       </View>
     </View>
@@ -490,6 +580,15 @@ const styles = StyleSheet.create({
   pinBtnDone: { borderColor: colors.primaryBorder, backgroundColor: colors.primarySoft },
   pinText: { fontSize: 14, color: colors.text, fontFamily: fonts.medium },
   pinTextDone: { color: colors.primaryDark },
+  quoteBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  quoteText: { flex: 1, fontSize: 12.5, color: colors.primaryDark, fontFamily: fonts.medium, lineHeight: 18 },
   couponRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   couponOkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
   couponOk: { color: colors.successDeep, fontFamily: fonts.semibold, fontSize: 13.5 },

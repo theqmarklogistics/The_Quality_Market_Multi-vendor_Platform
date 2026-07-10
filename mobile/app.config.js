@@ -24,5 +24,12 @@ module.exports = ({ config }) => ({
         color: '#111111',
       },
     ],
+    [
+      'expo-camera',
+      {
+        cameraPermission:
+          'Allow The Quality Market to use the camera to scan package QR codes.',
+      },
+    ],
   ],
 });

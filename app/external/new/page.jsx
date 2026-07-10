@@ -11,7 +11,8 @@ export default async function ExternalNewDeliveryPage() {
   if (!userId) return redirect('/sign-in')
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
-  if (!user || (user.role !== 'EXTERNAL_SELLER' && user.role !== 'ADMIN')) {
+  // Riders may record a new walk-up delivery at the hub.
+  if (!user || (user.role !== 'EXTERNAL_SELLER' && user.role !== 'ADMIN' && user.role !== 'RIDER')) {
     return <DeliveryAccessInvite redirectTo="/external/new" />
   }
 

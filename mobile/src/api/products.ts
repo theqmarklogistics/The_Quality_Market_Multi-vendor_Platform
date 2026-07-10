@@ -29,6 +29,15 @@ export function getProduct(id: string): Promise<{ product: Product }> {
   return apiGet<{ product: Product }>(`/api/product/${id}`);
 }
 
+// Public "Best Selling" ranking — products ordered by units sold across paid
+// orders, with a newest-products fallback so the rail is never empty. Mirrors
+// the web BestSelling section (GET /api/product/best-selling).
+export function getBestSelling(limit = 8): Promise<{ products: Product[] }> {
+  return apiGet<{ products: Product[] }>('/api/product/best-selling', {
+    params: { limit: String(limit) },
+  });
+}
+
 // Category list from the backend (admin-configured). Falls back to the ported
 // PRODUCT_CATEGORIES constant in the UI if this is empty.
 export function getCategories(): Promise<{ categories: { id?: string; name: string }[] }> {

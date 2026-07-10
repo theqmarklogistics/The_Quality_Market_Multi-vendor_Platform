@@ -4,11 +4,18 @@
 // the server at order creation — the client only estimates the item subtotal.
 import type { Product } from '@/api/types';
 
-export function unitPrice(product: Pick<Product, 'price' | 'wholesalePrice' | 'wholesaleMinQty'>, qty: number): number {
-  if (product.wholesalePrice && product.wholesaleMinQty && qty >= product.wholesaleMinQty) {
-    return product.wholesalePrice;
-  }
-  return product.price;
+type Priced = Pick<Product, 'price' | 'wholesalePrice' | 'wholesaleMinQty'>;
+
+// True once the wholesale price kicks in at the given quantity — used to badge
+// the cart line and hide the "buy N+" hint once it no longer applies.
+export function isWholesaleApplied(product: Priced, qty: number): boolean {
+  return Boolean(
+    product.wholesalePrice && product.wholesaleMinQty && qty >= product.wholesaleMinQty,
+  );
+}
+
+export function unitPrice(product: Priced, qty: number): number {
+  return isWholesaleApplied(product, qty) ? product.wholesalePrice! : product.price;
 }
 
 export function lineTotal(product: Product, qty: number): number {

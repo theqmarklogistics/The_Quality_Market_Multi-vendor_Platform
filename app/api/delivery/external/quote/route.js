@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import authExternalSeller from "@/middlewares/authExternalSeller";
 import authLogistics from "@/middlewares/authLogistics";
+import authRider from "@/middlewares/authRider";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
 
 // GET — live delivery quote. Params: sector, weightKg, lengthCm, widthCm, heightCm,
@@ -11,8 +12,8 @@ export async function GET(request) {
     try {
         const { userId } = getAuth(request);
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        if (!(await authExternalSeller(userId)) && !(await authLogistics(userId))) {
-            return NextResponse.json({ error: "Forbidden — delivery partners or logistics only" }, { status: 403 });
+        if (!(await authExternalSeller(userId)) && !(await authLogistics(userId)) && !(await authRider(userId))) {
+            return NextResponse.json({ error: "Forbidden — delivery partners, logistics or riders only" }, { status: 403 });
         }
 
         const { searchParams } = new URL(request.url);

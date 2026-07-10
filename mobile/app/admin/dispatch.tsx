@@ -24,11 +24,13 @@ import {
   listCorridors,
   listDispatchRiders,
   listPoolableOrders,
+  markOrderIntake,
   runBatch,
   setCorridorStatus,
   type Corridor,
   type CorridorStatus,
   type DispatchRider,
+  type PoolableOrder,
 } from '@/api/admin';
 import { useMyRole, canAccessOps } from '@/hooks/useMyRole';
 import { useRealtimeRoom } from '@/realtime/useRealtimeRoom';
@@ -80,8 +82,9 @@ export default function DispatchBoardScreen() {
 
   const [date, setDate] = useState(() => dateKey(new Date()));
   const [corridors, setCorridors] = useState<Corridor[]>([]);
-  const [poolableCount, setPoolableCount] = useState(0);
+  const [poolable, setPoolable] = useState<PoolableOrder[]>([]);
   const [riders, setRiders] = useState<DispatchRider[]>([]);
+  const [intakeBusyId, setIntakeBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [batching, setBatching] = useState(false);
@@ -92,7 +95,7 @@ export default function DispatchBoardScreen() {
   const load = useCallback(async (day: string) => {
     const [c, p] = await Promise.all([listCorridors(day), listPoolableOrders()]);
     setCorridors(c.corridors);
-    setPoolableCount(p.orders.length);
+    setPoolable(p.orders);
   }, []);
 
   useFocusEffect(
@@ -150,6 +153,18 @@ export default function DispatchBoardScreen() {
       Alert.alert('Batching failed', err?.message ?? 'Try again.');
     } finally {
       setBatching(false);
+    }
+  };
+
+  const onMarkIntake = async (orderId: string) => {
+    setIntakeBusyId(orderId);
+    try {
+      await markOrderIntake(orderId);
+      await load(date);
+    } catch (err: any) {
+      Alert.alert('Could not mark sorted', err?.message ?? 'Try again.');
+    } finally {
+      setIntakeBusyId(null);
     }
   };
 
@@ -235,31 +250,96 @@ export default function DispatchBoardScreen() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={
-          <View style={[styles.poolBanner, poolableCount === 0 && styles.poolBannerEmpty]}>
-            <Ionicons
-              name={poolableCount > 0 ? 'layers' : 'checkmark-circle'}
-              size={20}
-              color={poolableCount > 0 ? '#92400e' : colors.success}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.poolTitle}>
-                {poolableCount > 0
-                  ? `${poolableCount} order${poolableCount === 1 ? '' : 's'} waiting to batch`
-                  : 'No orders waiting to batch'}
-              </Text>
-              <Text style={styles.poolSub}>Sweep sorted pooled orders into routes now.</Text>
+          <View style={styles.poolPanel}>
+            {/* Available deliveries — un-batched pooled packages (internal +
+                external) awaiting intake/sorting at the hub. Auto-batch sweeps the
+                routable ones into corridors; unpaid external bookings show a
+                Payment pending badge and are held out of routing until paid. */}
+            <View style={styles.poolHead}>
+              <Ionicons name="cube-outline" size={18} color={colors.muted} />
+              <Text style={styles.poolTitle}>Available deliveries</Text>
+              <Text style={styles.poolCount}>({poolable.length})</Text>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity
+                style={[styles.batchBtn, (batching || poolable.length === 0) && styles.btnDisabled]}
+                onPress={onRunBatch}
+                disabled={batching || poolable.length === 0}
+              >
+                {batching ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.batchBtnText}>Auto-batch</Text>
+                )}
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.batchBtn, (batching || poolableCount === 0) && styles.btnDisabled]}
-              onPress={onRunBatch}
-              disabled={batching || poolableCount === 0}
-            >
-              {batching ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.batchBtnText}>Auto-batch</Text>
-              )}
-            </TouchableOpacity>
+
+            {poolable.length === 0 ? (
+              <Text style={styles.poolEmpty}>
+                No packages awaiting intake. New drop-offs and external bookings appear here.
+              </Text>
+            ) : (
+              poolable.map((o) => {
+                const busy = intakeBusyId === o.orderId;
+                return (
+                  <View key={o.orderId} style={styles.poolItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.poolName} numberOfLines={1}>
+                        {o.recipientName || 'Recipient'}
+                        <Text style={styles.poolSector}> · {o.sector || '—'}</Text>
+                      </Text>
+                      <View style={styles.poolBadges}>
+                        {o.isExternalDelivery ? (
+                          <View style={[styles.tag, styles.tagExternal]}>
+                            <Text style={[styles.tagText, styles.tagExternalText]}>External</Text>
+                          </View>
+                        ) : (
+                          <View style={[styles.tag, styles.tagStore]}>
+                            <Text style={[styles.tagText, styles.tagStoreText]} numberOfLines={1}>
+                              {o.storeName || 'Store'}
+                            </Text>
+                          </View>
+                        )}
+                        {o.intakeMethod ? (
+                          <View style={[styles.tag, styles.tagStore]}>
+                            <Text style={[styles.tagText, styles.tagMethodText]}>
+                              {o.intakeMethod === 'DRIVER_SWEEP' ? 'Driver sweep' : 'Hub drop-off'}
+                            </Text>
+                          </View>
+                        ) : null}
+                        {o.paymentPending ? (
+                          <View style={[styles.tag, styles.tagPending]}>
+                            <Text style={[styles.tagText, styles.tagPendingText]}>Payment pending</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {o.packageDescription || o.landmarkAddress ? (
+                        <Text style={styles.poolDesc} numberOfLines={1}>
+                          {o.packageDescription || o.landmarkAddress}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.poolItemRight}>
+                      <Text style={styles.poolStatus}>
+                        {STOP_LABEL[o.deliveryStatus] ?? o.deliveryStatus}
+                      </Text>
+                      {o.deliveryStatus === 'PENDING_INTAKE' ? (
+                        <TouchableOpacity
+                          style={[styles.sortBtn, busy && styles.btnDisabled]}
+                          onPress={() => onMarkIntake(o.orderId)}
+                          disabled={busy}
+                        >
+                          {busy ? (
+                            <ActivityIndicator size="small" color={colors.text} />
+                          ) : (
+                            <Text style={styles.sortBtnText}>Mark sorted</Text>
+                          )}
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -490,25 +570,71 @@ const styles = StyleSheet.create({
 
   list: { padding: spacing.lg, gap: spacing.md },
 
-  poolBanner: {
+  poolPanel: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    marginBottom: spacing.xs,
+    overflow: 'hidden',
+  },
+  poolHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  poolTitle: { fontSize: 14, fontFamily: fonts.bold, color: colors.text },
+  poolCount: { fontSize: 12, color: colors.subtle, fontFamily: fonts.medium },
+  poolEmpty: {
+    fontSize: 13,
+    color: colors.subtle,
+    fontFamily: fonts.regular,
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.md,
+  },
+  poolItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-    backgroundColor: '#fffbeb',
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
   },
-  poolBannerEmpty: { borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' },
-  poolTitle: { fontSize: 14, fontFamily: fonts.bold, color: colors.text },
-  poolSub: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  poolName: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
+  poolSector: { color: colors.subtle, fontFamily: fonts.regular },
+  poolBadges: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, marginTop: 4 },
+  poolDesc: { fontSize: 12, color: colors.subtle, fontFamily: fonts.regular, marginTop: 3 },
+  poolItemRight: { alignItems: 'flex-end', gap: 6 },
+  poolStatus: { fontSize: 10, fontFamily: fonts.semibold, color: colors.muted },
+  tag: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2, maxWidth: 120 },
+  tagText: { fontSize: 10, fontFamily: fonts.semibold },
+  tagExternal: { backgroundColor: '#e0e7ff' },
+  tagExternalText: { color: '#4338ca' },
+  tagStore: { backgroundColor: colors.borderLight },
+  tagStoreText: { color: colors.body },
+  tagMethodText: { color: colors.muted, fontFamily: fonts.medium },
+  tagPending: { backgroundColor: '#fef3c7' },
+  tagPendingText: { color: '#b45309' },
+  sortBtn: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 88,
+    alignItems: 'center',
+  },
+  sortBtnText: { fontSize: 12, fontFamily: fonts.semibold, color: colors.text },
   batchBtn: {
-    backgroundColor: colors.warning,
+    backgroundColor: colors.ink,
     borderRadius: radius.sm,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 92,

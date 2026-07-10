@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Expose the Google Maps browser key (client-side keys are public by design;
+    // restrict it by HTTP referrer in Google Cloud). Mapped here so the same
+    // PUBLIC_GOOGLE_MAPS_API_KEY env var serves both server geocoding and the
+    // client map without duplicating it.
+    env: {
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    },
     images: {
         remotePatterns: [
             ...(process.env.IMAGEKIT_URL_ENDPOINT ? [new URL(process.env.IMAGEKIT_URL_ENDPOINT)] : []),
