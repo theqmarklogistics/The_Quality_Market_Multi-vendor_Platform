@@ -12,9 +12,18 @@ const commissionClient = {
   },
 };
 
-// Local Seller: shipping is seller-quoted later, so it starts unquoted at 0.
+// Local Seller: same zone × weight tariff — shipping is charged at checkout.
 const localSellerClient = {
   store: { findUnique: async () => ({ sellerModel: 'LOCAL_SELLER', latitude: null, longitude: null }) },
+  weightShippingRate: { findFirst: async () => ({ cost: 1200 }) },
+};
+
+// Local Seller with no tariff rows configured: falls back to the delivery-service
+// flat base fee so shipping is still charged at checkout.
+const localSellerNoTariffClient = {
+  store: { findUnique: async () => ({ sellerModel: 'LOCAL_SELLER', latitude: null, longitude: null }) },
+  weightShippingRate: { findFirst: async () => null },
+  externalDeliveryConfig: { findUnique: async () => ({ basePrice: 2500, perSector: {} }) },
 };
 
 // Full Managed: zone × weight tariff is auto-calculated and confirmed.
@@ -29,10 +38,26 @@ async function run() {
   assert.equal(commission.commissionRate, 5);
   assert.equal(commission.fixedAmount, 2);
 
-  // Local Seller: cost 0 and shippingQuoted=false (seller sets it from their orders).
-  const local = await calculateShippingForStore(localSellerClient, 'store-1', { sector: 'Kicukiro' });
-  assert.equal(local.cost, 0);
-  assert.equal(local.shippingQuoted, false);
+  // Local Seller: zone × weight tariff, charged at checkout (weightless items
+  // bill at 1 kg/unit so the fee is never 0).
+  const local = await calculateOrderShippingForStore(
+    localSellerClient,
+    'store-1',
+    { sector: 'Kicukiro' },
+    [{ quantity: 1, weightKg: null, lengthCm: null, widthCm: null, heightCm: null, importOrigin: null }]
+  );
+  assert.equal(local.cost, 1200);
+  assert.equal(local.shippingQuoted, true);
+
+  // Local Seller without tariff rows: flat delivery-service base fee, still quoted.
+  const localFlat = await calculateOrderShippingForStore(
+    localSellerNoTariffClient,
+    'store-1',
+    { sector: 'Kicukiro' },
+    [{ quantity: 1, weightKg: 2, lengthCm: null, widthCm: null, heightCm: null, importOrigin: null }]
+  );
+  assert.equal(localFlat.cost, 2500);
+  assert.equal(localFlat.shippingQuoted, true);
 
   // Full Managed: Kicukiro = Zone A; a 5 kg item bills against the zone rate (1500).
   const managed = await calculateOrderShippingForStore(

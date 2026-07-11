@@ -77,12 +77,18 @@ export interface ExternalBookingPayload {
   recipientEmail?: string;
   recipientSector: string;
   recipientLandmark: string;
-  recipientLat: number;
-  recipientLng: number;
+  // Optional — when omitted, the client shares their location through the
+  // tracking link and the fee is re-priced from those coordinates.
+  recipientLat?: number;
+  recipientLng?: number;
   intakeMethod: 'HUB_DROP_OFF' | 'DRIVER_SWEEP';
   pickupContactName?: string;
   pickupPhone?: string;
   pickupLandmark?: string;
+  // When set (e.g. a rider recording a walk-up package in the field), the
+  // delivery distance — and fee — is measured from here instead of the hub.
+  pickupLat?: number;
+  pickupLng?: number;
   packageDescription?: string;
   declaredValue?: number;
   packageWeightKg?: number;

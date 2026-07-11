@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -22,6 +23,7 @@ import {
   bookExternalDelivery,
   getExternalDeliveries,
   quoteExternalDelivery,
+  trackingLink,
   type DeliveryQuote,
 } from '@/api/externalDelivery';
 import { Button, Field } from '@/components/ui';
@@ -45,6 +47,8 @@ export default function ExternalBookScreen() {
 
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pinning, setPinning] = useState(false);
+  const [pickupCoords, setPickupCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [pickupPinning, setPickupPinning] = useState(false);
 
   const [intakeMethod, setIntakeMethod] = useState<'HUB_DROP_OFF' | 'DRIVER_SWEEP'>('HUB_DROP_OFF');
   const [pickupContactName, setPickupContactName] = useState('');
@@ -128,6 +132,25 @@ export default function ExternalBookScreen() {
     }
   };
 
+  // Pickup origin (e.g. a rider recording a walk-up package in the field) — the
+  // delivery distance and fee are measured from here instead of the hub.
+  const pinPickup = async () => {
+    setPickupPinning(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Allow location access to record the pickup point.');
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setPickupCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+    } catch {
+      Alert.alert('Location error', 'Could not get the location. Try again outdoors.');
+    } finally {
+      setPickupPinning(false);
+    }
+  };
+
   const creditPreview = useMemo(() => {
     if (!quote || creditBalance <= 0 || !applyCredit) return null;
     const applied = Math.min(creditBalance, quote.fee);
@@ -138,10 +161,6 @@ export default function ExternalBookScreen() {
   const submit = useCallback(async () => {
     if (!recipientName.trim() || !recipientPhone.trim() || !sector || !landmark.trim()) {
       Alert.alert('Missing details', 'Recipient name, phone, sector and landmark are required.');
-      return;
-    }
-    if (!hasPin) {
-      Alert.alert('Pin required', 'Pin the delivery location with “Use my location”.');
       return;
     }
     if (!num(weightKg) || Number(weightKg) <= 0) {
@@ -160,12 +179,14 @@ export default function ExternalBookScreen() {
         recipientEmail: recipientEmail.trim() || undefined,
         recipientSector: sector,
         recipientLandmark: landmark.trim(),
-        recipientLat: coords!.latitude,
-        recipientLng: coords!.longitude,
+        recipientLat: coords?.latitude,
+        recipientLng: coords?.longitude,
         intakeMethod,
         pickupContactName: pickupContactName.trim() || undefined,
         pickupPhone: pickupPhone.trim() || undefined,
         pickupLandmark: pickupLandmark.trim() || undefined,
+        pickupLat: pickupCoords?.latitude,
+        pickupLng: pickupCoords?.longitude,
         packageDescription: packageDescription.trim() || undefined,
         declaredValue: num(declaredValue),
         packageWeightKg: num(weightKg),
@@ -178,8 +199,27 @@ export default function ExternalBookScreen() {
       const msg = res.fullyCovered
         ? `Fee ${formatPrice(res.fee)} fully covered by credit. Delivery code: ${res.deliveryOtp}.`
         : `Fee ${formatPrice(res.fee)}${res.creditApplied > 0 ? ` (credit −${formatPrice(res.creditApplied)}, pay ${formatPrice(res.amountDue)})` : ''}. Upload your payment proof to start it.`;
-      Alert.alert('Delivery booked', msg);
-      router.replace('/external');
+      // Hand the partner the client link first — the location the client shares
+      // through it is what the delivery fee is calculated from.
+      const clientLink = res.trackingToken ? trackingLink(res.orderId, res.trackingToken) : null;
+      Alert.alert(
+        'Delivery booked',
+        `${msg}\n\nSend your client their link first — the location they share sets the final delivery fee.`,
+        clientLink
+          ? [
+              {
+                text: 'Share client link',
+                onPress: async () => {
+                  try {
+                    await Share.share({ message: clientLink });
+                  } catch {}
+                  router.replace('/external');
+                },
+              },
+              { text: 'Later', style: 'cancel', onPress: () => router.replace('/external') },
+            ]
+          : [{ text: 'OK', onPress: () => router.replace('/external') }],
+      );
     } catch (err: any) {
       Alert.alert('Could not book', err?.message ?? 'Try again.');
     } finally {
@@ -187,7 +227,7 @@ export default function ExternalBookScreen() {
     }
   }, [
     recipientName, recipientPhone, recipientEmail, sector, landmark, hasPin, coords,
-    intakeMethod, pickupContactName, pickupPhone, pickupLandmark,
+    intakeMethod, pickupContactName, pickupPhone, pickupLandmark, pickupCoords,
     packageDescription, declaredValue, weightKg, lengthCm, widthCm, heightCm,
     paymentMethod, applyCredit, router,
   ]);
@@ -232,9 +272,15 @@ export default function ExternalBookScreen() {
             ? 'Getting location…'
             : hasPin
               ? `Pinned (${coords!.latitude.toFixed(5)}, ${coords!.longitude.toFixed(5)})`
-              : 'Use my location'}
+              : 'Use my location (optional)'}
         </Text>
       </TouchableOpacity>
+      {!hasPin ? (
+        <Text style={styles.hint}>
+          No pin? Book anyway — after booking, send your client their tracking link. The location they
+          share sets the final delivery fee before you pay.
+        </Text>
+      ) : null}
 
       {/* Pickup */}
       <Text style={styles.section}>Pickup</Text>
@@ -262,6 +308,24 @@ export default function ExternalBookScreen() {
           <Field label="Pickup location / landmark" value={pickupLandmark} onChangeText={setPickupLandmark} placeholder="Where to collect" />
         </View>
       ) : null}
+      <TouchableOpacity style={[styles.pinBtn, pickupCoords && styles.pinBtnDone]} onPress={pinPickup} disabled={pickupPinning}>
+        <Ionicons
+          name={pickupCoords ? 'checkmark-circle' : 'locate-outline'}
+          size={20}
+          color={pickupCoords ? colors.success : colors.text}
+        />
+        <Text style={styles.pinText}>
+          {pickupPinning
+            ? 'Getting location…'
+            : pickupCoords
+              ? 'Pickup point recorded (tap to update)'
+              : 'Record pickup at my current location'}
+        </Text>
+      </TouchableOpacity>
+      <Text style={styles.hint}>
+        When a pickup point is recorded (e.g. a rider logging a package in the field), the delivery
+        distance — and the fee — is measured from that point instead of the hub.
+      </Text>
 
       {/* Package */}
       <Text style={styles.section}>Package</Text>
@@ -279,6 +343,14 @@ export default function ExternalBookScreen() {
         <View style={styles.flex}><Field label="Length" value={lengthCm} onChangeText={setLengthCm} keyboardType="numeric" placeholder="0" /></View>
         <View style={styles.flex}><Field label="Width" value={widthCm} onChangeText={setWidthCm} keyboardType="numeric" placeholder="0" /></View>
         <View style={styles.flex}><Field label="Height" value={heightCm} onChangeText={setHeightCm} keyboardType="numeric" placeholder="0" /></View>
+      </View>
+      <View style={styles.warnBox}>
+        <Ionicons name="warning-outline" size={16} color="#b45309" style={{ marginTop: 1 }} />
+        <Text style={styles.warnText}>
+          Declare the weight and dimensions accurately. Every package is verified at intake — if the
+          actual weight or volume is higher than declared, the package is held until you pay the
+          difference, and unpaid differences cancel the delivery without a refund.
+        </Text>
       </View>
 
       {/* Payment method */}
@@ -342,6 +414,17 @@ const styles = StyleSheet.create({
   section: { fontSize: 13, fontFamily: fonts.bold, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 1 },
   fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6 },
   hint: { fontSize: 12, color: colors.subtle, marginBottom: spacing.sm },
+  warnBox: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  warnText: { flex: 1, fontSize: 11, lineHeight: 16, color: '#92400e', fontFamily: fonts.medium },
 
   chips: { gap: 8, paddingBottom: spacing.md },
   chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },

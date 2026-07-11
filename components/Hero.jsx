@@ -8,7 +8,7 @@ import CategoriesMarquee from './CategoriesMarquee'
 
 const DEFAULTS = {
     main: {
-        badgeText: 'Free Shipping on Orders Above RWF 50K!',
+        badgeText: 'Fast, Tracked Delivery Across Kigali!',
         headline: "Gadgets you'll love. Prices you'll trust.",
         description: 'Discover hand-picked electronics, practical accessories, and store-approved finds built for everyday use and long-term value.',
         startingPrice: '4.9K',

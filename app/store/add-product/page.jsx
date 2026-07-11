@@ -324,7 +324,15 @@ export default function StoreAddProduct() {
             {/* Shipping Details */}
             <div className="mt-8 border-t border-slate-100 pt-6">
                 <p className="text-slate-700 font-medium mb-1">Shipping Details</p>
-                <p className="text-xs text-slate-400 mb-4">Optional — enables accurate delivery cost calculation for Full Managed stores.</p>
+                <p className="text-xs text-slate-400 mb-2">Used to calculate the shipping fee charged at checkout. Products without weight or dimensions are billed at 1 kg per unit.</p>
+                <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 mb-4 max-w-xl">
+                    <p className="text-xs leading-relaxed text-amber-800">
+                        <span className="font-semibold">⚠ Declare weight and dimensions accurately.</span> Packages are verified
+                        at intake — if the actual weight or volume exceeds what was declared, the shipment is
+                        <span className="font-semibold"> held until the difference is paid</span>, and unpaid differences cancel
+                        the delivery <span className="font-semibold">without refunding the payment</span>.
+                    </p>
+                </div>
                 <div className="flex flex-wrap gap-5 mb-5">
                     <div className="flex flex-col gap-1">
                         <label htmlFor="weightKg">Weight (kg)</label>

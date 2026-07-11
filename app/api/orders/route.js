@@ -4,6 +4,7 @@ import { randomBytes, randomInt } from "crypto";
 import prisma from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
 import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
+import { quotePooledCartFee } from '@/lib/externalDelivery';
 import { getSocketServer } from "@/lib/socketServer";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
@@ -276,10 +277,27 @@ export async function POST(request) {
                 let total = storeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
                 if (couponCode && coupon) total -= (total * coupon.discount / 100);
 
-                const shippingRes = await calculateOrderShippingForStore(prisma, storeId, address, storeItems);
-                const shippingCost = shippingRes?.cost || 0;
-                const shippingRuleId = shippingRes?.ruleId || null;
-                const shippingQuoted = shippingRes?.shippingQuoted ?? true;
+                // Shipping is always charged at checkout. Pooled orders pay the
+                // distance × weight pooled fee (batch of one — the final shared
+                // route can only be cheaper); standard orders pay the zone × weight
+                // tariff (with the flat base-fee fallback).
+                let shippingCost = 0;
+                let shippingRuleId = null;
+                let shippingQuoted = true;
+                if (deliveryType === 'KIGALI_POOL') {
+                    const pooled = await quotePooledCartFee({
+                        items: storeItems,
+                        lat: recipientLat ?? address.latitude ?? null,
+                        lng: recipientLng ?? address.longitude ?? null,
+                        sector: address.sector || null,
+                    });
+                    shippingCost = pooled?.fee || 0;
+                } else {
+                    const shippingRes = await calculateOrderShippingForStore(prisma, storeId, address, storeItems);
+                    shippingCost = shippingRes?.cost || 0;
+                    shippingRuleId = shippingRes?.ruleId || null;
+                    shippingQuoted = shippingRes?.shippingQuoted ?? true;
+                }
                 total += shippingCost;
 
                 const commissionBreakdown = [];

@@ -47,6 +47,10 @@ export async function GET(request) {
                 intakeMethod: o.intakeMethod,
                 deliveryOtp: o.deliveryOtp,
                 trackingToken: o.trackingToken,
+                // Client's shared/pinned location drives the delivery price — the
+                // dashboard nudges the partner to send the tracking link until set.
+                hasClientLocation: o.recipientLat != null && o.recipientLng != null,
+                locationSharedAt: o.locationSharedAt,
                 packageDescription: o.packageDescription,
                 recipientName: o.address?.name ?? null,
                 recipientPhone: o.address?.phone ?? null,
@@ -151,6 +155,11 @@ export async function POST(request) {
         });
 
         // ── Quote the published delivery fee (partner-paid, batch of one) ────
+        // Distance origin: the pickup point when recorded (driver sweep, or a
+        // rider logging a walk-up package from the field) — otherwise the hub.
+        // When the recipient hasn't pinned/shared a location yet, this is a
+        // provisional flat quote; it is re-priced from the coordinates the
+        // client shares through their tracking link (see share-location route).
         const quote = await quoteExternalDeliveryFee({
             sector: recipientSector,
             weightKg: packageWeightKg,
@@ -159,6 +168,8 @@ export async function POST(request) {
             heightCm: packageHeightCm,
             dropLat: recipientLat,
             dropLng: recipientLng,
+            originLat: pickupLat ?? undefined,
+            originLng: pickupLng ?? undefined,
         });
         const fee = quote.fee;
 

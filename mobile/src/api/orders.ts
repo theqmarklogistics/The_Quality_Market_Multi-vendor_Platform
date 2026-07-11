@@ -30,6 +30,25 @@ export function getPoolQuote(payload: {
   return apiPost<PoolQuote>('/api/delivery/pool-quote', payload);
 }
 
+// Checkout-time shipping quote for the whole cart — computed server-side exactly
+// like order creation, so the amount shown is the amount charged at checkout.
+export interface ShippingQuote {
+  shipping: number;
+  stores: number;
+  deliveryType: string;
+  basis: 'formula' | 'flat' | null;
+}
+
+export function getShippingQuote(payload: {
+  addressId: string;
+  items: { id: string; quantity: number }[];
+  deliveryType?: string;
+  lat?: number;
+  lng?: number;
+}): Promise<ShippingQuote> {
+  return apiPost<ShippingQuote>('/api/orders/shipping-quote', payload);
+}
+
 // Local file (from expo-image-picker) to upload as the payment proof.
 export interface ProofFile {
   uri: string;

@@ -197,6 +197,11 @@ export async function GET(request, { params }) {
             isExternalDelivery: order.isExternalDelivery,
             packageDescription: order.packageDescription,
             senderName: order.isExternalDelivery ? (order.user?.name ?? null) : null,
+            // External bookings: the fee is priced from the recipient's shared
+            // location, so the track page can prompt for it and show the result.
+            deliveryFee: order.isExternalDelivery ? order.total : null,
+            isPaid: order.isPaid,
+            locationSharedAt: order.locationSharedAt,
             address: {
                 name: order.address?.name,
                 street: order.address?.street,

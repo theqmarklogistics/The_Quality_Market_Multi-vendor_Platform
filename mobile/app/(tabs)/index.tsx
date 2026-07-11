@@ -1,4 +1,5 @@
-// Storefront: searchable, category-filterable, paginated product grid.
+// Home: brand hero, delivery-service CTA, quick actions, value props, and the
+// searchable, category-filterable, paginated product grid.
 // Branded like the web home: wordmark header, green hero banner, pill search.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getBestSelling, getCategories, listProducts } from '@/api/products';
@@ -24,7 +26,8 @@ import { colors, fonts, radius, spacing } from '@/theme';
 
 const PAGE_SIZE = 20;
 
-export default function ShopScreen() {
+export default function HomeScreen() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>(PRODUCT_CATEGORIES);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -137,7 +140,7 @@ export default function ShopScreen() {
           <View style={styles.hero}>
             <View style={styles.heroBadge}>
               <Ionicons name="flash" size={12} color={colors.primaryDark} />
-              <Text style={styles.heroBadgeText}>Free shipping on orders above RWF 50K</Text>
+              <Text style={styles.heroBadgeText}>Fast, tracked delivery across Kigali</Text>
             </View>
             <Text style={styles.heroTitle}>Gadgets you’ll love.{'\n'}Prices you’ll trust.</Text>
             <Text style={styles.heroSub}>
@@ -146,6 +149,46 @@ export default function ShopScreen() {
             <View style={styles.heroIcon}>
               <Ionicons name="bag-handle" size={30} color={colors.primary} />
             </View>
+          </View>
+        ) : null}
+
+        {/* Delivery service CTA — mirrors the web DeliveryCTA banner */}
+        {!search && !activeCategory ? (
+          <TouchableOpacity
+            style={styles.deliveryCta}
+            activeOpacity={0.85}
+            onPress={() => router.push('/external')}
+            accessibilityRole="button"
+          >
+            <View style={styles.deliveryIconWrap}>
+              <Ionicons name="bicycle" size={26} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.deliveryTitle}>Need something delivered?</Text>
+              <Text style={styles.deliverySub}>
+                Book a rider on our shared Kigali routes — pay by MoMo, track every drop live. Your
+                client shares their location through a link, and it sets the delivery fee.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Quick actions */}
+        {!search && !activeCategory ? (
+          <View style={styles.quickRow}>
+            <QuickAction icon="cube-outline" label="Book delivery" onPress={() => router.push('/external/book')} />
+            <QuickAction icon="time-outline" label="Departures" onPress={() => router.push('/schedule')} />
+            <QuickAction icon="receipt-outline" label="My orders" onPress={() => router.push('/(tabs)/orders')} />
+          </View>
+        ) : null}
+
+        {/* Value props */}
+        {!search && !activeCategory ? (
+          <View style={styles.propsRow}>
+            <ValueProp icon="flash-outline" label="Fast, tracked delivery" />
+            <ValueProp icon="shield-checkmark-outline" label="Verified sellers" />
+            <ValueProp icon="wallet-outline" label="Pay by MoMo or bank" />
           </View>
         ) : null}
 
@@ -194,7 +237,7 @@ export default function ShopScreen() {
         <Text style={styles.sectionLabel}>{sectionLabel}</Text>
       </View>
     ),
-    [searchInput, categories, activeCategory, search, sectionLabel, bestSellers],
+    [searchInput, categories, activeCategory, search, sectionLabel, bestSellers, router],
   );
 
   return (
@@ -255,6 +298,32 @@ export default function ShopScreen() {
         />
       )}
     </SafeAreaView>
+  );
+}
+
+function QuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.quickCard} onPress={onPress} activeOpacity={0.8} accessibilityRole="button">
+      <Ionicons name={icon} size={20} color={colors.primary} />
+      <Text style={styles.quickLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function ValueProp({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+  return (
+    <View style={styles.propItem}>
+      <Ionicons name={icon} size={14} color={colors.primaryDark} />
+      <Text style={styles.propLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -363,6 +432,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  deliveryCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  deliveryIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deliveryTitle: { fontSize: 14, color: colors.text, fontFamily: fonts.semibold },
+  deliverySub: { fontSize: 11, lineHeight: 15, color: colors.muted, fontFamily: fonts.regular, marginTop: 2 },
+  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  quickCard: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+  },
+  quickLabel: { fontSize: 11, color: colors.body, fontFamily: fonts.medium },
+  propsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  propItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  propLabel: { fontSize: 11, color: colors.muted, fontFamily: fonts.medium },
   bestWrap: { marginBottom: spacing.md },
   bestHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
   bestTitle: { fontSize: 16, color: colors.text, fontFamily: fonts.semibold },

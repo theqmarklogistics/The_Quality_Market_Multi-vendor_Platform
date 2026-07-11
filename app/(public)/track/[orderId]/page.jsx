@@ -37,6 +37,10 @@ function TrackOrderPageInner() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [sharing, setSharing] = useState(false);
+    // One-tap pre-transit pin (external bookings) — sets the drop point that the
+    // delivery fee is calculated from.
+    const [pinning, setPinning] = useState(false);
+    const [pinnedOk, setPinnedOk] = useState(false);
 
     const watchIdRef = useRef(null);
     const lastShareRef = useRef(0);
@@ -154,6 +158,27 @@ function TrackOrderPageInner() {
         }
     }, []);
 
+    // Pre-transit: pin the delivery point once. For external bookings the shared
+    // coordinates are what the delivery fee is calculated from.
+    const pinMyLocation = () => {
+        if (!('geolocation' in navigator)) {
+            setError('Location is not supported on this device.');
+            return;
+        }
+        setPinning(true);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                lastShareRef.current = 0; // bypass the live-share throttle for this one-off pin
+                await postLocation(pos.coords.latitude, pos.coords.longitude);
+                setPinning(false);
+                setPinnedOk(true);
+                fetchTracking({ silent: true });
+            },
+            () => { setPinning(false); setError('Could not access your location.'); },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    };
+
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF';
 
     if (!isLoaded || loading) return <div className="min-h-screen flex items-center justify-center"><Loading /></div>;
@@ -172,6 +197,8 @@ function TrackOrderPageInner() {
     const isFailed = trackData?.deliveryStatus === 'FAILED';
     const isArriving = trackData?.deliveryStatus === 'ARRIVING';
     const enRoute = ['IN_TRANSIT', 'ARRIVING'].includes(trackData?.deliveryStatus);
+    const preTransit = ['PENDING_INTAKE', 'SORTING'].includes(trackData?.deliveryStatus);
+    const locationSet = pinnedOk || trackData?.locationSharedAt != null;
 
     const riderPos = (trackData?.riderLat != null && trackData?.riderLng != null)
         ? { lat: trackData.riderLat, lng: trackData.riderLng } : null;
@@ -193,6 +220,42 @@ function TrackOrderPageInner() {
                         <p className="mt-2 text-sm text-white/80">From <span className="font-semibold text-white">{trackData.senderName}</span></p>
                     )}
                 </div>
+
+                {/* Pre-transit: capture the exact delivery point. For external
+                    bookings this is what the delivery fee is calculated from. */}
+                {preTransit && (
+                    <div className={`rounded-3xl border-2 p-5 shadow-sm ${locationSet ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-white'}`}>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">Delivery location</p>
+                        {locationSet ? (
+                            <div className="flex items-start gap-3">
+                                <CheckCircleIcon size={22} className="text-green-600 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="font-semibold text-green-800">Location received — thank you!</p>
+                                    <p className="text-sm text-slate-600 mt-0.5">The rider will be guided straight to this point. You can update it any time by tapping again below.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-slate-600">
+                                Tap the button below <span className="font-semibold">from the exact place your package should be delivered</span> so the rider can find you.
+                                {trackData?.isExternalDelivery && <> The <span className="font-semibold">delivery fee is calculated from this point</span>.</>}
+                            </p>
+                        )}
+                        <button
+                            onClick={pinMyLocation}
+                            disabled={pinning}
+                            className={`mt-3 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${locationSet ? 'border border-green-300 bg-white text-green-700 hover:bg-green-50' : 'bg-green-600 text-white hover:bg-green-700'} disabled:opacity-60`}
+                        >
+                            <MapPinIcon size={16} />
+                            {pinning ? 'Getting your location…' : locationSet ? 'Update my delivery location' : 'Share my delivery location'}
+                        </button>
+                        {trackData?.isExternalDelivery && trackData?.deliveryFee != null && (
+                            <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-sm">
+                                <span className="text-slate-500">Delivery fee{trackData?.isPaid ? ' (paid)' : ''}</span>
+                                <span className="font-bold text-slate-800">{currency} {Number(trackData.deliveryFee).toLocaleString()}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Arriving banner */}
                 {isArriving && (

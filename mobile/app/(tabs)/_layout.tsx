@@ -39,8 +39,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Shop',
-          tabBarIcon: tabIcon('storefront-outline', 'storefront'),
+          title: 'Home',
+          tabBarIcon: tabIcon('home-outline', 'home'),
         }}
       />
       <Tabs.Screen

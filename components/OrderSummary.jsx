@@ -35,8 +35,9 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     const [pinning, setPinning] = useState(false);
     // Phone is mandatory at checkout; prefilled from the selected address.
     const [contactPhone, setContactPhone] = useState('');
-    // Live pooled-delivery fee estimate ({fee, distanceKm, basis} | null)
-    const [poolQuote, setPoolQuote] = useState(null);
+    // Live shipping quote for the cart ({shipping, basis} | null) — shipping is
+    // always calculated and paid at checkout, for both delivery methods.
+    const [shippingQuote, setShippingQuote] = useState(null);
     const [quoting, setQuoting] = useState(false);
 
     const handlePinLocation = () => {
@@ -65,27 +66,28 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
         if (selectedAddress?.phone) setContactPhone(prev => prev || selectedAddress.phone);
     }, [selectedAddress]);
 
-    // Show the Kigali Pooled Delivery fee up-front: quote whenever the pooled
-    // option, address, or pinned location changes. Uses the pinned checkout point
-    // when shared, otherwise the address's saved/geocoded (village) location.
+    // Show the shipping fee up-front: quote whenever the delivery method,
+    // address, or pinned location changes. Computed server-side exactly like
+    // order creation, so the amount shown is the amount charged at checkout.
     useEffect(() => {
         let cancelled = false;
         const quote = async () => {
-            if (deliveryType !== 'KIGALI_POOL' || !selectedAddress || !user) {
-                setPoolQuote(null);
+            if (!selectedAddress || !user) {
+                setShippingQuote(null);
                 return;
             }
             setQuoting(true);
             try {
                 const token = await getToken();
-                const { data } = await axios.post('/api/delivery/pool-quote', {
+                const { data } = await axios.post('/api/orders/shipping-quote', {
                     addressId: selectedAddress.id,
+                    deliveryType,
                     items: (items || []).map(i => ({ id: i.id || i.productId, quantity: i.quantity })),
                     ...(pinnedLocation && { lat: pinnedLocation.lat, lng: pinnedLocation.lng }),
                 }, { headers: { Authorization: `Bearer ${token}` } });
-                if (!cancelled) setPoolQuote(data);
+                if (!cancelled) setShippingQuote(data);
             } catch {
-                if (!cancelled) setPoolQuote(null);
+                if (!cancelled) setShippingQuote(null);
             } finally {
                 if (!cancelled) setQuoting(false);
             }
@@ -345,13 +347,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                             </div>
                             <div className='flex flex-col gap-1 font-medium text-right text-slate-800'>
                                 <p>{formatAmount(totalPrice)}</p>
-                                {deliveryType === 'KIGALI_POOL'
-                                    ? (quoting
-                                        ? <p className='text-green-700 text-xs'>Calculating…</p>
-                                        : poolQuote?.fee != null
-                                            ? <p className='text-green-700'>{formatAmount(poolQuote.fee)}</p>
-                                            : <p className='text-green-700 text-xs'>Pooled (shared route)</p>)
-                                    : <p>Free in Kigali</p>}
+                                {quoting
+                                    ? <p className='text-green-700 text-xs'>Calculating…</p>
+                                    : shippingQuote?.shipping != null
+                                        ? <p className='text-green-700'>{formatAmount(shippingQuote.shipping)}</p>
+                                        : <p className='text-slate-400 text-xs'>Select an address</p>}
 
                                 {coupon && <p>{`-${formatAmount((coupon.discount / 100) * totalPrice)}`}</p>}
                             </div>
@@ -379,12 +379,14 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                             <p className='text-lg font-semibold'>
                                 {formatAmount(
                                     (coupon ? totalPrice - ((coupon.discount / 100) * totalPrice) : totalPrice)
-                                    + (deliveryType === 'KIGALI_POOL' && poolQuote?.fee != null ? poolQuote.fee : 0)
+                                    + (shippingQuote?.shipping != null ? shippingQuote.shipping : 0)
                                 )}
                             </p>
                         </div>
-                        {deliveryType === 'KIGALI_POOL' && poolQuote?.fee != null && (
-                            <p className='mt-1 text-[11px] text-white/60'>Includes {formatAmount(poolQuote.fee)} estimated delivery — the final pooled fee can only be lower when your route is shared.</p>
+                        {shippingQuote?.shipping != null && (
+                            <p className='mt-1 text-[11px] text-white/60'>
+                                Includes {formatAmount(shippingQuote.shipping)} shipping, paid now at checkout{deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : '.'}
+                            </p>
                         )}
                     </div>
 

@@ -6,10 +6,11 @@ import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { KIGALI_SECTORS } from "@/lib/constants";
-import { ArrowLeftIcon, PackagePlusIcon, Loader2Icon, MapPinIcon, CrosshairIcon, CheckCircleIcon } from "lucide-react";
+import { ArrowLeftIcon, PackagePlusIcon, Loader2Icon, MapPinIcon, CrosshairIcon, CheckCircleIcon, CopyIcon, CheckIcon, LinkIcon, AlertTriangleIcon } from "lucide-react";
 import LocationPicker from "@/components/delivery/LocationPicker";
 
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "RWF";
+const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 
 export default function ExternalBookingForm() {
     const router = useRouter();
@@ -22,12 +23,17 @@ export default function ExternalBookingForm() {
         packageDescription: "", declaredValue: "", paymentMethod: "MTN_MOMO",
         packageWeightKg: "", packageLengthCm: "", packageWidthCm: "", packageHeightCm: "",
         recipientLat: null, recipientLng: null,
+        pickupLat: null, pickupLng: null,
     });
     const [quote, setQuote] = useState(null);
     const [creditBalance, setCreditBalance] = useState(0);
     const [applyCredit, setApplyCredit] = useState(true);
     const [locating, setLocating] = useState(false);
+    const [pickupLocating, setPickupLocating] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    // Set after a successful booking → shows the "send this link to your client" panel.
+    const [booked, setBooked] = useState(null);
+    const [linkCopied, setLinkCopied] = useState(false);
     const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
     const hasPin = form.recipientLat != null && form.recipientLng != null;
@@ -80,11 +86,24 @@ export default function ExternalBookingForm() {
         );
     };
 
+    const usePickupLocation = () => {
+        if (!("geolocation" in navigator)) { toast.error("Location not supported on this device."); return; }
+        setPickupLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setForm((f) => ({ ...f, pickupLat: pos.coords.latitude, pickupLng: pos.coords.longitude }));
+                setPickupLocating(false);
+                toast.success("Pickup point recorded — the distance is measured from here");
+            },
+            () => { setPickupLocating(false); toast.error("Could not access your location."); },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    };
+
     const submit = async () => {
         if (!form.recipientName || !form.recipientPhone || !form.recipientSector || !form.recipientLandmark) {
             return toast.error("Recipient name, phone, sector and landmark are required");
         }
-        if (!hasPin) return toast.error("Pin the delivery location on the map");
         if (!form.packageWeightKg || Number(form.packageWeightKg) <= 0) return toast.error("Enter the package weight (kg)");
         if (form.intakeMethod === "DRIVER_SWEEP" && (!form.pickupContactName || !form.pickupPhone || !form.pickupLandmark)) {
             return toast.error("Pickup contact, phone and location are required for a sweep");
@@ -92,7 +111,7 @@ export default function ExternalBookingForm() {
         setSubmitting(true);
         try {
             const num = (v) => (v !== "" && v != null && Number.isFinite(Number(v)) ? Number(v) : undefined);
-            await axios.post(`/api/delivery/external`, {
+            const { data } = await axios.post(`/api/delivery/external`, {
                 ...form,
                 declaredValue: num(form.declaredValue),
                 packageWeightKg: num(form.packageWeightKg),
@@ -101,8 +120,7 @@ export default function ExternalBookingForm() {
                 packageHeightCm: num(form.packageHeightCm),
                 applyCredit,
             }, { headers: await authHeaders() });
-            toast.success("Delivery booked — upload your payment proof to start it");
-            router.push("/external");
+            setBooked(data);
         } catch (err) {
             toast.error(err?.response?.data?.error || err.message);
         } finally {
@@ -110,13 +128,55 @@ export default function ExternalBookingForm() {
         }
     };
 
+    const clientLink = booked ? `${APP_ORIGIN}/track/${booked.orderId}?t=${booked.trackingToken}` : "";
+    const copyClientLink = () => {
+        navigator.clipboard?.writeText(clientLink);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 1500);
+    };
+
     const input = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-green-400 focus:outline-none";
+
+    // ── Booked: hand the partner the client link before anything else ────────
+    if (booked) {
+        return (
+            <div className="p-4 sm:p-6 max-w-lg mx-auto">
+                <div className="rounded-2xl border-2 border-green-300 bg-green-50 p-5 text-center">
+                    <CheckCircleIcon size={36} className="mx-auto text-green-600" />
+                    <h1 className="text-xl font-bold text-slate-800 mt-2">Delivery booked</h1>
+                    <p className="text-sm text-slate-600 mt-1">
+                        Fee: <b>{currency} {Number(booked.fee).toLocaleString()}</b>
+                        {booked.amountDue != null && booked.amountDue !== booked.fee && <> · you pay <b>{currency} {Number(booked.amountDue).toLocaleString()}</b></>}
+                    </p>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-slate-200 p-5">
+                    <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-800"><LinkIcon size={15} className="text-green-600" /> Send this link to your client first</p>
+                    <p className="text-xs text-slate-500 mt-1.5">
+                        Your client opens it to <b>share their exact location</b> and track the package.
+                        Their shared location is what the <b>delivery fee is calculated from</b> — if it changes the
+                        distance, the fee updates before you pay.
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                        <input readOnly value={clientLink} className={`${input} font-mono text-xs bg-slate-50`} onFocus={(e) => e.target.select()} />
+                        <button onClick={copyClientLink} className="shrink-0 flex items-center gap-1 rounded-xl bg-slate-800 text-white px-3 py-2 text-xs font-medium hover:bg-slate-900">
+                            {linkCopied ? <CheckIcon size={13} className="text-green-400" /> : <CopyIcon size={13} />} Copy
+                        </button>
+                    </div>
+                </div>
+
+                <button onClick={() => router.push("/external")} className="mt-4 w-full rounded-xl bg-green-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-green-700">
+                    Go to my deliveries (pay &amp; print documents)
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 sm:p-6 max-w-lg mx-auto">
             <Link href="/external" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-4"><ArrowLeftIcon size={14} /> Back to my deliveries</Link>
             <h1 className="text-2xl font-bold text-slate-800 mb-1">Book a delivery</h1>
-            <p className="text-sm text-slate-500 mb-5">We pool your package onto a shared Kigali route. Pay the fee after booking to start it.</p>
+            <p className="text-sm text-slate-500 mb-5">We pool your package onto a shared Kigali route. After booking you get a link for your client — their shared location sets the final fee, paid before dispatch.</p>
 
             <div className="space-y-4">
                 <div className="rounded-2xl border border-slate-100 p-4 space-y-2">
@@ -145,8 +205,14 @@ export default function ExternalBookingForm() {
                     <p className={`text-[11px] ${hasPin ? "text-green-600" : "text-slate-400"}`}>
                         {hasPin
                             ? <><CheckCircleIcon size={12} className="inline -mt-0.5 mr-1" />Pinned at {form.recipientLat.toFixed(5)}, {form.recipientLng.toFixed(5)}</>
-                            : <><MapPinIcon size={12} className="inline -mt-0.5 mr-1" />No location pinned yet (required)</>}
+                            : <><MapPinIcon size={12} className="inline -mt-0.5 mr-1" />No pin yet (optional)</>}
                     </p>
+                    {!hasPin && (
+                        <p className="text-[11px] rounded-lg bg-green-50 border border-green-100 text-green-800 px-2.5 py-2">
+                            Don&apos;t know the exact spot? Book anyway — after booking you get a <b>link to send your client</b>.
+                            The location they share sets the final delivery fee before you pay.
+                        </p>
+                    )}
                 </div>
 
                 <div className="rounded-2xl border border-slate-100 p-4 space-y-2">
@@ -168,6 +234,21 @@ export default function ExternalBookingForm() {
                             <input className={input} placeholder="Pickup location / landmark" value={form.pickupLandmark} onChange={(e) => set("pickupLandmark", e.target.value)} />
                         </div>
                     )}
+                    <button
+                        type="button"
+                        onClick={usePickupLocation}
+                        disabled={pickupLocating}
+                        className={`w-full flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-medium transition ${
+                            form.pickupLat != null ? "border-green-300 bg-green-50 text-green-700" : "border-slate-200 text-slate-600 hover:border-green-400"
+                        } disabled:opacity-50`}
+                    >
+                        {pickupLocating ? <Loader2Icon size={13} className="animate-spin" /> : form.pickupLat != null ? <CheckCircleIcon size={13} /> : <CrosshairIcon size={13} />}
+                        {form.pickupLat != null ? "Pickup point recorded (tap to update)" : "Record pickup at my current location"}
+                    </button>
+                    <p className="text-[11px] text-slate-400">
+                        When a pickup point is recorded (e.g. a rider logging a package in the field), the delivery
+                        distance — and the fee — is measured <b>from that point instead of the hub</b>.
+                    </p>
                 </div>
 
                 <div className="rounded-2xl border border-slate-100 p-4 space-y-2">
@@ -182,6 +263,15 @@ export default function ExternalBookingForm() {
                         <input className={input} type="number" min="0" placeholder="Length" value={form.packageLengthCm} onChange={(e) => set("packageLengthCm", e.target.value)} />
                         <input className={input} type="number" min="0" placeholder="Width" value={form.packageWidthCm} onChange={(e) => set("packageWidthCm", e.target.value)} />
                         <input className={input} type="number" min="0" placeholder="Height" value={form.packageHeightCm} onChange={(e) => set("packageHeightCm", e.target.value)} />
+                    </div>
+                    <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                        <AlertTriangleIcon size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-[11px] leading-relaxed text-amber-800">
+                            <span className="font-semibold">Declare the weight and dimensions accurately.</span> Every package is
+                            verified at intake. If the actual weight or volume is higher than declared, the package is
+                            <span className="font-semibold"> held until you pay the difference</span> — and if you don&apos;t,
+                            the delivery is cancelled and <span className="font-semibold">your payment is not refunded</span>.
+                        </p>
                     </div>
                 </div>
 

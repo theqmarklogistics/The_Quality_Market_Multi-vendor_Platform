@@ -327,6 +327,14 @@ export default function ProductFormScreen() {
               <Field label="Height (cm)" value={values.heightCm ?? ''} onChangeText={(t) => set('heightCm', t)} keyboardType="numeric" placeholder="0" />
             </View>
           </View>
+          <View style={styles.warnBox}>
+            <Ionicons name="warning-outline" size={16} color="#b45309" style={{ marginTop: 1 }} />
+            <Text style={styles.warnText}>
+              Declare weight and dimensions accurately — packages are verified at intake. If the actual
+              weight or volume exceeds the declaration, the shipment is held until the difference is
+              paid; unpaid differences cancel the delivery without a refund.
+            </Text>
+          </View>
 
           <Text style={styles.fieldLabel}>Product origin</Text>
           <View style={styles.originRow}>
@@ -412,6 +420,17 @@ const styles = StyleSheet.create({
 
   sectionLabel: { fontSize: 13, fontFamily: fonts.bold, color: colors.text, marginTop: spacing.lg, marginBottom: spacing.sm },
   fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6 },
+  warnBox: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  warnText: { flex: 1, fontSize: 11, lineHeight: 16, color: '#92400e', fontFamily: fonts.medium },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

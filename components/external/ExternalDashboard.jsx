@@ -130,6 +130,12 @@ export default function ExternalDashboard() {
                                         <p className="text-xs text-slate-400 mt-0.5 font-mono">{d.orderId}</p>
                                         {d.packageDescription && <p className="text-xs text-slate-500 mt-1">{d.packageDescription}</p>}
                                         <p className="text-sm text-slate-600 mt-1">Fee: <b>{currency} {d.total}</b> · Code: <b className="tracking-widest">{d.deliveryOtp}</b></p>
+                                        {!d.hasClientLocation && d.deliveryStatus === "PENDING_INTAKE" && (
+                                            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1 text-[11px] text-amber-800">
+                                                <MapPinIcon size={12} className="shrink-0" />
+                                                Awaiting client location — <b>send them the track link</b>; their location sets the final fee.
+                                            </p>
+                                        )}
                                         {(d.creditApplied > 0 || d.poolingSavings) && (
                                             <p className="text-xs mt-0.5">
                                                 {d.creditApplied > 0 && (
@@ -141,12 +147,17 @@ export default function ExternalDashboard() {
                                         )}
                                     </div>
                                     <div className="flex flex-col items-end gap-2 shrink-0">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
                                             <button onClick={() => copyLink(d.orderId, d.trackingToken)} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400">
-                                                {copiedId === d.orderId ? <CheckIcon size={12} className="text-green-600" /> : <CopyIcon size={12} />} Track link
+                                                {copiedId === d.orderId ? <CheckIcon size={12} className="text-green-600" /> : <CopyIcon size={12} />} Client link
                                             </button>
                                             <Link href={`/track/${d.orderId}?t=${d.trackingToken}`} target="_blank" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><MapPinIcon size={12} /> Track</Link>
+                                        </div>
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                            <a href={`/api/delivery/external/docs/${d.orderId}?type=invoice`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Invoice</a>
                                             <a href={`/api/delivery/external/label/${d.orderId}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Label</a>
+                                            <a href={`/api/delivery/external/docs/${d.orderId}?type=sender`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Sender receipt</a>
+                                            <a href={`/api/delivery/external/docs/${d.orderId}?type=receiver`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Delivery confirmation</a>
                                         </div>
                                         {needsProof && (
                                             <label className="flex items-center gap-1 rounded-lg bg-slate-800 text-white px-2 py-1 text-xs font-medium hover:bg-slate-900 cursor-pointer">

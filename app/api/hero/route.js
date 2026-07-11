@@ -8,7 +8,7 @@ const heroLimiter = createRateLimiter({ max: 30, windowMs: 60_000 });
 const DEFAULTS = {
     main: {
         slot: 'main',
-        badgeText: 'Free Shipping on Orders Above RWF 50K!',
+        badgeText: 'Fast, Tracked Delivery Across Kigali!',
         headline: "Gadgets you'll love. Prices you'll trust.",
         description: 'Discover hand-picked electronics, practical accessories, and store-approved finds built for everyday use and long-term value.',
         startingPrice: '4.9K',
@@ -54,6 +54,10 @@ export async function GET(request) {
         const result = {};
         for (const key of ['main', 'card1', 'card2']) {
             result[key] = { ...DEFAULTS[key], ...(bySlot[key] || {}) };
+        }
+        // Shipping is never free — scrub any stale admin-saved free-shipping copy.
+        if (/free\s*(shipping|delivery)/i.test(result.main.badgeText || '')) {
+            result.main.badgeText = DEFAULTS.main.badgeText;
         }
 
         return cachedJson(result);

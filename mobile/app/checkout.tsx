@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getAddresses } from '@/api/addresses';
 import { getProduct } from '@/api/products';
 import { verifyCoupon } from '@/api/coupons';
-import { createOrder, getPoolQuote, type PoolQuote } from '@/api/orders';
+import { createOrder, getShippingQuote, type ShippingQuote } from '@/api/orders';
 import type { Address, Coupon, Product } from '@/api/types';
 import { Button, Loader, Money } from '@/components/ui';
 import { SignedOutGate } from '@/components/SignedOutGate';
@@ -74,7 +74,7 @@ function CheckoutScreenInner() {
   const [pinning, setPinning] = useState(false);
   // Mandatory at checkout; prefilled from the selected address, still editable.
   const [contactPhone, setContactPhone] = useState('');
-  const [poolQuote, setPoolQuote] = useState<PoolQuote | null>(null);
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
   const [quoting, setQuoting] = useState(false);
 
   const [payment, setPayment] = useState<PaymentMethod>(PaymentMethod.MTN_MOMO);
@@ -122,25 +122,27 @@ function CheckoutScreenInner() {
     if (a?.phone) setContactPhone((cur) => cur || a.phone);
   }, [addressId, addresses]);
 
-  // Live pooled-delivery fee estimate whenever the pooled option / address / pin change.
+  // Live shipping quote whenever the delivery type / address / pin change —
+  // shipping is always calculated and paid at checkout.
   useEffect(() => {
     let cancelled = false;
-    if (deliveryType !== DeliveryType.KIGALI_POOL || !addressId) {
-      setPoolQuote(null);
+    if (!addressId) {
+      setShippingQuote(null);
       return;
     }
     setQuoting(true);
-    getPoolQuote({
+    getShippingQuote({
       addressId,
+      deliveryType,
       items: ids.map((id) => ({ id, quantity: cartItems[id] })),
       lat: pin?.latitude,
       lng: pin?.longitude,
     })
       .then((q) => {
-        if (!cancelled) setPoolQuote(q);
+        if (!cancelled) setShippingQuote(q);
       })
       .catch(() => {
-        if (!cancelled) setPoolQuote(null);
+        if (!cancelled) setShippingQuote(null);
       })
       .finally(() => {
         if (!cancelled) setQuoting(false);
@@ -161,8 +163,8 @@ function CheckoutScreenInner() {
   );
 
   const discount = coupon ? (subtotal * coupon.discount) / 100 : 0;
-  const poolFee = deliveryType === DeliveryType.KIGALI_POOL && poolQuote ? poolQuote.fee : 0;
-  const estimatedTotal = subtotal - discount + poolFee;
+  const shippingFee = shippingQuote?.shipping ?? 0;
+  const estimatedTotal = subtotal - discount + shippingFee;
 
   const pinLocation = async () => {
     setPinning(true);
@@ -339,10 +341,8 @@ function CheckoutScreenInner() {
               <Text style={styles.quoteText}>
                 {quoting
                   ? 'Calculating delivery fee…'
-                  : poolQuote
-                    ? `Estimated delivery fee: ${formatPrice(poolQuote.fee)}${
-                        poolQuote.distanceKm != null ? ` (~${poolQuote.distanceKm} km)` : ''
-                      } — sharing the route can only make it cheaper.`
+                  : shippingQuote
+                    ? `Delivery fee: ${formatPrice(shippingQuote.shipping)} — paid at checkout; sharing the route can only make it cheaper.`
                     : 'Delivery fee is calculated from your address location.'}
               </Text>
             </View>
@@ -418,20 +418,22 @@ function CheckoutScreenInner() {
             </Text>
           </View>
         ) : null}
-        {poolFee > 0 ? (
-          <View style={styles.sumRow}>
-            <Text style={styles.muted}>Delivery (pooled, est.)</Text>
-            <Text style={styles.sumVal}>{formatPrice(poolFee)}</Text>
-          </View>
-        ) : null}
         <View style={styles.sumRow}>
-          <Text style={styles.totalLabel}>Estimated total</Text>
+          <Text style={styles.muted}>
+            {deliveryType === DeliveryType.KIGALI_POOL ? 'Shipping (pooled)' : 'Shipping'}
+          </Text>
+          <Text style={styles.sumVal}>
+            {quoting ? 'Calculating…' : shippingQuote ? formatPrice(shippingFee) : '—'}
+          </Text>
+        </View>
+        <View style={styles.sumRow}>
+          <Text style={styles.totalLabel}>Total</Text>
           <Money value={estimatedTotal} style={{ fontSize: 20 }} />
         </View>
         <Text style={styles.note}>
-          {deliveryType === DeliveryType.KIGALI_POOL && poolQuote
-            ? 'The final pooled delivery fee can only be lower when your route is shared.'
-            : '+ delivery fee, calculated by the server.'}
+          {deliveryType === DeliveryType.KIGALI_POOL && shippingQuote
+            ? 'Shipping is paid at checkout — the final pooled fee can only be lower when your route is shared.'
+            : 'Shipping is calculated and paid at checkout.'}
         </Text>
         <Button label="Place order" icon="bag-check-outline" onPress={placeOrder} loading={placing} />
       </View>
