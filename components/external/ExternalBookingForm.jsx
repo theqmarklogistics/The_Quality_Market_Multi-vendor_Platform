@@ -67,12 +67,16 @@ export default function ExternalBookingForm() {
                 if (form.packageHeightCm) params.set("heightCm", form.packageHeightCm);
                 if (lat != null) params.set("dropLat", String(lat));
                 if (lng != null) params.set("dropLng", String(lng));
+                // Recorded pickup point overrides the hub as the distance origin,
+                // so the live quote matches the fee charged at booking.
+                if (form.pickupLat != null) params.set("originLat", String(form.pickupLat));
+                if (form.pickupLng != null) params.set("originLng", String(form.pickupLng));
                 const { data } = await axios.get(`/api/delivery/external/quote?${params.toString()}`, { headers: await authHeaders() });
                 if (active) setQuote(data);
             } catch (_) { if (active) setQuote(null); }
         })();
         return () => { active = false; };
-    }, [form.recipientSector, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, authHeaders]);
+    }, [form.recipientSector, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, form.pickupLat, form.pickupLng, authHeaders]);
 
     const onPick = (lat, lng) => setForm((f) => ({ ...f, recipientLat: lat, recipientLng: lng }));
 
@@ -286,7 +290,7 @@ export default function ExternalBookingForm() {
                         <span className="text-lg font-bold text-slate-800">{quote?.fee != null ? `${currency} ${Number(quote.fee).toLocaleString()}` : "—"}</span>
                     </div>
                     {quote?.basis === "formula" && (
-                        <p className="text-[11px] text-slate-400 mt-1">Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from hub</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from {form.pickupLat != null ? "pickup point" : "hub"}</p>
                     )}
                     {quote?.basis === "flat" && (
                         <p className="text-[11px] text-slate-400 mt-1">Flat sector rate — add a weight and pin the location for distance pricing.</p>

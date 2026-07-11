@@ -6,7 +6,8 @@ import authRider from "@/middlewares/authRider";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
 
 // GET — live delivery quote. Params: sector, weightKg, lengthCm, widthCm, heightCm,
-// dropLat, dropLng (or distanceKm). Returns { fee, chargeableKg, distanceKm, basis }.
+// dropLat, dropLng (or distanceKm), originLat, originLng (pickup/rider origin —
+// overrides the hub). Returns { fee, chargeableKg, distanceKm, basis }.
 // Available to delivery partners (own bookings) and logistics staff (booking for them).
 export async function GET(request) {
     try {
@@ -30,6 +31,8 @@ export async function GET(request) {
             heightCm: num("heightCm"),
             dropLat: num("dropLat"),
             dropLng: num("dropLng"),
+            originLat: num("originLat"),
+            originLng: num("originLng"),
             distanceKm: num("distanceKm"),
         });
         return NextResponse.json(quote);

@@ -3,6 +3,11 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import { calculateOrderShippingForStore } from "@/lib/pricing";
 import { quotePooledCartFee } from "@/lib/externalDelivery";
+import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+
+// Quotes fire on every address/pin/delivery-type change at checkout — generous
+// but bounded, mirroring the other public-ish read endpoints.
+const quoteLimiter = createRateLimiter({ max: 30, windowMs: 60_000 });
 
 // POST { addressId, items: [{ id, quantity }], deliveryType?, lat?, lng? }
 // Checkout-time shipping quote for the whole cart, computed exactly like order
@@ -11,6 +16,14 @@ import { quotePooledCartFee } from "@/lib/externalDelivery";
 // carts use the zone × weight tariff with the flat base-fee fallback.
 export async function POST(request) {
     try {
+        const rl = quoteLimiter(`shipping-quote:${getClientIp(request)}`);
+        if (!rl.success) {
+            return NextResponse.json(
+                { error: "Too many requests." },
+                { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+            );
+        }
+
         const { userId } = getAuth(request);
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

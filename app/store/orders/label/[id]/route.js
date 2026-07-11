@@ -5,9 +5,16 @@ import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image as PDFIma
 import prisma from "@/lib/prisma";
 import authSeller from "@/middlewares/authSeller";
 import path from "path";
+import fs from "fs";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://thequalitymarket.com";
-const LOGO_PATH = path.join(process.cwd(), "public", "the-quality-market-logo.png");
+// Base64 data URI so the logo embeds on every host (raw Windows paths are
+// misread as URLs by react-pdf and the image silently drops out).
+let LOGO_SRC = null;
+try {
+    const logoPath = path.join(process.cwd(), "public", "the-quality-market-logo.png");
+    LOGO_SRC = `data:image/png;base64,${fs.readFileSync(logoPath).toString("base64")}`;
+} catch { /* render without the logo rather than fail the document */ }
 const BRAND_GREEN = "#16a34a";
 const BRAND_DARK = "#0f172a";
 
@@ -47,7 +54,7 @@ function PackageLabel({ order }) {
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <PDFImage src={LOGO_PATH} style={{ width: 34, height: 34, marginRight: 8 }} />
+                        {LOGO_SRC && <PDFImage src={LOGO_SRC} style={{ width: 34, height: 34, marginRight: 8 }} />}
                         <View>
                             <Text style={styles.brand}>The Quality Market</Text>
                             <Text style={styles.brandSub}>thequalitymarket.com</Text>

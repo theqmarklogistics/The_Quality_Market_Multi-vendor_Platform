@@ -103,6 +103,10 @@ export default function ExternalBookScreen() {
           heightCm: num(heightCm),
           dropLat: coords?.latitude,
           dropLng: coords?.longitude,
+          // Recorded pickup point overrides the hub as the distance origin,
+          // so the live quote matches the fee charged at booking.
+          originLat: pickupCoords?.latitude,
+          originLng: pickupCoords?.longitude,
         });
         if (active) setQuote(q);
       } catch {
@@ -113,7 +117,7 @@ export default function ExternalBookScreen() {
       active = false;
       clearTimeout(t);
     };
-  }, [sector, weightKg, lengthCm, widthCm, heightCm, coords]);
+  }, [sector, weightKg, lengthCm, widthCm, heightCm, coords, pickupCoords]);
 
   const pinLocation = async () => {
     setPinning(true);
@@ -380,7 +384,9 @@ export default function ExternalBookScreen() {
           <Text style={styles.quoteFee}>{quote?.fee != null ? formatPrice(quote.fee) : '—'}</Text>
         </View>
         {quote?.basis === 'formula' ? (
-          <Text style={styles.quoteHint}>Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from hub</Text>
+          <Text style={styles.quoteHint}>
+            Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from {pickupCoords ? 'pickup point' : 'hub'}
+          </Text>
         ) : null}
         {quote?.basis === 'flat' ? (
           <Text style={styles.quoteHint}>Flat sector rate — add a weight and pin the location for distance pricing.</Text>

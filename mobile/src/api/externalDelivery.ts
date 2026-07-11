@@ -53,6 +53,9 @@ export interface QuoteParams {
   heightCm?: number;
   dropLat?: number;
   dropLng?: number;
+  // Pickup/rider origin — overrides the hub as the distance origin.
+  originLat?: number;
+  originLng?: number;
 }
 
 export interface DeliveryQuote {
