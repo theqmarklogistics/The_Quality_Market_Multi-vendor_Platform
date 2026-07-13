@@ -30,10 +30,14 @@ ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ARG NEXT_PUBLIC_CURRENCY_SYMBOL=RWF
 ARG NEXT_PUBLIC_SOCKET_ENABLED=true
+# Browser Maps key — next.config.mjs inlines it into the client bundle at build
+# time, so it must be present here, not just at runtime.
+ARG PUBLIC_GOOGLE_MAPS_API_KEY
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
     NEXT_PUBLIC_CURRENCY_SYMBOL=$NEXT_PUBLIC_CURRENCY_SYMBOL \
     NEXT_PUBLIC_SOCKET_ENABLED=$NEXT_PUBLIC_SOCKET_ENABLED \
+    PUBLIC_GOOGLE_MAPS_API_KEY=$PUBLIC_GOOGLE_MAPS_API_KEY \
     # Dummy DB URL so `prisma generate`/module import don't complain at build;
     # the real DATABASE_URL is provided at runtime.
     DATABASE_URL=postgresql://build:build@localhost:5432/build \
