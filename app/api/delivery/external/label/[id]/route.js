@@ -109,9 +109,10 @@ export async function GET(request, { params }) {
         if (!order || !order.isExternalDelivery) {
             return NextResponse.json({ error: "External delivery not found" }, { status: 404 });
         }
-        // The owning partner, or logistics/admin, may print the label.
-        if (order.userId !== userId && !(await authLogistics(userId))) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        // Labels are issued by staff only (admin / logistics manager); the package
+        // is labelled at intake, not by the partner.
+        if (!(await authLogistics(userId))) {
+            return NextResponse.json({ error: "Forbidden — delivery documents are issued by The Quality Market staff" }, { status: 403 });
         }
 
         const pdfBuffer = await renderToBuffer(<ExternalLabel order={order} senderName={order.user?.name} />);

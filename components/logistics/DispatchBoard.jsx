@@ -8,7 +8,7 @@ import ScheduleRouteModal from "@/components/logistics/ScheduleRouteModal";
 import ExternalDeliveryModal from "@/components/logistics/ExternalDeliveryModal";
 import { initializeSocket } from "@/lib/socketClient";
 import { haversineKm, KIGALI_HUB } from "@/lib/deliveryEta";
-import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon } from "lucide-react";
+import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon, FileTextIcon } from "lucide-react";
 
 const CORRIDOR_BADGE = {
     OPEN: "bg-slate-100 text-slate-600",
@@ -18,6 +18,28 @@ const CORRIDOR_BADGE = {
 };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
+
+// The four staff-issued documents for an external booking (partners no longer
+// print these themselves). Plain links — the PDF routes authenticate via the
+// signed-in Clerk session.
+const EXTERNAL_DOCS = [
+    { label: "Invoice", href: (id) => `/api/delivery/external/docs/${id}?type=invoice` },
+    { label: "Label", href: (id) => `/api/delivery/external/label/${id}` },
+    { label: "Sender receipt", href: (id) => `/api/delivery/external/docs/${id}?type=sender` },
+    { label: "Delivery confirmation", href: (id) => `/api/delivery/external/docs/${id}?type=receiver` },
+];
+
+function ExternalDocLinks({ orderId }) {
+    return (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {EXTERNAL_DOCS.map((d) => (
+                <a key={d.label} href={d.href(orderId)} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-600 hover:border-green-400">
+                    <FileTextIcon size={11} /> {d.label}
+                </a>
+            ))}
+        </div>
+    );
+}
 
 export default function DispatchBoard() {
     const { getToken } = useAuth();
@@ -194,6 +216,7 @@ export default function DispatchBoard() {
                                     {(o.landmarkAddress || o.packageDescription) && (
                                         <p className="mt-0.5 text-xs text-slate-400 truncate">{o.packageDescription || o.landmarkAddress}</p>
                                     )}
+                                    {o.isExternalDelivery && <ExternalDocLinks orderId={o.orderId} />}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <span className="text-[10px] font-semibold text-slate-500">{o.deliveryStatus}</span>
@@ -261,6 +284,7 @@ export default function DispatchBoard() {
                                                         {hubKm != null && <span className="ml-2 text-[10px] font-semibold text-slate-500 bg-slate-100 rounded-full px-1.5 py-0.5">{hubKm.toFixed(1)} km from hub</span>}
                                                     </p>
                                                     {s.landmarkAddress && <p className="text-xs text-slate-400 truncate">{s.landmarkAddress}</p>}
+                                                    {s.isExternalDelivery && <ExternalDocLinks orderId={s.orderId} />}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">

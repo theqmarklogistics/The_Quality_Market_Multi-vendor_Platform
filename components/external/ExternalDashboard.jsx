@@ -153,12 +153,9 @@ export default function ExternalDashboard() {
                                             </button>
                                             <Link href={`/track/${d.orderId}?t=${d.trackingToken}`} target="_blank" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><MapPinIcon size={12} /> Track</Link>
                                         </div>
-                                        <div className="flex flex-wrap items-center justify-end gap-2">
-                                            <a href={`/api/delivery/external/docs/${d.orderId}?type=invoice`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Invoice</a>
-                                            <a href={`/api/delivery/external/label/${d.orderId}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Label</a>
-                                            <a href={`/api/delivery/external/docs/${d.orderId}?type=sender`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Sender receipt</a>
-                                            <a href={`/api/delivery/external/docs/${d.orderId}?type=receiver`} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><FileTextIcon size={12} /> Delivery confirmation</a>
-                                        </div>
+                                        <p className="flex items-center gap-1 text-[11px] text-slate-400 text-right">
+                                            <FileTextIcon size={12} className="shrink-0" /> Invoice, label &amp; receipts are issued by our staff at intake and delivery.
+                                        </p>
                                         {needsProof && (
                                             <label className="flex items-center gap-1 rounded-lg bg-slate-800 text-white px-2 py-1 text-xs font-medium hover:bg-slate-900 cursor-pointer">
                                                 {uploadingId === d.orderId ? <Loader2Icon size={12} className="animate-spin" /> : <UploadIcon size={12} />} Upload payment proof

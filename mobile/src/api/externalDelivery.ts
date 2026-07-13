@@ -3,11 +3,9 @@
 // components/external/ExternalDashboard + ExternalBookingForm. Booking pushes a
 // delivery-only order through the Kigali pooled pipeline; payment proof reuses the
 // shared /api/orders/payment-proof route (see src/api/orders.ts → uploadPaymentProof).
-import { apiGet, apiPost, getAuthToken } from './client';
+import { apiGet, apiPost } from './client';
 import { API_URL } from '@/constants';
 import type { PaymentMethod } from '@/constants';
-// SDK 54+ moved cacheDirectory/downloadAsync to the legacy entry point.
-import * as FileSystem from 'expo-file-system/legacy';
 
 export type ExternalPaymentProofStatus =
   | 'NOT_SUBMITTED'
@@ -121,23 +119,7 @@ export function bookExternalDelivery(
 
 // The public, token-scoped tracking link for a delivery — safe to share with the
 // recipient (no auth needed). Matches the QR encoded on the printed label.
+// (Label/invoice/receipt PDFs are staff-issued and not downloadable by partners.)
 export function trackingLink(orderId: string, token: string | null): string {
   return `${API_URL}/track/${orderId}${token ? `?t=${token}` : ''}`;
-}
-
-// Download the label PDF to a local cache file. The label route is auth-gated, so
-// we attach the bearer token on this direct (non-axios) download. Returns the local
-// file URI; the caller then shares/opens it.
-export async function downloadLabel(orderId: string): Promise<string> {
-  const token = await getAuthToken();
-  const target = `${FileSystem.cacheDirectory}external-label-${orderId}.pdf`;
-  const res = await FileSystem.downloadAsync(
-    `${API_URL}/api/delivery/external/label/${orderId}`,
-    target,
-    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
-  );
-  if (res.status !== 200) {
-    throw new Error('Could not download the label. Please try again.');
-  }
-  return res.uri;
 }

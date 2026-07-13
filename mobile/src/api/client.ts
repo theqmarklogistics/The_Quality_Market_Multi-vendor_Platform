@@ -28,18 +28,6 @@ export function setAuthTokenGetter(getter: TokenGetter | null): void {
   tokenGetter = getter;
 }
 
-// Reads the current Clerk session JWT outside an axios request — used by callers
-// that download binary responses directly (e.g. the external-delivery label PDF
-// via expo-file-system, which needs the bearer header on a non-axios request).
-export async function getAuthToken(): Promise<string | null> {
-  if (!tokenGetter) return null;
-  try {
-    return await tokenGetter();
-  } catch {
-    return null;
-  }
-}
-
 export const api = axios.create({
   baseURL: API_URL,
   timeout: 20_000,

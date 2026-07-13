@@ -333,9 +333,10 @@ export async function GET(request, { params }) {
         if (!order || !order.isExternalDelivery) {
             return NextResponse.json({ error: "External delivery not found" }, { status: 404 });
         }
-        // The owning partner, or logistics/admin, may print documents.
-        if (order.userId !== userId && !(await authLogistics(userId))) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        // Delivery documents are issued by staff only (admin / logistics manager);
+        // partners receive printed copies at intake and delivery.
+        if (!(await authLogistics(userId))) {
+            return NextResponse.json({ error: "Forbidden — delivery documents are issued by The Quality Market staff" }, { status: 403 });
         }
 
         const Component = doc.component;

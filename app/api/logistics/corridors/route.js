@@ -55,6 +55,7 @@ export async function GET(request) {
                 deliveryStatus: o.deliveryStatus,
                 intakeMethod: o.intakeMethod,
                 storeName: o.store?.name ?? null,
+                isExternalDelivery: o.isExternalDelivery,
                 recipientName: o.address?.name ?? null,
                 recipientPhone: o.address?.phone ?? null,
                 sector: o.address?.sector ?? null,

@@ -1,15 +1,15 @@
 // External-seller (delivery partner) console — the mobile equivalent of the web's
 // components/external/ExternalDashboard. Lists the partner's booked deliveries with
 // live status, payment state, redeemable pooling credit, and per-delivery actions:
-// track live, share the public tracking link, view/print the label, and upload a
-// payment proof. Booking lives on the separate /external/book screen.
+// track live, share the public tracking link, view the label summary, and upload a
+// payment proof. Official documents (invoice, label, receipts) are staff-issued.
+// Booking lives on the separate /external/book screen.
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   Share,
@@ -23,7 +23,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import {
   getExternalDeliveries,
-  downloadLabel,
   trackingLink,
   type ExternalDelivery,
 } from '@/api/externalDelivery';
@@ -66,7 +65,6 @@ export default function ExternalDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [labelBusyId, setLabelBusyId] = useState<string | null>(null);
   const [labelView, setLabelView] = useState<ExternalDelivery | null>(null);
 
   const load = useCallback(async () => {
@@ -100,24 +98,6 @@ export default function ExternalDashboardScreen() {
       await Share.share({ message: `Track your delivery with The Quality Market: ${link}`, url: link });
     } catch {
       /* user dismissed */
-    }
-  };
-
-  // Download the official label PDF (authenticated). iOS can share the file directly;
-  // Android lacks a built-in file-share, so we confirm where it was saved.
-  const saveLabelPdf = async (orderId: string) => {
-    setLabelBusyId(orderId);
-    try {
-      const uri = await downloadLabel(orderId);
-      if (Platform.OS === 'ios') {
-        await Share.share({ url: uri });
-      } else {
-        Alert.alert('Label saved', 'The label PDF was downloaded to the app cache and can be shared via the tracking link.');
-      }
-    } catch (err: any) {
-      Alert.alert('Could not get label', err?.message ?? 'Try again.');
-    } finally {
-      setLabelBusyId(null);
     }
   };
 
@@ -324,20 +304,9 @@ export default function ExternalDashboardScreen() {
                   <Ionicons name="share-outline" size={16} color={colors.text} />
                   <Text style={styles.labelShareText}>Share tracking link</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.labelPdf}
-                  onPress={() => saveLabelPdf(labelView.orderId)}
-                  disabled={labelBusyId === labelView.orderId}
-                >
-                  {labelBusyId === labelView.orderId ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="download-outline" size={16} color="#fff" />
-                      <Text style={styles.labelPdfText}>Download official PDF</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                <Text style={styles.labelNote}>
+                  The official label, invoice and receipts are printed by The Quality Market staff at intake and delivery.
+                </Text>
               </ScrollView>
             ) : null}
           </View>
@@ -482,16 +451,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   labelShareText: { fontSize: 14, fontFamily: fonts.semibold, color: colors.text },
-  labelPdf: {
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: 12,
-    marginTop: spacing.sm,
-  },
-  labelPdfText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
+  labelNote: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: spacing.md, lineHeight: 17 },
 });
