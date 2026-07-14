@@ -87,6 +87,9 @@ export default function DeliveryScheduleScreen() {
                 {corridor.areas.length > 0 ? (
                   <Text style={styles.areas}>Serves: {corridor.areas.join(', ')}</Text>
                 ) : null}
+                {corridor.landmarks?.length > 0 ? (
+                  <Text style={styles.areas}>Route: {corridor.landmarks.join(' → ')}</Text>
+                ) : null}
                 <View style={styles.chips}>
                   {corridor.schedules.map((s) => (
                     <View key={s.id} style={styles.chip}>

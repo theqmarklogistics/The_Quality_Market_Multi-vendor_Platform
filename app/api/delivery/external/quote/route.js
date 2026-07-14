@@ -4,10 +4,14 @@ import authExternalSeller from "@/middlewares/authExternalSeller";
 import authLogistics from "@/middlewares/authLogistics";
 import authRider from "@/middlewares/authRider";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
+import { geocodeRwAddress } from "@/lib/geocode";
 
 // GET — live delivery quote. Params: sector, weightKg, lengthCm, widthCm, heightCm,
 // dropLat, dropLng (or distanceKm), originLat, originLng (pickup/rider origin —
-// overrides the hub). Returns { fee, chargeableKg, distanceKm, basis }.
+// overrides the hub), district, cell, village. Returns { fee, chargeableKg,
+// distanceKm, basis, locationSource? }.
+// Without a drop pin, the recorded address (district → sector → cell/village) is
+// geocoded so the distance is still measured from its geographic location.
 // Available to delivery partners (own bookings) and logistics staff (booking for them).
 export async function GET(request) {
     try {
@@ -23,19 +27,40 @@ export async function GET(request) {
             return Number.isFinite(v) ? v : undefined;
         };
 
+        const sector = searchParams.get("sector") || "";
+        let dropLat = num("dropLat");
+        let dropLng = num("dropLng");
+        let locationSource = dropLat != null && dropLng != null ? "pin" : null;
+
+        // Second option after a shared/pinned location: derive the drop point from
+        // the geographic location of the recorded address.
+        if (dropLat == null || dropLng == null) {
+            const district = (searchParams.get("district") || "").trim();
+            const cell = (searchParams.get("cell") || "").trim();
+            const village = (searchParams.get("village") || "").trim();
+            if (district && sector && cell) {
+                const geo = await geocodeRwAddress({ village: village || cell, sector, district, province: "Kigali" });
+                if (geo) {
+                    dropLat = geo.lat;
+                    dropLng = geo.lng;
+                    locationSource = "address";
+                }
+            }
+        }
+
         const quote = await quoteExternalDeliveryFee({
-            sector: searchParams.get("sector") || "",
+            sector,
             weightKg: num("weightKg"),
             lengthCm: num("lengthCm"),
             widthCm: num("widthCm"),
             heightCm: num("heightCm"),
-            dropLat: num("dropLat"),
-            dropLng: num("dropLng"),
+            dropLat,
+            dropLng,
             originLat: num("originLat"),
             originLng: num("originLng"),
             distanceKm: num("distanceKm"),
         });
-        return NextResponse.json(quote);
+        return NextResponse.json({ ...quote, ...(locationSource && { locationSource }) });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

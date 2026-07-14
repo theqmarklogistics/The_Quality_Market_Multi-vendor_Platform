@@ -3,7 +3,9 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authAdmin from "@/middlewares/authAdmin";
 
-// PATCH { name?, description?, areas?, isActive? } — update a registered corridor.
+// PATCH { name?, description?, areas?, landmarks?, isActive? } — update a
+// registered corridor. `landmarks` replaces the ordered route landmarks
+// (start → end; array order is the route order).
 export async function PATCH(request, { params }) {
     try {
         const { userId } = getAuth(request);
@@ -21,6 +23,11 @@ export async function PATCH(request, { params }) {
             data.areas = Array.isArray(body.areas)
                 ? body.areas.map((a) => String(a).trim()).filter(Boolean)
                 : String(body.areas || "").split(",").map((a) => a.trim()).filter(Boolean);
+        }
+        if (body?.landmarks !== undefined) {
+            data.landmarks = Array.isArray(body.landmarks)
+                ? body.landmarks.map((l) => String(l).trim()).filter(Boolean)
+                : String(body.landmarks || "").split(",").map((l) => l.trim()).filter(Boolean);
         }
 
         const corridor = await prisma.corridorRoute.update({ where: { id }, data });

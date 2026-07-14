@@ -3,10 +3,14 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import { emitDelivery } from "@/lib/deliveryRealtime";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
+import { geocodeRwAddress } from "@/lib/geocode";
 
 // POST { lat, lng } — the customer opts in to share their live location so the rider
 // can find them. Persists on the order (not the saved address) and pushes the pin to
 // the rider/corridor + logistics rooms.
+// POST { useAddress: true } — second option: the customer asks us to derive the drop
+// point from the geographic location of the address recorded with the booking
+// (district → sector → cell/village, geocoded server-side).
 //
 // For external (delivery-only) bookings the client's shared coordinates are the
 // authoritative drop point: while payment is still pending, the delivery fee is
@@ -20,8 +24,10 @@ export async function POST(request, { params }) {
         const { orderId } = await params;
         if (!orderId) return NextResponse.json({ error: "Missing order ID" }, { status: 400 });
 
-        const { lat, lng } = await request.json();
-        if (typeof lat !== "number" || typeof lng !== "number" || Number.isNaN(lat) || Number.isNaN(lng)) {
+        const body = await request.json();
+        let { lat, lng } = body;
+        const useAddress = body?.useAddress === true;
+        if (!useAddress && (typeof lat !== "number" || typeof lng !== "number" || Number.isNaN(lat) || Number.isNaN(lng))) {
             return NextResponse.json({ error: "lat and lng (numbers) are required" }, { status: 400 });
         }
 
@@ -34,7 +40,7 @@ export async function POST(request, { params }) {
                 total: true, creditApplied: true, addressId: true,
                 pickupLat: true, pickupLng: true,
                 packageWeightKg: true, packageLengthCm: true, packageWidthCm: true, packageHeightCm: true,
-                address: { select: { sector: true } },
+                address: { select: { sector: true, district: true, cell: true, village: true, state: true } },
             },
         });
         if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -46,6 +52,29 @@ export async function POST(request, { params }) {
         }
         if (order.deliveryType !== "KIGALI_POOL") {
             return NextResponse.json({ error: "Not a pooled-delivery order" }, { status: 400 });
+        }
+
+        if (useAddress) {
+            if (!order.address?.sector || !order.address?.district) {
+                return NextResponse.json(
+                    { error: "No recorded address to locate — share your location instead" },
+                    { status: 400 }
+                );
+            }
+            const geo = await geocodeRwAddress({
+                village: order.address.village || order.address.cell,
+                sector: order.address.sector,
+                district: order.address.district,
+                province: order.address.state,
+            });
+            if (!geo) {
+                return NextResponse.json(
+                    { error: "Could not locate the recorded address — share your location instead" },
+                    { status: 400 }
+                );
+            }
+            lat = geo.lat;
+            lng = geo.lng;
         }
 
         const now = new Date();

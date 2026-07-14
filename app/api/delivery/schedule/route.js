@@ -22,6 +22,8 @@ export async function GET() {
                         name: true,
                         description: true,
                         areas: true,
+                        // Ordered route landmarks (start → end) the rider passes.
+                        landmarks: true,
                         schedules: {
                             where: { isActive: true },
                             orderBy: [{ dayOfWeek: "asc" }, { departTime: "asc" }],

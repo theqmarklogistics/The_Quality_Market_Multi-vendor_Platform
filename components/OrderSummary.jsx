@@ -301,10 +301,24 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                         </label>
                     </div>
 
-                    {/* Landmark / Directions field — only shown for Kigali Pool */}
+                    {/* Kigali Pool extras: location share (always the first option) + landmark */}
                     {deliveryType === 'KIGALI_POOL' && (
                         <div className='mt-3'>
-                            <label className='block text-xs font-semibold text-slate-700 mb-1'>
+                            {/* Option 1: share the exact delivery location */}
+                            <button
+                                type='button'
+                                onClick={handlePinLocation}
+                                disabled={pinning}
+                                className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium transition border ${
+                                    pinnedLocation ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-200 bg-white text-slate-700 hover:border-green-400'
+                                }`}
+                            >
+                                {pinnedLocation ? <CheckIcon size={16} /> : <MapPinIcon size={16} />}
+                                {pinning ? 'Getting location…' : pinnedLocation ? 'Location shared (tap to update)' : 'Share my delivery location'}
+                            </button>
+                            <p className='mt-1 text-[11px] text-slate-400'>Best option — the rider navigates straight to you. Otherwise the delivery distance is calculated from the geographic location of your saved address.</p>
+
+                            <label className='mt-3 block text-xs font-semibold text-slate-700 mb-1'>
                                 Kigali Landmark / Directions <span className='text-red-500'>*</span>
                             </label>
                             <div className='relative'>
@@ -319,20 +333,6 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 <InfoIcon size={14} className='absolute right-3 top-3 text-slate-400' />
                             </div>
                             <p className='mt-1 text-[11px] text-slate-400'>Help the rider find you — include a nearby landmark or contextual clue.</p>
-
-                            {/* Optional precise GPS pin */}
-                            <button
-                                type='button'
-                                onClick={handlePinLocation}
-                                disabled={pinning}
-                                className={`mt-3 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium transition border ${
-                                    pinnedLocation ? 'border-green-300 bg-green-50 text-green-700' : 'border-slate-200 bg-white text-slate-700 hover:border-green-400'
-                                }`}
-                            >
-                                {pinnedLocation ? <CheckIcon size={16} /> : <MapPinIcon size={16} />}
-                                {pinning ? 'Getting location…' : pinnedLocation ? 'Location pinned (tap to update)' : 'Pin my exact location (optional)'}
-                            </button>
-                            <p className='mt-1 text-[11px] text-slate-400'>Shares a one-time precise point so the rider can navigate straight to you.</p>
                         </div>
                     )}
                 </section>

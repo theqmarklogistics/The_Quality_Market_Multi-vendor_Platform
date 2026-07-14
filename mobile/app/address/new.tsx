@@ -93,10 +93,8 @@ export default function NewAddressScreen() {
       <Field label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
       <Field label="Street / house / landmark" value={street} onChangeText={setStreet} />
 
+      {/* Option 1 (always first): share the exact delivery location. */}
       <Text style={styles.fieldLabel}>Where should we deliver?</Text>
-      <Text style={styles.hint}>Select down to the cell — or just pin your exact location below.</Text>
-      <RwLocationSelect value={location} onChange={setLocation} />
-
       <TouchableOpacity style={[styles.pinBtn, coords && styles.pinBtnDone]} onPress={pinLocation} disabled={pinning}>
         <Ionicons
           name={coords ? 'checkmark-circle' : 'location-outline'}
@@ -107,10 +105,18 @@ export default function NewAddressScreen() {
           {pinning
             ? 'Getting location…'
             : coords
-              ? `Location pinned (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
-              : 'Pin my exact location (best option)'}
+              ? `Location shared (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
+              : 'Share my delivery location (best option)'}
         </Text>
       </TouchableOpacity>
+
+      {/* Option 2: record the address — the delivery distance is calculated from
+          the geographic location of the selected cell/village. */}
+      <Text style={[styles.hint, { marginTop: spacing.md }]}>
+        Or select your address down to the cell — we calculate the delivery distance from its
+        geographic location.
+      </Text>
+      <RwLocationSelect value={location} onChange={setLocation} />
 
       <View style={{ marginTop: spacing.lg }}>
         <Button label="Save address" onPress={onSave} loading={saving} disabled={!canSave} />

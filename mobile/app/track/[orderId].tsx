@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { getTracking, shareMyLocation, type TrackingSnapshot } from '@/api/tracking';
+import { getTracking, locateFromMyAddress, shareMyLocation, type TrackingSnapshot } from '@/api/tracking';
 import { useRealtimeRoom } from '@/realtime/useRealtimeRoom';
 import { DeliveryTimeline } from '@/components/DeliveryTimeline';
 import { Button, EmptyState, Loader } from '@/components/ui';
@@ -42,6 +42,7 @@ export default function TrackScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [locatingAddress, setLocatingAddress] = useState(false);
 
   // Live rider position (socket updates patch this without a full refetch).
   const [riderPos, setRiderPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -110,6 +111,22 @@ export default function TrackScreen() {
       Alert.alert('Could not share', err?.message ?? 'Try again.');
     } finally {
       setSharing(false);
+    }
+  };
+
+  // Second option: derive the drop point from the geographic location of the
+  // address recorded with the booking (geocoded server-side).
+  const locateFromAddress = async () => {
+    if (!orderId) return;
+    setLocatingAddress(true);
+    try {
+      await locateFromMyAddress(orderId);
+      await load();
+      Alert.alert('Located', 'The delivery distance is calculated from your recorded address.');
+    } catch (err: any) {
+      Alert.alert('Could not locate', err?.message ?? 'Try sharing your location instead.');
+    } finally {
+      setLocatingAddress(false);
     }
   };
 
@@ -252,16 +269,27 @@ export default function TrackScreen() {
           </>
         ) : null}
 
-        {/* Share my location */}
+        {/* Delivery location: sharing it is always the first option; the recorded
+            address's geographic location is the second. */}
         {data.deliveryStatus !== 'DELIVERED' && data.deliveryStatus !== 'FAILED' ? (
-          <View style={{ marginTop: spacing.lg }}>
+          <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
             <Button
-              label="Share my live location"
+              label="Share my delivery location"
               variant="outline"
               onPress={shareLocation}
               loading={sharing}
             />
             <Text style={styles.hint}>Helps the rider find your exact spot.</Text>
+            <Button
+              label="Use the address on my booking instead"
+              variant="ghost"
+              onPress={locateFromAddress}
+              loading={locatingAddress}
+            />
+            <Text style={styles.hint}>
+              Can't share your location? The delivery distance is calculated from the geographic
+              location of your recorded address.
+            </Text>
           </View>
         ) : null}
       </View>

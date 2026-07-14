@@ -91,8 +91,8 @@ export default function HomeScreen() {
   const slides = useMemo<AdSlide[]>(
     () => [
       { key: 'main', kind: 'main', main: hero.main },
-      { key: 'card1', kind: 'card', card: hero.card1, fallbackIcon: 'shopping-outline' },
-      { key: 'card2', kind: 'card', card: hero.card2, fallbackIcon: 'sale' },
+      { key: 'card1', kind: 'card', card: hero.card1, fallbackIcon: 'truck-fast-outline' },
+      { key: 'card2', kind: 'card', card: hero.card2, fallbackIcon: 'storefront-outline' },
     ],
     [hero],
   );

@@ -47,3 +47,10 @@ export function shareMyLocation(
 ): Promise<{ success: boolean; at: string }> {
   return apiPost(`/api/delivery/track/${orderId}/share-location`, { lat, lng });
 }
+
+// Second option after sharing the live location: the server geocodes the address
+// recorded with the booking and uses its geographic location as the drop point,
+// so the delivery distance can be calculated without GPS access.
+export function locateFromMyAddress(orderId: string): Promise<{ success: boolean; at: string }> {
+  return apiPost(`/api/delivery/track/${orderId}/share-location`, { useAddress: true });
+}

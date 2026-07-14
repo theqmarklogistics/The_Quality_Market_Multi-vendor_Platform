@@ -20,21 +20,25 @@ const DEFAULTS = {
     },
     card1: {
         slot: 'card1',
-        cardTitle: 'Best products',
-        accentColor: '#FFAD51',
-        linkLabel: 'View more',
-        linkHref: '/shop',
+        cardTitle: 'Fast, tracked delivery',
+        accentColor: '#16A34A',
+        linkLabel: 'Book a delivery',
+        linkHref: '/external',
         imageUrl: null,
     },
     card2: {
         slot: 'card2',
-        cardTitle: '20% discounts',
-        accentColor: '#78B2FF',
-        linkLabel: 'View more',
-        linkHref: '/shop',
+        cardTitle: 'Open your own store',
+        accentColor: '#FFAD51',
+        linkLabel: 'Start selling',
+        linkHref: '/create-store',
         imageUrl: null,
     },
 };
+
+// The side cards became service CTAs (delivery / open a store). Admin rows saved
+// under the old ad campaigns are migrated to the new defaults on read.
+const LEGACY_CARD_TITLES = { card1: /best\s*products?/i, card2: /20%\s*discounts?/i };
 
 // The hero config is admin-managed and changes rarely — cached for 1h under
 // tag "hero". The admin POST that mutates it invalidates via revalidateTag.
@@ -58,6 +62,11 @@ export async function GET(request) {
         // Shipping is never free — scrub any stale admin-saved free-shipping copy.
         if (/free\s*(shipping|delivery)/i.test(result.main.badgeText || '')) {
             result.main.badgeText = DEFAULTS.main.badgeText;
+        }
+        for (const slot of ['card1', 'card2']) {
+            if (LEGACY_CARD_TITLES[slot].test(result[slot].cardTitle || '')) {
+                result[slot] = { ...DEFAULTS[slot] };
+            }
         }
 
         return cachedJson(result);

@@ -6,10 +6,58 @@ import { useAuth } from "@clerk/nextjs"
 import { useCallback, useEffect, useState } from "react"
 import axios from "axios"
 import toast from "react-hot-toast"
-import { WarehouseIcon, PlusIcon, Trash2Icon, RouteIcon, CalendarClockIcon, PowerIcon } from "lucide-react"
+import { WarehouseIcon, PlusIcon, Trash2Icon, RouteIcon, CalendarClockIcon, PowerIcon, MapPinIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from "lucide-react"
 import { KIGALI_SECTORS } from "@/lib/constants"
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+// Ordered route landmarks (start → end). Landmarks are appended in the order the
+// rider passes them; the arrows fix mistakes without re-typing the whole route.
+function LandmarkListEditor({ landmarks, onChange }) {
+    const [draft, setDraft] = useState('')
+
+    const add = () => {
+        const v = draft.trim()
+        if (!v) return
+        onChange([...landmarks, v])
+        setDraft('')
+    }
+    const remove = (i) => onChange(landmarks.filter((_, idx) => idx !== i))
+    const move = (i, dir) => {
+        const j = i + dir
+        if (j < 0 || j >= landmarks.length) return
+        const next = [...landmarks]
+        ;[next[i], next[j]] = [next[j], next[i]]
+        onChange(next)
+    }
+
+    return (
+        <div className="space-y-1.5">
+            {landmarks.map((l, i) => (
+                <div key={`${l}-${i}`} className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-2.5 py-1.5 text-xs">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-[10px] font-bold text-green-700">{i + 1}</span>
+                    <span className="flex-1 text-slate-700">{l}</span>
+                    <button type="button" onClick={() => move(i, -1)} disabled={i === 0} title="Move earlier on the route" className="text-slate-400 hover:text-slate-700 disabled:opacity-30"><ArrowUpIcon size={13} /></button>
+                    <button type="button" onClick={() => move(i, 1)} disabled={i === landmarks.length - 1} title="Move later on the route" className="text-slate-400 hover:text-slate-700 disabled:opacity-30"><ArrowDownIcon size={13} /></button>
+                    <button type="button" onClick={() => remove(i)} title="Remove landmark" className="text-slate-400 hover:text-red-600"><XIcon size={13} /></button>
+                </div>
+            ))}
+            <div className="flex gap-2">
+                <input
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+                    placeholder={landmarks.length === 0 ? 'First landmark on the route (at the start)…' : 'Next landmark the rider passes…'}
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white"
+                />
+                <button type="button" onClick={add} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-green-200 text-green-700 text-xs font-medium hover:bg-green-50">
+                    <PlusIcon size={12} /> Add
+                </button>
+            </div>
+            <p className="text-[11px] text-slate-400">Add the landmarks in the order the rider passes them, from the beginning of the corridor to the end.</p>
+        </div>
+    )
+}
 
 export default function AdminHubs() {
     const { getToken } = useAuth()
@@ -22,7 +70,9 @@ export default function AdminHubs() {
     const [hubForm, setHubForm] = useState({ name: '', sector: '', landmark: '' })
     // New corridor form (keyed open per hub)
     const [corridorHub, setCorridorHub] = useState(null)
-    const [corridorForm, setCorridorForm] = useState({ name: '', areas: '', description: '' })
+    const [corridorForm, setCorridorForm] = useState({ name: '', areas: '', description: '', landmarks: [] })
+    // Route-landmark editor (keyed open per corridor) for existing corridors
+    const [editingRoute, setEditingRoute] = useState(null) // { id, landmarks } | null
     // New schedule form (keyed open per corridor)
     const [scheduleCorridor, setScheduleCorridor] = useState(null)
     const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: '1', departTime: '09:00', riderId: '' })
@@ -83,11 +133,24 @@ export default function AdminHubs() {
     const createCorridor = async (e, hubId) => {
         e.preventDefault()
         if (!corridorForm.name.trim()) return toast.error('Corridor name is required')
+        if (corridorForm.landmarks.length === 0) return toast.error('Add the route landmarks in order, from the beginning to the end')
         try {
             await axios.post('/api/admin/corridor-routes', { ...corridorForm, hubId }, { headers: await authHeaders() })
-            toast.success('Corridor registered')
-            setCorridorForm({ name: '', areas: '', description: '' })
+            toast.success('Corridor recorded')
+            setCorridorForm({ name: '', areas: '', description: '', landmarks: [] })
             setCorridorHub(null)
+            load()
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
+    }
+
+    const saveRouteLandmarks = async () => {
+        if (!editingRoute) return
+        try {
+            await axios.patch(`/api/admin/corridor-routes/${editingRoute.id}`, { landmarks: editingRoute.landmarks }, { headers: await authHeaders() })
+            toast.success('Route landmarks saved')
+            setEditingRoute(null)
             load()
         } catch (error) {
             toast.error(error?.response?.data?.error || error.message)
@@ -210,6 +273,9 @@ export default function AdminHubs() {
                                         {corridor.description && <p className="text-xs text-slate-400">{corridor.description}</p>}
                                     </div>
                                     <div className="flex gap-2">
+                                        <button onClick={() => setEditingRoute(editingRoute?.id === corridor.id ? null : { id: corridor.id, landmarks: corridor.landmarks || [] })} title="Edit route landmarks" className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:border-green-400 hover:text-green-600">
+                                            <MapPinIcon size={13} />
+                                        </button>
                                         <button onClick={() => toggleCorridor(corridor)} title={corridor.isActive ? 'Deactivate' : 'Activate'} className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:border-amber-400 hover:text-amber-600">
                                             <PowerIcon size={13} />
                                         </button>
@@ -218,6 +284,27 @@ export default function AdminHubs() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Ordered route landmarks (start → end) */}
+                                {editingRoute?.id === corridor.id ? (
+                                    <div className="mt-2 rounded-lg border border-green-100 bg-green-50/50 p-3">
+                                        <p className="text-xs font-medium text-slate-600 mb-2 flex items-center gap-1"><MapPinIcon size={12} className="text-green-600" /> Route landmarks — in the order the rider passes them</p>
+                                        <LandmarkListEditor landmarks={editingRoute.landmarks} onChange={(landmarks) => setEditingRoute({ ...editingRoute, landmarks })} />
+                                        <div className="mt-2 flex gap-2">
+                                            <button onClick={saveRouteLandmarks} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700">Save route</button>
+                                            <button onClick={() => setEditingRoute(null)} className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600">Cancel</button>
+                                        </div>
+                                    </div>
+                                ) : corridor.landmarks?.length > 0 ? (
+                                    <p className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-slate-500">
+                                        <MapPinIcon size={11} className="text-green-600" />
+                                        {corridor.landmarks.map((l, i) => (
+                                            <span key={`${l}-${i}`}>{i > 0 && <span className="text-slate-300"> → </span>}{l}</span>
+                                        ))}
+                                    </p>
+                                ) : (
+                                    <p className="mt-1.5 text-[11px] text-amber-600">No route landmarks recorded yet — tap the pin to add them in order.</p>
+                                )}
 
                                 {/* Schedules */}
                                 <div className="mt-2 space-y-1.5">
@@ -254,20 +341,26 @@ export default function AdminHubs() {
                             </div>
                         ))}
 
-                        {/* Register corridor for this hub */}
+                        {/* Record a corridor for this hub */}
                         {corridorHub === hub.id ? (
-                            <form onSubmit={e => createCorridor(e, hub.id)} className="rounded-lg border border-green-100 bg-green-50/50 p-3 grid gap-2 sm:grid-cols-3">
-                                <input value={corridorForm.name} onChange={e => setCorridorForm(f => ({ ...f, name: e.target.value }))} placeholder="Corridor name (e.g. Remera line)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" required />
-                                <input value={corridorForm.areas} onChange={e => setCorridorForm(f => ({ ...f, areas: e.target.value }))} placeholder="Areas (comma-separated)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
-                                <input value={corridorForm.description} onChange={e => setCorridorForm(f => ({ ...f, description: e.target.value }))} placeholder="Notes (optional)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
-                                <div className="sm:col-span-3 flex gap-2">
-                                    <button className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700">Register corridor</button>
+                            <form onSubmit={e => createCorridor(e, hub.id)} className="rounded-lg border border-green-100 bg-green-50/50 p-3 space-y-2">
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                    <input value={corridorForm.name} onChange={e => setCorridorForm(f => ({ ...f, name: e.target.value }))} placeholder="Corridor name (e.g. Remera line)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" required />
+                                    <input value={corridorForm.areas} onChange={e => setCorridorForm(f => ({ ...f, areas: e.target.value }))} placeholder="Areas (comma-separated)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
+                                    <input value={corridorForm.description} onChange={e => setCorridorForm(f => ({ ...f, description: e.target.value }))} placeholder="Notes (optional)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1"><MapPinIcon size={12} className="text-green-600" /> Route landmarks — in the order the rider passes them</p>
+                                    <LandmarkListEditor landmarks={corridorForm.landmarks} onChange={(landmarks) => setCorridorForm(f => ({ ...f, landmarks }))} />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700">Record corridor</button>
                                     <button type="button" onClick={() => setCorridorHub(null)} className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600">Cancel</button>
                                 </div>
                             </form>
                         ) : (
-                            <button onClick={() => { setCorridorHub(hub.id); setCorridorForm({ name: '', areas: '', description: '' }) }} className="inline-flex items-center gap-1.5 text-sm text-green-700 hover:underline">
-                                <PlusIcon size={14} /> Register a corridor from this hub
+                            <button onClick={() => { setCorridorHub(hub.id); setCorridorForm({ name: '', areas: '', description: '', landmarks: [] }) }} className="inline-flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+                                <PlusIcon size={14} /> Record a corridor from this hub
                             </button>
                         )}
                     </div>

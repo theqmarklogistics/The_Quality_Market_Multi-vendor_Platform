@@ -54,6 +54,11 @@ export interface QuoteParams {
   // Pickup/rider origin — overrides the hub as the distance origin.
   originLat?: number;
   originLng?: number;
+  // Without a drop pin, the recorded address is geocoded server-side so the
+  // distance is still measured from its geographic location.
+  district?: string;
+  cell?: string;
+  village?: string;
 }
 
 export interface DeliveryQuote {
@@ -61,6 +66,9 @@ export interface DeliveryQuote {
   chargeableKg?: number;
   distanceKm?: number;
   basis: 'formula' | 'flat' | string;
+  // 'pin' when priced from a shared/pinned point, 'address' when priced from
+  // the geocoded address location.
+  locationSource?: 'pin' | 'address' | string;
 }
 
 export function quoteExternalDelivery(params: QuoteParams): Promise<DeliveryQuote> {

@@ -681,6 +681,9 @@ model CorridorRoute {
     description String?
     // Areas/sectors this corridor passes through (free-form labels)
     areas       String[] @default([])
+    // Ordered landmarks the rider passes on this route, recorded from the
+    // beginning of the corridor to its end (array order IS the route order).
+    landmarks   String[] @default([])
     isActive    Boolean  @default(true)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt

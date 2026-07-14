@@ -13,6 +13,8 @@ export interface ScheduleCorridor {
   name: string;
   description: string | null;
   areas: string[];
+  // Ordered landmarks the rider passes on this route (start → end).
+  landmarks: string[];
   schedules: ScheduleEntry[];
 }
 

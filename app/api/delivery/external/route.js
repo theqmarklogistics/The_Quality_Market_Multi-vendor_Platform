@@ -7,6 +7,7 @@ import authLogistics from "@/middlewares/authLogistics";
 import authRider from "@/middlewares/authRider";
 import { paymentMethod } from "@/lib/constants";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
+import { geocodeRwAddress } from "@/lib/geocode";
 import { getSocketServer } from "@/lib/socketServer";
 
 const ALLOWED_PAYMENT = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
@@ -167,6 +168,24 @@ export async function POST(request) {
             );
         }
 
+        // Second option after a shared/pinned location: geocode the recorded
+        // address (cell/village) so the fee is still distance-based. The
+        // approximate point is stored on the booking address (for batching and
+        // routing) but NOT as the order's recipient pin — the client's shared
+        // location through the tracking link remains the authoritative drop point.
+        let addressLat = null;
+        let addressLng = null;
+        if (!hasRecipientPin) {
+            const geo = await geocodeRwAddress({
+                village: recipientVillage || recipientCell,
+                sector: recipientSector,
+                district: recipientDistrict,
+                province: "Kigali",
+            });
+            addressLat = geo?.lat ?? null;
+            addressLng = geo?.lng ?? null;
+        }
+
         // ── Recipient address (owned by the partner; satisfies Address.userId) ─
         const address = await prisma.address.create({
             data: {
@@ -183,25 +202,25 @@ export async function POST(request) {
                 sector: recipientSector,
                 cell: recipientCell || null,
                 village: recipientVillage || null,
-                latitude: recipientLat,
-                longitude: recipientLng,
+                latitude: recipientLat ?? addressLat,
+                longitude: recipientLng ?? addressLng,
             },
         });
 
         // ── Quote the published delivery fee (partner-paid, batch of one) ────
         // Distance origin: the pickup point when recorded (driver sweep, or a
         // rider logging a walk-up package from the field) — otherwise the hub.
-        // When the recipient hasn't pinned/shared a location yet, this is a
-        // provisional flat quote; it is re-priced from the coordinates the
-        // client shares through their tracking link (see share-location route).
+        // Drop point: the recipient pin, else the geocoded address location.
+        // Either way the fee is re-priced from the coordinates the client shares
+        // through their tracking link (see share-location route).
         const quote = await quoteExternalDeliveryFee({
             sector: recipientSector,
             weightKg: packageWeightKg,
             lengthCm: packageLengthCm,
             widthCm: packageWidthCm,
             heightCm: packageHeightCm,
-            dropLat: recipientLat,
-            dropLng: recipientLng,
+            dropLat: recipientLat ?? addressLat,
+            dropLng: recipientLng ?? addressLng,
             originLat: pickupLat ?? undefined,
             originLng: pickupLng ?? undefined,
         });
