@@ -53,7 +53,9 @@ export default function ExternalBookingForm() {
         return () => { active = false; };
     }, [authHeaders]);
 
-    // Live quote whenever a pricing input changes (sector, weight, dims, or pin).
+    // Live quote whenever a pricing input changes (sector, weight, dims, pin, or
+    // the recorded address — geocoded server-side when there is no pin, so the
+    // distance is measured from the address's geographic location).
     useEffect(() => {
         const sector = form.recipientSector;
         const w = form.packageWeightKg;
@@ -70,6 +72,12 @@ export default function ExternalBookingForm() {
                 if (form.packageHeightCm) params.set("heightCm", form.packageHeightCm);
                 if (lat != null) params.set("dropLat", String(lat));
                 if (lng != null) params.set("dropLng", String(lng));
+                if (lat == null) {
+                    // No pin — send the address so the server can geocode it.
+                    if (form.recipientDistrict) params.set("district", form.recipientDistrict);
+                    if (form.recipientCell) params.set("cell", form.recipientCell);
+                    if (form.recipientVillage) params.set("village", form.recipientVillage);
+                }
                 // Recorded pickup point overrides the hub as the distance origin,
                 // so the live quote matches the fee charged at booking.
                 if (form.pickupLat != null) params.set("originLat", String(form.pickupLat));
@@ -79,7 +87,7 @@ export default function ExternalBookingForm() {
             } catch (_) { if (active) setQuote(null); }
         })();
         return () => { active = false; };
-    }, [form.recipientSector, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, form.pickupLat, form.pickupLng, authHeaders]);
+    }, [form.recipientSector, form.recipientDistrict, form.recipientCell, form.recipientVillage, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, form.pickupLat, form.pickupLng, authHeaders]);
 
     const onPick = (lat, lng) => setForm((f) => ({ ...f, recipientLat: lat, recipientLng: lng }));
 
@@ -215,7 +223,30 @@ export default function ExternalBookingForm() {
                         <input className={input} placeholder="Phone" value={form.recipientPhone} onChange={(e) => set("recipientPhone", e.target.value)} />
                     </div>
                     <input className={input} type="email" placeholder="Email — receives the tracking link" value={form.recipientEmail} onChange={(e) => set("recipientEmail", e.target.value)} />
-                    <p className="text-[11px] text-slate-400 pt-1">Delivery area — select down to the cell (not needed if you pin the exact location below).</p>
+                    <input className={input} placeholder="Landmark / directions to recipient" value={form.recipientLandmark} onChange={(e) => set("recipientLandmark", e.target.value)} />
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 p-4 space-y-2">
+                    {/* Option 1 (always first): share/pin the exact delivery location */}
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Delivery location</p>
+                        <button type="button" onClick={useMyLocation} disabled={locating} className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-800 disabled:opacity-50">
+                            {locating ? <Loader2Icon size={13} className="animate-spin" /> : <CrosshairIcon size={13} />} Share my delivery location
+                        </button>
+                    </div>
+                    <p className="text-[11px] text-slate-400">Tap the recipient&apos;s exact spot on the map — it sets the delivery distance used for pricing and routing.</p>
+                    <LocationPicker value={hasPin ? { lat: form.recipientLat, lng: form.recipientLng } : null} onPick={onPick} height={220} />
+                    <p className={`text-[11px] ${hasPin ? "text-green-600" : "text-slate-400"}`}>
+                        {hasPin
+                            ? <><CheckCircleIcon size={12} className="inline -mt-0.5 mr-1" />Pinned at {form.recipientLat.toFixed(5)}, {form.recipientLng.toFixed(5)}</>
+                            : <><MapPinIcon size={12} className="inline -mt-0.5 mr-1" />No pin yet</>}
+                    </p>
+                    {/* Option 2: record the address — the distance (and fee) is
+                        calculated from its geographic location until a pin is shared. */}
+                    <p className="text-[11px] text-slate-400 pt-1">
+                        Or select the delivery area down to the cell — the delivery distance is calculated
+                        from the geographic location of this address until an exact spot is shared.
+                    </p>
                     <RwLocationSelect
                         kigaliOnly
                         inputClass={input}
@@ -228,23 +259,6 @@ export default function ExternalBookingForm() {
                             recipientVillage: loc.village,
                         }))}
                     />
-                    <input className={input} placeholder="Landmark / directions to recipient" value={form.recipientLandmark} onChange={(e) => set("recipientLandmark", e.target.value)} />
-                </div>
-
-                <div className="rounded-2xl border border-slate-100 p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Delivery location</p>
-                        <button type="button" onClick={useMyLocation} disabled={locating} className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-800 disabled:opacity-50">
-                            {locating ? <Loader2Icon size={13} className="animate-spin" /> : <CrosshairIcon size={13} />} Use my location
-                        </button>
-                    </div>
-                    <p className="text-[11px] text-slate-400">Tap the recipient&apos;s exact spot on the map — it sets the delivery distance used for pricing and routing.</p>
-                    <LocationPicker value={hasPin ? { lat: form.recipientLat, lng: form.recipientLng } : null} onPick={onPick} height={220} />
-                    <p className={`text-[11px] ${hasPin ? "text-green-600" : "text-slate-400"}`}>
-                        {hasPin
-                            ? <><CheckCircleIcon size={12} className="inline -mt-0.5 mr-1" />Pinned at {form.recipientLat.toFixed(5)}, {form.recipientLng.toFixed(5)}</>
-                            : <><MapPinIcon size={12} className="inline -mt-0.5 mr-1" />No pin yet</>}
-                    </p>
                     {!hasPin && (
                         <p className="text-[11px] rounded-lg bg-green-50 border border-green-100 text-green-800 px-2.5 py-2">
                             Don&apos;t know the exact spot? Book anyway — you&apos;ll get a <b>link to send your client</b>,
@@ -324,10 +338,13 @@ export default function ExternalBookingForm() {
                         <span className="text-lg font-bold text-slate-800">{quote?.fee != null ? `${currency} ${Number(quote.fee).toLocaleString()}` : "—"}</span>
                     </div>
                     {quote?.basis === "formula" && (
-                        <p className="text-[11px] text-slate-400 mt-1">Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from {form.pickupLat != null ? "pickup point" : "hub"}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">
+                            Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from {form.pickupLat != null ? "pickup point" : "hub"}
+                            {quote.locationSource === "address" && " — measured to the recorded address's location"}
+                        </p>
                     )}
                     {quote?.basis === "flat" && (
-                        <p className="text-[11px] text-slate-400 mt-1">Flat sector rate — add a weight and pin the location for distance pricing.</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Flat sector rate — add a weight, then share the location (or select the address down to the cell) for distance pricing.</p>
                     )}
                     {creditBalance > 0 && quote?.fee != null && (
                         <>

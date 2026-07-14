@@ -74,12 +74,19 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                 if (form.packageHeightCm) params.set("heightCm", form.packageHeightCm);
                 if (lat != null) params.set("dropLat", String(lat));
                 if (lng != null) params.set("dropLng", String(lng));
+                if (lat == null) {
+                    // No pin — send the address so the server can geocode it and
+                    // still price by distance.
+                    if (form.recipientDistrict) params.set("district", form.recipientDistrict);
+                    if (form.recipientCell) params.set("cell", form.recipientCell);
+                    if (form.recipientVillage) params.set("village", form.recipientVillage);
+                }
                 const { data } = await axios.get(`/api/delivery/external/quote?${params.toString()}`, { headers: await authHeaders() });
                 if (active) setQuote(data);
             } catch (_) { if (active) setQuote(null); }
         })();
         return () => { active = false; };
-    }, [open, form.recipientSector, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, authHeaders]);
+    }, [open, form.recipientSector, form.recipientDistrict, form.recipientCell, form.recipientVillage, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, authHeaders]);
 
     const onPick = (lat, lng) => setForm((f) => ({ ...f, recipientLat: lat, recipientLng: lng }));
 
@@ -223,7 +230,25 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                                 <input value={form.recipientPhone} onChange={(e) => set("recipientPhone", e.target.value)} placeholder="Phone" className={inp} />
                             </div>
                             <input type="email" value={form.recipientEmail} onChange={(e) => set("recipientEmail", e.target.value)} placeholder="Email — receives the tracking link" className={`w-full ${inp}`} />
-                            <p className="text-[11px] text-slate-400">Delivery area — select down to the cell (not needed with a map pin).</p>
+                            <input value={form.recipientLandmark} onChange={(e) => set("recipientLandmark", e.target.value)} placeholder="Landmark / directions" className={`w-full ${inp}`} />
+                        </div>
+
+                        {/* Delivery location: share/pin first, then the address as
+                            the second option (its geocoded location sets the distance). */}
+                        <div className="rounded-2xl border border-slate-100 p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Delivery location</p>
+                                <button type="button" onClick={useMyLocation} disabled={locating} className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-800 disabled:opacity-50">
+                                    {locating ? <Loader2Icon size={13} className="animate-spin" /> : <CrosshairIcon size={13} />} Share my delivery location
+                                </button>
+                            </div>
+                            <LocationPicker value={hasPin ? { lat: form.recipientLat, lng: form.recipientLng } : null} onPick={onPick} height={200} />
+                            <p className={`text-[11px] ${hasPin ? "text-green-600" : "text-slate-400"}`}>
+                                {hasPin
+                                    ? <><CheckCircleIcon size={12} className="inline -mt-0.5 mr-1" />Pinned at {form.recipientLat.toFixed(5)}, {form.recipientLng.toFixed(5)}</>
+                                    : <><MapPinIcon size={12} className="inline -mt-0.5 mr-1" />Tap the recipient&apos;s spot — sets the delivery distance for pricing.</>}
+                            </p>
+                            <p className="text-[11px] text-slate-400 pt-1">Or select the delivery area down to the cell — the distance is calculated from the geographic location of this address until a pin is set.</p>
                             <RwLocationSelect
                                 kigaliOnly
                                 inputClass={`w-full ${inp}`}
@@ -236,23 +261,6 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                                     recipientVillage: loc.village,
                                 }))}
                             />
-                            <input value={form.recipientLandmark} onChange={(e) => set("recipientLandmark", e.target.value)} placeholder="Landmark / directions" className={`w-full ${inp}`} />
-                        </div>
-
-                        {/* Delivery location pin */}
-                        <div className="rounded-2xl border border-slate-100 p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Delivery location</p>
-                                <button type="button" onClick={useMyLocation} disabled={locating} className="inline-flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-800 disabled:opacity-50">
-                                    {locating ? <Loader2Icon size={13} className="animate-spin" /> : <CrosshairIcon size={13} />} Use my location
-                                </button>
-                            </div>
-                            <LocationPicker value={hasPin ? { lat: form.recipientLat, lng: form.recipientLng } : null} onPick={onPick} height={200} />
-                            <p className={`text-[11px] ${hasPin ? "text-green-600" : "text-slate-400"}`}>
-                                {hasPin
-                                    ? <><CheckCircleIcon size={12} className="inline -mt-0.5 mr-1" />Pinned at {form.recipientLat.toFixed(5)}, {form.recipientLng.toFixed(5)}</>
-                                    : <><MapPinIcon size={12} className="inline -mt-0.5 mr-1" />Tap the recipient&apos;s spot — sets the delivery distance for pricing.</>}
-                            </p>
                         </div>
 
                         {/* Pickup */}
@@ -306,10 +314,13 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                                 <span className="text-lg font-bold text-slate-800">{quote?.fee != null ? `${currency} ${Number(quote.fee).toLocaleString()}` : "—"}</span>
                             </div>
                             {quote?.basis === "formula" && (
-                                <p className="text-[11px] text-slate-400 mt-1">Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from hub</p>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from hub
+                                    {quote.locationSource === "address" && " — measured to the recorded address's location"}
+                                </p>
                             )}
                             {quote?.basis === "flat" && (
-                                <p className="text-[11px] text-slate-400 mt-1">Flat sector rate — add a weight and pin the location for distance pricing.</p>
+                                <p className="text-[11px] text-slate-400 mt-1">Flat sector rate — add a weight, then share the location (or select the address down to the cell) for distance pricing.</p>
                             )}
                         </div>
 

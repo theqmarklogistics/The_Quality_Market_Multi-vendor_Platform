@@ -115,12 +115,7 @@ const AddressModal = ({ setShowAddressModal }) => {
                 <input name="phone" onChange={handleAddressChange} value={address.phone} className={input} type="text" placeholder="Phone" required />
                 <input name="street" onChange={handleAddressChange} value={address.street} className={input} type="text" placeholder="Street / house / landmark" required />
 
-                <div className="flex flex-col gap-1.5">
-                    <p className="text-xs text-slate-500">Where should we deliver? Select down to the cell — or just pin your exact location below.</p>
-                    <RwLocationSelect value={location} onChange={setLocation} inputClass={input} />
-                </div>
-
-                {/* Exact GPS pin — replaces the dropdowns when shared */}
+                {/* Option 1 (always first): share the exact delivery location. */}
                 <div className="flex flex-col gap-1.5">
                     <button
                         type="button"
@@ -135,12 +130,19 @@ const AddressModal = ({ setShowAddressModal }) => {
                         {locating
                             ? <><LoaderIcon size={16} className="animate-spin" /> Getting your location…</>
                             : hasLocation
-                                ? <><CheckCircleIcon size={16} /> Location pinned — tap to update</>
-                                : <><MapPinIcon size={16} /> Pin my exact location</>}
+                                ? <><CheckCircleIcon size={16} /> Location shared — tap to update</>
+                                : <><MapPinIcon size={16} /> Share my delivery location</>}
                     </button>
                     {hasLocation
                         ? <p className="text-[11px] text-slate-400">{address.latitude.toFixed(5)}, {address.longitude.toFixed(5)}</p>
                         : <p className="text-[11px] text-slate-400">Best option — lets us measure the delivery distance exactly.</p>}
+                </div>
+
+                {/* Option 2: record the address — the delivery distance is calculated
+                    from the geographic location of the selected cell/village. */}
+                <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-slate-500">Or select your address down to the cell — we&apos;ll calculate the delivery distance from its location.</p>
+                    <RwLocationSelect value={location} onChange={setLocation} inputClass={input} />
                 </div>
 
                 <button disabled={!canSave} className="bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">SAVE ADDRESS</button>

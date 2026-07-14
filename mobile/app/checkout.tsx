@@ -308,15 +308,8 @@ function CheckoutScreenInner() {
 
         {deliveryType === DeliveryType.KIGALI_POOL ? (
           <View style={styles.poolBox}>
-            <Text style={styles.fieldLabel}>Landmark / directions (required)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Near Kisimenti Simba, Remera"
-              placeholderTextColor={colors.subtle}
-              value={landmark}
-              onChangeText={setLandmark}
-              multiline
-            />
+            {/* Option 1 (always first): share the exact delivery location.
+                Otherwise the distance is calculated from the address's location. */}
             <TouchableOpacity
               style={[styles.pinBtn, pin && styles.pinBtnDone]}
               onPress={pinLocation}
@@ -332,10 +325,23 @@ function CheckoutScreenInner() {
                 {pinning
                   ? 'Getting location…'
                   : pin
-                    ? 'Exact location pinned'
-                    : 'Pin exact location (optional)'}
+                    ? 'Delivery location shared'
+                    : 'Share my delivery location'}
               </Text>
             </TouchableOpacity>
+            <Text style={styles.hint}>
+              Best option — the rider navigates straight to you. Otherwise the delivery distance is
+              calculated from the geographic location of your saved address.
+            </Text>
+            <Text style={styles.fieldLabel}>Landmark / directions (required)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Near Kisimenti Simba, Remera"
+              placeholderTextColor={colors.subtle}
+              value={landmark}
+              onChangeText={setLandmark}
+              multiline
+            />
             <View style={styles.quoteBox}>
               <Ionicons name="bicycle-outline" size={16} color={colors.primaryDark} />
               <Text style={styles.quoteText}>
@@ -557,6 +563,7 @@ const styles = StyleSheet.create({
   addText: { color: colors.primaryDark, fontFamily: fonts.semibold, fontSize: 14 },
   poolBox: { gap: spacing.sm },
   fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 2, fontFamily: fonts.medium },
+  hint: { fontSize: 12, color: colors.subtle, marginBottom: spacing.sm, fontFamily: fonts.regular },
   input: {
     borderWidth: 1.5,
     borderColor: colors.border,

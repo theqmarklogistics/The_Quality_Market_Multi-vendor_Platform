@@ -41,6 +41,8 @@ function TrackOrderPageInner() {
     // delivery fee is calculated from.
     const [pinning, setPinning] = useState(false);
     const [pinnedOk, setPinnedOk] = useState(false);
+    // Second option: locate via the address recorded with the booking.
+    const [locatingAddress, setLocatingAddress] = useState(false);
 
     const watchIdRef = useRef(null);
     const lastShareRef = useRef(0);
@@ -179,6 +181,24 @@ function TrackOrderPageInner() {
         );
     };
 
+    // Second option: derive the drop point (and the distance the fee is calculated
+    // from) from the geographic location of the address recorded with the booking.
+    const useRecordedAddress = async () => {
+        setLocatingAddress(true);
+        try {
+            const config = trackToken
+                ? { params: { t: trackToken } }
+                : { headers: { Authorization: `Bearer ${await getToken()}` } };
+            await axios.post(`/api/delivery/track/${orderId}/share-location`, { useAddress: true }, config);
+            setPinnedOk(true);
+            fetchTracking({ silent: true });
+        } catch (err) {
+            setError(err?.response?.data?.error || err.message);
+        } finally {
+            setLocatingAddress(false);
+        }
+    };
+
     const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF';
 
     if (!isLoaded || loading) return <div className="min-h-screen flex items-center justify-center"><Loading /></div>;
@@ -240,14 +260,29 @@ function TrackOrderPageInner() {
                                 {trackData?.isExternalDelivery && <> The <span className="font-semibold">delivery fee is calculated from this point</span>.</>}
                             </p>
                         )}
+                        {/* Option 1 (always first): share the exact location. */}
                         <button
                             onClick={pinMyLocation}
-                            disabled={pinning}
+                            disabled={pinning || locatingAddress}
                             className={`mt-3 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${locationSet ? 'border border-green-300 bg-white text-green-700 hover:bg-green-50' : 'bg-green-600 text-white hover:bg-green-700'} disabled:opacity-60`}
                         >
                             <MapPinIcon size={16} />
                             {pinning ? 'Getting your location…' : locationSet ? 'Update my delivery location' : 'Share my delivery location'}
                         </button>
+                        {/* Option 2: locate via the recorded address — the delivery
+                            distance is calculated from its geographic location. */}
+                        <button
+                            onClick={useRecordedAddress}
+                            disabled={pinning || locatingAddress}
+                            className='mt-2 w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-600 transition hover:border-green-400 disabled:opacity-60'
+                        >
+                            <NavigationIcon size={15} />
+                            {locatingAddress ? 'Locating your address…' : 'Use the address on my booking instead'}
+                        </button>
+                        <p className='mt-1.5 text-[11px] text-slate-400'>
+                            Can&apos;t share your location? We&apos;ll calculate the delivery distance from the
+                            geographic location of the address recorded with this delivery.
+                        </p>
                         {trackData?.isExternalDelivery && trackData?.deliveryFee != null && (
                             <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-sm">
                                 <span className="text-slate-500">Delivery fee{trackData?.isPaid ? ' (paid)' : ''}</span>

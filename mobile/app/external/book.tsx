@@ -110,6 +110,11 @@ export default function ExternalBookScreen() {
           heightCm: num(heightCm),
           dropLat: coords?.latitude,
           dropLng: coords?.longitude,
+          // No pin — send the address so the server can geocode it and still
+          // price the delivery by distance.
+          district: coords ? undefined : location.district || undefined,
+          cell: coords ? undefined : location.cell || undefined,
+          village: coords ? undefined : location.village || undefined,
           // Recorded pickup point overrides the hub as the distance origin,
           // so the live quote matches the fee charged at booking.
           originLat: pickupCoords?.latitude,
@@ -124,7 +129,7 @@ export default function ExternalBookScreen() {
       active = false;
       clearTimeout(t);
     };
-  }, [sector, weightKg, lengthCm, widthCm, heightCm, coords, pickupCoords]);
+  }, [sector, location.district, location.cell, location.village, weightKg, lengthCm, widthCm, heightCm, coords, pickupCoords]);
 
   const pinLocation = async () => {
     setPinning(true);
@@ -294,29 +299,34 @@ export default function ExternalBookScreen() {
         placeholder="name@example.com"
       />
 
-      <Text style={styles.fieldLabel}>Delivery area (Kigali)</Text>
-      <Text style={styles.hint}>Select down to the cell — not needed if you pin the exact location below.</Text>
-      <RwLocationSelect kigaliOnly value={location} onChange={setLocation} />
-
       <Field label="Landmark / directions" value={landmark} onChangeText={setLandmark} placeholder="Directions to the recipient" />
 
-      {/* Delivery location pin */}
+      {/* Delivery location: sharing/pinning it is always the first option. */}
       <Text style={styles.section}>Delivery location</Text>
-      <Text style={styles.hint}>Pin the recipient&apos;s exact spot — it sets the distance used for pricing and routing.</Text>
+      <Text style={styles.hint}>Share the recipient&apos;s exact spot — it sets the distance used for pricing and routing.</Text>
       <TouchableOpacity style={[styles.pinBtn, hasPin && styles.pinBtnDone]} onPress={pinLocation} disabled={pinning}>
         <Ionicons name={hasPin ? 'checkmark-circle' : 'location-outline'} size={20} color={hasPin ? colors.success : colors.text} />
         <Text style={styles.pinText}>
           {pinning
             ? 'Getting location…'
             : hasPin
-              ? `Pinned (${coords!.latitude.toFixed(5)}, ${coords!.longitude.toFixed(5)})`
-              : 'Pin the delivery location'}
+              ? `Location shared (${coords!.latitude.toFixed(5)}, ${coords!.longitude.toFixed(5)})`
+              : 'Share the delivery location'}
         </Text>
       </TouchableOpacity>
+
+      {/* Option 2: record the address — its geocoded location sets the distance
+          until an exact spot is shared. */}
+      <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Delivery area (Kigali)</Text>
+      <Text style={styles.hint}>
+        Or select down to the cell — the delivery distance is calculated from the geographic
+        location of this address until an exact spot is shared.
+      </Text>
+      <RwLocationSelect kigaliOnly value={location} onChange={setLocation} />
       {!hasPin ? (
         <Text style={styles.hint}>
-          No pin? Book anyway — after booking, send your client their tracking link. The location they
-          share sets the final delivery fee before you pay.
+          Don&apos;t know the exact spot? Book anyway — after booking, send your client their tracking
+          link. The location they share sets the final delivery fee before you pay.
         </Text>
       ) : null}
 
@@ -420,10 +430,14 @@ export default function ExternalBookScreen() {
         {quote?.basis === 'formula' ? (
           <Text style={styles.quoteHint}>
             Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from {pickupCoords ? 'pickup point' : 'hub'}
+            {quote.locationSource === 'address' ? " — measured to the recorded address's location" : ''}
           </Text>
         ) : null}
         {quote?.basis === 'flat' ? (
-          <Text style={styles.quoteHint}>Flat sector rate — add a weight and pin the location for distance pricing.</Text>
+          <Text style={styles.quoteHint}>
+            Flat sector rate — add a weight, then share the location (or select the address down to
+            the cell) for distance pricing.
+          </Text>
         ) : null}
 
         {creditBalance > 0 && quote?.fee != null ? (

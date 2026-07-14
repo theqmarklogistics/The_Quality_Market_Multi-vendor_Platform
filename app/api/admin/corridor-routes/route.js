@@ -4,8 +4,10 @@ import prisma from "@/lib/prisma";
 import authAdmin from "@/middlewares/authAdmin";
 import { logAdminAction } from "@/lib/auditLog";
 
-// POST { name, hubId, description?, areas? } — register a corridor served from a hub.
-// Registered corridors are the building blocks of the public rider schedule.
+// POST { name, hubId, description?, areas?, landmarks? } — register a corridor
+// served from a hub. Registered corridors are the building blocks of the public
+// rider schedule. `landmarks` is the ordered list of landmarks the rider passes,
+// from the beginning of the route to its end (array order is the route order).
 export async function POST(request) {
     try {
         const { userId } = getAuth(request);
@@ -26,12 +28,18 @@ export async function POST(request) {
             ? body.areas.map((a) => String(a).trim()).filter(Boolean)
             : String(body?.areas || "").split(",").map((a) => a.trim()).filter(Boolean);
 
+        // Ordered route landmarks (start → end). The submitted order is preserved.
+        const landmarks = Array.isArray(body?.landmarks)
+            ? body.landmarks.map((l) => String(l).trim()).filter(Boolean)
+            : String(body?.landmarks || "").split(",").map((l) => l.trim()).filter(Boolean);
+
         const corridor = await prisma.corridorRoute.create({
             data: {
                 name,
                 hubId,
                 description: (body?.description || "").trim() || null,
                 areas,
+                landmarks,
             },
         });
 

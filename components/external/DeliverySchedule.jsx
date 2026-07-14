@@ -59,6 +59,14 @@ export default function DeliverySchedule() {
                                 {corridor.areas?.length > 0 && (
                                     <p className="text-xs text-slate-400 mt-0.5">Serves: {corridor.areas.join(', ')}</p>
                                 )}
+                                {corridor.landmarks?.length > 0 && (
+                                    <p className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-slate-500 mt-0.5">
+                                        <MapPinIcon size={11} className="text-green-600 shrink-0" />
+                                        {corridor.landmarks.map((l, i) => (
+                                            <span key={`${l}-${i}`}>{i > 0 && <span className="text-slate-300"> → </span>}{l}</span>
+                                        ))}
+                                    </p>
+                                )}
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {corridor.schedules.map(s => (
                                         <span key={s.id} className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-3 py-1 text-xs font-medium text-green-800">

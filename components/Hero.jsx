@@ -1,6 +1,6 @@
 'use client'
 import { assets } from '@/assets/assets'
-import { ArrowRightIcon, ShoppingBagIcon } from 'lucide-react'
+import { ArrowRightIcon, BikeIcon, ShoppingBagIcon, StoreIcon, TruckIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React, { useEffect, useState } from 'react'
@@ -14,24 +14,20 @@ const DEFAULTS = {
         startingPrice: '4.9K',
         cta1Label: 'Shop now',
         cta1Href: '/shop',
-        cta1Desc: 'Buy anything from verified stores — delivered and tracked.',
-        cta2Label: 'Delivery service',
-        cta2Href: '/external',
-        cta2Desc: 'Send your own packages across Kigali with our riders.',
         imageUrl: null,
     },
     card1: {
-        cardTitle: 'Best products',
-        accentColor: '#FFAD51',
-        linkLabel: 'View more',
-        linkHref: '/shop',
+        cardTitle: 'Fast, tracked delivery',
+        accentColor: '#16A34A',
+        linkLabel: 'Book a delivery',
+        linkHref: '/external',
         imageUrl: null,
     },
     card2: {
-        cardTitle: '20% discounts',
-        accentColor: '#78B2FF',
-        linkLabel: 'View more',
-        linkHref: '/shop',
+        cardTitle: 'Open your own store',
+        accentColor: '#FFAD51',
+        linkLabel: 'Start selling',
+        linkHref: '/create-store',
         imageUrl: null,
     },
 }
@@ -72,28 +68,9 @@ const Hero = () => {
                         )}
                         <div className='flex flex-wrap items-start gap-x-4 gap-y-3 mt-5 sm:mt-10'>
                             {main.cta1Label && main.cta1Href && (
-                                <div className='flex flex-col gap-1.5 w-full sm:w-auto sm:max-w-56'>
-                                    <Link href={main.cta1Href} className='inline-flex items-center justify-center gap-2 bg-slate-800 text-white text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full hover:bg-slate-900 hover:-translate-y-0.5 active:scale-95 transition shadow-lg shadow-slate-800/20'>
-                                        {main.cta1Label} <ShoppingBagIcon size={16} />
-                                    </Link>
-                                    {(main.cta1Desc ?? (main.cta1Href === DEFAULTS.main.cta1Href ? DEFAULTS.main.cta1Desc : null)) && (
-                                        <p className='text-xs leading-4 text-slate-500 text-center px-1'>
-                                            {main.cta1Desc ?? DEFAULTS.main.cta1Desc}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                            {main.cta2Label && main.cta2Href && (
-                                <div className='flex flex-col gap-1.5 w-full sm:w-auto sm:max-w-56'>
-                                    <Link href={main.cta2Href} className='inline-flex items-center justify-center gap-2 bg-white/80 backdrop-blur text-slate-800 text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full border border-slate-200 hover:bg-white hover:-translate-y-0.5 active:scale-95 transition'>
-                                        {main.cta2Label} <ArrowRightIcon size={16} />
-                                    </Link>
-                                    {(main.cta2Desc ?? (main.cta2Href === DEFAULTS.main.cta2Href ? DEFAULTS.main.cta2Desc : null)) && (
-                                        <p className='text-xs leading-4 text-slate-500 text-center px-1'>
-                                            {main.cta2Desc ?? DEFAULTS.main.cta2Desc}
-                                        </p>
-                                    )}
-                                </div>
+                                <Link href={main.cta1Href} className='inline-flex items-center justify-center gap-2 bg-slate-800 text-white text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full hover:bg-slate-900 hover:-translate-y-0.5 active:scale-95 transition shadow-lg shadow-slate-800/20'>
+                                    {main.cta1Label} <ShoppingBagIcon size={16} />
+                                </Link>
                             )}
                         </div>
                     </div>
@@ -107,10 +84,10 @@ const Hero = () => {
                     />
                 </div>
 
-                {/* Side cards */}
+                {/* Side cards: service CTAs — book a delivery / open a store */}
                 <div className='flex flex-col md:flex-row xl:flex-col gap-5 w-full xl:max-w-sm text-sm text-slate-600'>
-                    <HeroCard config={card1} fallbackImage={assets.hero_product_img1} />
-                    <HeroCard config={card2} fallbackImage={assets.hero_product_img2} />
+                    <HeroCard config={card1} fallbackGraphic={<DeliveryGraphic accent={card1.accentColor || DEFAULTS.card1.accentColor} />} />
+                    <HeroCard config={card2} fallbackGraphic={<StoreGraphic accent={card2.accentColor || DEFAULTS.card2.accentColor} />} />
                 </div>
             </div>
             <CategoriesMarquee />
@@ -118,7 +95,7 @@ const Hero = () => {
     )
 }
 
-function HeroCard({ config, fallbackImage }) {
+function HeroCard({ config, fallbackGraphic }) {
     const accent = config.accentColor || '#FFAD51'
     return (
         <Link href={config.linkHref || '/shop'} className='flex-1 flex items-center justify-between w-full bg-white rounded-3xl p-6 px-8 group border shadow-[0_10px_30px_rgba(0,0,0,0.06)] hover:shadow-md transition-shadow'
@@ -136,14 +113,39 @@ function HeroCard({ config, fallbackImage }) {
                     {config.linkLabel || 'View more'} <ArrowRightIcon className='group-hover:ml-2 transition-all' size={18} />
                 </p>
             </div>
-            <Image
-                className='w-35'
-                src={config.imageUrl || fallbackImage}
-                alt={config.cardTitle || ''}
-                width={140}
-                height={140}
-            />
+            {config.imageUrl ? (
+                <Image
+                    className='w-35'
+                    src={config.imageUrl}
+                    alt={config.cardTitle || ''}
+                    width={140}
+                    height={140}
+                />
+            ) : fallbackGraphic}
         </Link>
+    )
+}
+
+// Truck + motorcycle composition for the delivery-service CTA card.
+function DeliveryGraphic({ accent }) {
+    return (
+        <div className='relative w-28 h-28 shrink-0' aria-hidden='true'>
+            <div className='absolute inset-0 rounded-full' style={{ backgroundColor: `${accent}1A` }} />
+            <TruckIcon className='absolute top-4 left-3 group-hover:-translate-y-0.5 transition-transform' size={58} strokeWidth={1.5} style={{ color: accent }} />
+            <div className='absolute bottom-1 right-0 rounded-full bg-white border p-2 shadow-sm' style={{ borderColor: `${accent}40` }}>
+                <BikeIcon size={30} strokeWidth={1.5} className='text-slate-700' />
+            </div>
+        </div>
+    )
+}
+
+// Storefront graphic for the open-your-store CTA card.
+function StoreGraphic({ accent }) {
+    return (
+        <div className='relative w-28 h-28 shrink-0' aria-hidden='true'>
+            <div className='absolute inset-0 rounded-full' style={{ backgroundColor: `${accent}1A` }} />
+            <StoreIcon className='absolute inset-0 m-auto group-hover:-translate-y-0.5 transition-transform' size={62} strokeWidth={1.5} style={{ color: accent }} />
+        </div>
     )
 }
 
