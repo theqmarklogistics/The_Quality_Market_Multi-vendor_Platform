@@ -1,6 +1,6 @@
-// Add a delivery address. A pinned lat/long is preferred (exact routing), but a
-// customer who won't share their location can instead describe it down to the
-// village (umudugudu) — the backend geocodes that into an approximate point.
+// Add a delivery address. The location is mandatory: either a pinned lat/long
+// (exact routing), or the official administrative address selected down to the
+// cell — the backend geocodes that into an approximate point.
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '@clerk/clerk-expo';
 import { addAddress } from '@/api/addresses';
 import { Button, Field } from '@/components/ui';
-import { KIGALI_SECTORS } from '@/constants';
+import { EMPTY_RW_LOCATION, RwLocationSelect, type RwLocation } from '@/components/RwLocationSelect';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 export default function NewAddressScreen() {
@@ -20,16 +20,14 @@ export default function NewAddressScreen() {
   const [email, setEmail] = useState(user?.primaryEmailAddress?.emailAddress ?? '');
   const [phone, setPhone] = useState('');
   const [street, setStreet] = useState('');
-  const [city, setCity] = useState('Kigali');
-  const [state, setState] = useState('Kigali');
-  const [zip, setZip] = useState('0000');
-  const [country, setCountry] = useState('Rwanda');
-  const [sector, setSector] = useState<string | null>(null);
-  const [village, setVillage] = useState('');
+  const [location, setLocation] = useState<RwLocation>(EMPTY_RW_LOCATION);
 
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pinning, setPinning] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const hasCellLevel = !!(location.district && location.sector && location.cell);
+  const canSave = !!coords || hasCellLevel;
 
   const pinLocation = async () => {
     setPinning(true);
@@ -51,10 +49,10 @@ export default function NewAddressScreen() {
   };
 
   const onSave = async () => {
-    if (!coords && !village.trim()) {
+    if (!canSave) {
       Alert.alert(
         'Location needed',
-        'Pin your current location, or fill in your village (umudugudu) so we can locate you approximately.',
+        'Pin your current location, or select your district, sector and cell so we can locate you.',
       );
       return;
     }
@@ -69,12 +67,14 @@ export default function NewAddressScreen() {
         email,
         phone,
         street,
-        city,
-        state,
-        zip,
-        country,
-        sector: sector ?? undefined,
-        village: village.trim() || undefined,
+        city: location.district || '-',
+        state: location.province || 'Kigali',
+        zip: '-',
+        country: 'Rwanda',
+        district: location.district || undefined,
+        sector: location.sector || undefined,
+        cell: location.cell || undefined,
+        village: location.village || undefined,
         latitude: coords?.latitude,
         longitude: coords?.longitude,
       });
@@ -91,43 +91,11 @@ export default function NewAddressScreen() {
       <Field label="Full name" value={name} onChangeText={setName} />
       <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <Field label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-      <Field label="Street / house" value={street} onChangeText={setStreet} />
+      <Field label="Street / house / landmark" value={street} onChangeText={setStreet} />
 
-      <Text style={styles.fieldLabel}>Sector (Kigali)</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {KIGALI_SECTORS.map((s) => (
-          <TouchableOpacity
-            key={s}
-            style={[styles.chip, sector === s && styles.chipActive]}
-            onPress={() => setSector(s)}
-          >
-            <Text style={[styles.chipText, sector === s && styles.chipTextActive]}>{s}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <Field
-        label="Village (umudugudu) — required if you don't pin your location"
-        value={village}
-        onChangeText={setVillage}
-      />
-
-      <View style={styles.row}>
-        <View style={styles.flex}>
-          <Field label="City" value={city} onChangeText={setCity} />
-        </View>
-        <View style={styles.flex}>
-          <Field label="State / Province" value={state} onChangeText={setState} />
-        </View>
-      </View>
-      <View style={styles.row}>
-        <View style={styles.flex}>
-          <Field label="ZIP" value={zip} onChangeText={setZip} />
-        </View>
-        <View style={styles.flex}>
-          <Field label="Country" value={country} onChangeText={setCountry} />
-        </View>
-      </View>
+      <Text style={styles.fieldLabel}>Where should we deliver?</Text>
+      <Text style={styles.hint}>Select down to the cell — or just pin your exact location below.</Text>
+      <RwLocationSelect value={location} onChange={setLocation} />
 
       <TouchableOpacity style={[styles.pinBtn, coords && styles.pinBtnDone]} onPress={pinLocation} disabled={pinning}>
         <Ionicons
@@ -140,17 +108,12 @@ export default function NewAddressScreen() {
             ? 'Getting location…'
             : coords
               ? `Location pinned (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
-              : 'Pin my current location'}
+              : 'Pin my exact location (best option)'}
         </Text>
       </TouchableOpacity>
 
       <View style={{ marginTop: spacing.lg }}>
-        <Button
-          label="Save address"
-          onPress={onSave}
-          loading={saving}
-          disabled={!coords && !village.trim()}
-        />
+        <Button label="Save address" onPress={onSave} loading={saving} disabled={!canSave} />
       </View>
     </ScrollView>
   );
@@ -159,22 +122,8 @@ export default function NewAddressScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg },
-  fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 6, fontFamily: fonts.medium },
-  row: { flexDirection: 'row', gap: spacing.md },
-  flex: { flex: 1 },
-  chips: { gap: 8, paddingBottom: spacing.md },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: radius.full,
-    paddingHorizontal: 14,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 13, color: colors.body, fontFamily: fonts.medium },
-  chipTextActive: { color: colors.primaryText, fontFamily: fonts.semibold },
+  fieldLabel: { fontSize: 13, color: colors.muted, marginBottom: 4, fontFamily: fonts.medium },
+  hint: { fontSize: 12, color: colors.subtle, marginBottom: spacing.sm, fontFamily: fonts.regular },
   pinBtn: {
     flexDirection: 'row',
     alignItems: 'center',

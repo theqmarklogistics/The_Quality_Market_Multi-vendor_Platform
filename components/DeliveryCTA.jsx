@@ -36,19 +36,25 @@ const DeliveryCTA = () => {
                         </div>
                     </div>
 
-                    <div className='flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0'>
-                        <Link
-                            href='/external'
-                            className='inline-flex items-center justify-center gap-2 bg-green-600 text-white text-sm py-3.5 px-8 rounded-full hover:bg-green-700 hover:-translate-y-0.5 active:scale-95 transition shadow-lg shadow-green-600/20'
-                        >
-                            Get delivery access <ArrowRightIcon size={16} />
-                        </Link>
-                        <Link
-                            href='/external/new'
-                            className='inline-flex items-center justify-center gap-2 bg-white/80 backdrop-blur text-slate-800 text-sm py-3.5 px-8 rounded-full border border-slate-200 hover:bg-white hover:-translate-y-0.5 active:scale-95 transition'
-                        >
-                            Book a delivery <TruckIcon size={16} />
-                        </Link>
+                    <div className='flex flex-col sm:flex-row lg:flex-col gap-4 shrink-0'>
+                        <div className='flex flex-col gap-1.5 w-full sm:w-auto'>
+                            <Link
+                                href='/external'
+                                className='inline-flex items-center justify-center gap-2 bg-green-600 text-white text-sm py-3.5 px-8 rounded-full hover:bg-green-700 hover:-translate-y-0.5 active:scale-95 transition shadow-lg shadow-green-600/20'
+                            >
+                                Get delivery access <ArrowRightIcon size={16} />
+                            </Link>
+                            <p className='text-xs leading-4 text-slate-500 text-center max-w-56 mx-auto'>Become a delivery partner and manage all your deliveries.</p>
+                        </div>
+                        <div className='flex flex-col gap-1.5 w-full sm:w-auto'>
+                            <Link
+                                href='/external/new'
+                                className='inline-flex items-center justify-center gap-2 bg-white/80 backdrop-blur text-slate-800 text-sm py-3.5 px-8 rounded-full border border-slate-200 hover:bg-white hover:-translate-y-0.5 active:scale-95 transition'
+                            >
+                                Book a delivery <TruckIcon size={16} />
+                            </Link>
+                            <p className='text-xs leading-4 text-slate-500 text-center max-w-56 mx-auto'>Send a package across Kigali in a few minutes.</p>
+                        </div>
                     </div>
                 </div>
             </div>

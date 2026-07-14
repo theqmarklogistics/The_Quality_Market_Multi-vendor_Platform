@@ -9,13 +9,13 @@ const DEFAULTS = {
     main: {
         slot: 'main',
         badgeText: 'Fast, Tracked Delivery Across Kigali!',
-        headline: "Gadgets you'll love. Prices you'll trust.",
-        description: 'Discover hand-picked electronics, practical accessories, and store-approved finds built for everyday use and long-term value.',
+        headline: 'Anything you need. Anyone can sell.',
+        description: 'Shop products of every kind from verified stores across Rwanda — and get them delivered to your door by our own riders, tracked live.',
         startingPrice: '4.9K',
         cta1Label: 'Shop now',
         cta1Href: '/shop',
-        cta2Label: 'Open a store',
-        cta2Href: '/create-store',
+        cta2Label: 'Delivery service',
+        cta2Href: '/external',
         imageUrl: null,
     },
     card1: {

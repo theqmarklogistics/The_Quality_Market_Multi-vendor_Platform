@@ -75,6 +75,10 @@ export default function HomeScreen() {
       if (!href) return;
       if (href.startsWith('/shop')) {
         router.push('/(tabs)/shop');
+      } else if (href === '/external/new') {
+        router.push('/external/book');
+      } else if (href.startsWith('/external')) {
+        router.push('/external');
       } else if (href === '/create-store') {
         router.push({ pathname: '/web-dashboard', params: { path: '/create-store', title: 'Create your store' } });
       } else {
@@ -153,6 +157,36 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* ---- Top CTAs: the two things you can do here, in one line each ---- */}
+        <View style={styles.quickRow}>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/(tabs)/shop')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Start shopping"
+          >
+            <View style={styles.quickIcon}>
+              <Ionicons name="bag-handle" size={18} color={colors.primaryDark} />
+            </View>
+            <Text style={styles.quickTitle}>Shop</Text>
+            <Text style={styles.quickDesc}>Buy anything from verified stores — delivered to you.</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickCard, styles.quickCardBrand]}
+            onPress={() => router.push('/external/book')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Book a delivery"
+          >
+            <View style={styles.quickIcon}>
+              <MaterialCommunityIcons name="truck-fast" size={18} color={colors.primaryDark} />
+            </View>
+            <Text style={styles.quickTitle}>Delivery</Text>
+            <Text style={styles.quickDesc}>Send your own package across Kigali with our riders.</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* ---- Advertisement carousel (admin-managed hero slots) ---- */}
         <FlatList
           ref={adListRef}
@@ -189,15 +223,15 @@ export default function HomeScreen() {
         <View style={styles.serviceCard}>
           <View style={styles.serviceHead}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.serviceTag}>EVERYDAY TECH & ESSENTIALS</Text>
+              <Text style={styles.serviceTag}>ANYTHING, FROM ANY STORE</Text>
               <Text style={styles.serviceTitle}>Shop the market</Text>
             </View>
             <BrandArt variant="bags" size={92} />
           </View>
           <Text style={styles.serviceDesc}>
-            Browse hand-picked electronics, accessories and everyday essentials. Every seller is
-            verified by our staff, and every order is delivered by our own riders — tracked live
-            from checkout to your door.
+            Shop products of every kind — electronics, groceries, fashion and more. Every seller
+            is verified by our staff, and every order is delivered by our own riders, tracked
+            live from checkout to your door.
           </Text>
           <Bullet text="Store-approved products at honest prices" />
           <Bullet text="Pay with MTN MoMo or bank transfer" />
@@ -263,9 +297,9 @@ export default function HomeScreen() {
             <BrandArt variant="storefront" size={92} />
           </View>
           <Text style={styles.serviceDesc}>
-            Turn your products into a storefront buyers across Rwanda can reach. Choose Local
-            Seller — you pack and ship your own orders — or Full Managed, where our warehouse
-            stores, packs and delivers for you.
+            Anyone can sell anything here — all you need is a store. Choose Local Seller — you
+            pack and ship your own orders — or Full Managed, where our warehouse stores, packs
+            and delivers for you.
           </Text>
           <Bullet text="Quick application, reviewed by our staff" />
           <Bullet text="Manage products, orders and payouts in the seller console" />
@@ -493,6 +527,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.borderLight,
   },
+
+  // Top quick CTAs
+  quickRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  quickCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: 4,
+    ...shadows.card,
+  },
+  quickCardBrand: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryBorder,
+  },
+  quickIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primaryTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  quickTitle: { fontSize: 15, color: colors.text, fontFamily: fonts.bold },
+  quickDesc: { fontSize: 11.5, lineHeight: 15, color: colors.muted, fontFamily: fonts.regular },
 
   // Ads
   adRail: { paddingHorizontal: spacing.lg, gap: spacing.md },

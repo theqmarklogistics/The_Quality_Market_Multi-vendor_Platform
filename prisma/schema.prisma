@@ -238,7 +238,11 @@ model Order {
     // ── External-seller delivery (off-platform merchant uses our delivery only) ──
     // True when this is a delivery-only order with no platform store/products.
     isExternalDelivery Boolean           @default(false)
-    // Pickup/sender details — where the rider (or sweep) collects the package.
+    // Package sender — who is sending the package (shown on delivery documents).
+    senderName         String?
+    senderPhone        String?
+    senderEmail        String?
+    // Pickup details — where the rider (or sweep) collects the package.
     pickupContactName  String?
     pickupPhone        String?
     pickupLandmark     String?
@@ -326,8 +330,10 @@ model Address {
     district  String?
     // Kigali sector for zone-based shipping (Zone A/B/C)
     sector    String?
-    // Village-level detail (umudugudu) — used to geocode an approximate location
-    // when the customer hasn't shared/pinned GPS coordinates.
+    // Cell — every recorded address goes down to at least this level.
+    cell      String?
+    // Village-level detail (umudugudu) — finest administrative detail; also used
+    // to geocode an approximate location when GPS isn't shared/pinned.
     village   String?
     createdAt DateTime @default(now())
 

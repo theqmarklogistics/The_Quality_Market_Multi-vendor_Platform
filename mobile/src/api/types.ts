@@ -61,12 +61,14 @@ export interface Address {
   longitude: number | null;
   district: string | null;
   sector: string | null;
+  cell: string | null;
   village: string | null;
   createdAt: string;
 }
 
-// Fields collected by the add-address form. Either a pinned lat/long OR a
-// village-level description is required (the backend geocodes the village).
+// Fields collected by the add-address form. Either a pinned lat/long OR the
+// administrative address down to the cell is required (the backend geocodes
+// the cell/village into an approximate point when there is no pin).
 export interface AddressInput {
   name: string;
   email: string;
@@ -76,8 +78,9 @@ export interface AddressInput {
   zip: string;
   country: string;
   phone: string;
-  sector?: string;
   district?: string;
+  sector?: string;
+  cell?: string;
   village?: string;
   latitude?: number;
   longitude?: number;

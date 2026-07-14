@@ -93,10 +93,17 @@ export async function POST(request) {
         }
 
         // ── Validate inputs ──────────────────────────────────────────────────
+        const senderName = (body?.senderName || "").trim();
+        const senderPhone = (body?.senderPhone || "").trim();
+        const senderEmail = (body?.senderEmail || "").trim();
+
         const recipientName = (body?.recipientName || "").trim();
         const recipientPhone = (body?.recipientPhone || "").trim();
         const recipientEmail = (body?.recipientEmail || "").trim();
+        const recipientDistrict = (body?.recipientDistrict || "").trim();
         const recipientSector = (body?.recipientSector || "").trim();
+        const recipientCell = (body?.recipientCell || "").trim();
+        const recipientVillage = (body?.recipientVillage || "").trim();
         const recipientLandmark = (body?.recipientLandmark || "").trim();
         const recipientLat = typeof body?.recipientLat === "number" && !Number.isNaN(body.recipientLat) ? body.recipientLat : null;
         const recipientLng = typeof body?.recipientLng === "number" && !Number.isNaN(body.recipientLng) ? body.recipientLng : null;
@@ -109,6 +116,8 @@ export async function POST(request) {
         const pickupLng = typeof body?.pickupLng === "number" && !Number.isNaN(body.pickupLng) ? body.pickupLng : null;
 
         const packageDescription = (body?.packageDescription || "").trim() || null;
+        // Declared value is mandatory — it backs the under-declaration policy and
+        // any loss/damage claim on the package.
         const declaredValue = Number.isFinite(body?.declaredValue) && body.declaredValue > 0 ? body.declaredValue : null;
         const selectedPaymentMethod = body?.paymentMethod;
 
@@ -120,11 +129,33 @@ export async function POST(request) {
         const packageWidthCm = pos(body?.packageWidthCm);
         const packageHeightCm = pos(body?.packageHeightCm);
 
-        if (!recipientName || !recipientPhone || !recipientSector || !recipientLandmark) {
+        const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v);
+        if (!senderName || !senderPhone || !senderEmail) {
+            return NextResponse.json({ error: "Sender name, phone and email are required" }, { status: 400 });
+        }
+        if (!isEmail(senderEmail)) {
+            return NextResponse.json({ error: "Enter a valid sender email" }, { status: 400 });
+        }
+        if (!recipientName || !recipientPhone || !recipientEmail || !recipientLandmark) {
             return NextResponse.json(
-                { error: "Recipient name, phone, sector and landmark/directions are required" },
+                { error: "Recipient name, phone, email and landmark/directions are required" },
                 { status: 400 }
             );
+        }
+        if (!isEmail(recipientEmail)) {
+            return NextResponse.json({ error: "Enter a valid recipient email" }, { status: 400 });
+        }
+        // The delivery location is mandatory: either an exact GPS pin, or the
+        // administrative address recorded down to the cell level.
+        const hasRecipientPin = recipientLat != null && recipientLng != null;
+        if (!hasRecipientPin && (!recipientDistrict || !recipientSector || !recipientCell)) {
+            return NextResponse.json(
+                { error: "Pin the delivery location, or select the recipient's district, sector and cell" },
+                { status: 400 }
+            );
+        }
+        if (!declaredValue) {
+            return NextResponse.json({ error: "Enter the declared value of the package" }, { status: 400 });
         }
         if (!ALLOWED_PAYMENT.includes(selectedPaymentMethod)) {
             return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
@@ -144,11 +175,14 @@ export async function POST(request) {
                 email: recipientEmail,
                 phone: recipientPhone,
                 street: recipientLandmark || "-",
-                city: "Kigali",
+                city: recipientDistrict || "Kigali",
                 state: "Kigali",
                 zip: "-",
                 country: "Rwanda",
+                district: recipientDistrict || null,
                 sector: recipientSector,
+                cell: recipientCell || null,
+                village: recipientVillage || null,
                 latitude: recipientLat,
                 longitude: recipientLng,
             },
@@ -210,7 +244,8 @@ export async function POST(request) {
                 "invoiceRequested", "paymentProofStatus",
                 "deliveryType", "intakeMethod", "landmarkAddress", "deliveryOtp",
                 "deliveryStatus", "escrowStatus",
-                "isExternalDelivery", "pickupContactName", "pickupPhone", "pickupLandmark",
+                "isExternalDelivery", "senderName", "senderPhone", "senderEmail",
+                "pickupContactName", "pickupPhone", "pickupLandmark",
                 "pickupLat", "pickupLng", "packageDescription", "declaredValue",
                 "packageWeightKg", "packageLengthCm", "packageWidthCm", "packageHeightCm", "creditApplied",
                 "trackingToken",
@@ -226,7 +261,8 @@ export async function POST(request) {
                 false, ${proofStatusVal}::"PaymentProofStatus",
                 'KIGALI_POOL'::"DeliveryType", ${intakeMethod}::"IntakeMethod", ${recipientLandmark}, ${deliveryOtp},
                 'PENDING_INTAKE'::"PoolDeliveryStatus", 'NOT_HELD'::"EscrowStatus",
-                true, ${pickupContactName}, ${pickupPhone}, ${pickupLandmark},
+                true, ${senderName}, ${senderPhone}, ${senderEmail},
+                ${pickupContactName}, ${pickupPhone}, ${pickupLandmark},
                 ${pickupLat}, ${pickupLng}, ${packageDescription}, ${declaredValue},
                 ${packageWeightKg}, ${packageLengthCm}, ${packageWidthCm}, ${packageHeightCm}, ${creditApplied},
                 ${trackingToken},

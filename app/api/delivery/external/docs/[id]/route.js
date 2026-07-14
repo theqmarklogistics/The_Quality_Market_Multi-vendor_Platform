@@ -66,6 +66,11 @@ const styles = StyleSheet.create({
 
 const money = (n) => `${CURRENCY} ${Number(n || 0).toLocaleString()}`;
 const fmtDate = (d) => (d ? new Date(d).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+// Delivery area recorded down to the cell (village → cell → sector → district).
+const areaOf = (address) =>
+    [address?.village, address?.cell, address?.sector, address?.district || address?.city]
+        .filter(Boolean)
+        .join(", ") || null;
 
 function Header({ badge }) {
     return (
@@ -140,8 +145,15 @@ function ShippingInvoice({ order, partnerName, partnerEmail }) {
                     <Text style={styles.sectionTitle}>Deliver to</Text>
                     <Row label="Recipient" value={order.address?.name} />
                     <Row label="Phone" value={order.address?.phone} />
-                    <Row label="Area" value={[order.address?.sector, order.address?.city].filter(Boolean).join(", ")} />
+                    <Row label="Area" value={areaOf(order.address)} />
                     {order.landmarkAddress && <Row label="Landmark" value={order.landmarkAddress} />}
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Sender</Text>
+                    <Row label="Name" value={order.senderName || order.pickupContactName || partnerName} />
+                    <Row label="Phone" value={order.senderPhone || order.pickupPhone} />
+                    {order.senderEmail && <Row label="Email" value={order.senderEmail} />}
                 </View>
 
                 <PackageDetails order={order} />
@@ -196,6 +208,9 @@ function SenderReceipt({ order, partnerName }) {
                 <View style={[styles.cols, styles.section]}>
                     <View style={styles.col}>
                         <Text style={styles.sectionTitle}>Sender</Text>
+                        <Row label="Name" value={order.senderName || order.pickupContactName || partnerName} />
+                        <Row label="Phone" value={order.senderPhone || order.pickupPhone} />
+                        {order.senderEmail && <Row label="Email" value={order.senderEmail} />}
                         <Row label="Partner" value={partnerName} />
                         {order.pickupContactName && <Row label="Pickup contact" value={order.pickupContactName} />}
                         {order.pickupPhone && <Row label="Pickup phone" value={order.pickupPhone} />}
@@ -206,7 +221,7 @@ function SenderReceipt({ order, partnerName }) {
                         <Text style={styles.sectionTitle}>Recipient</Text>
                         <Row label="Name" value={order.address?.name} />
                         <Row label="Phone" value={order.address?.phone} />
-                        <Row label="Area" value={[order.address?.sector, order.address?.city].filter(Boolean).join(", ")} />
+                        <Row label="Area" value={areaOf(order.address)} />
                         {order.landmarkAddress && <Row label="Landmark" value={order.landmarkAddress} />}
                     </View>
                 </View>
@@ -262,10 +277,12 @@ function DeliveryConfirmation({ order, partnerName }) {
                         <Text style={styles.sectionTitle}>Recipient</Text>
                         <Row label="Name" value={order.address?.name} />
                         <Row label="Phone" value={order.address?.phone} />
-                        <Row label="Area" value={[order.address?.sector, order.address?.city].filter(Boolean).join(", ")} />
+                        <Row label="Area" value={areaOf(order.address)} />
                     </View>
                     <View style={styles.col}>
                         <Text style={styles.sectionTitle}>Sender</Text>
+                        <Row label="Name" value={order.senderName || order.pickupContactName || partnerName} />
+                        {order.senderPhone && <Row label="Phone" value={order.senderPhone} />}
                         <Row label="Partner" value={partnerName} />
                         {order.deliveredAt && <Row label="Delivered" value={fmtDate(order.deliveredAt)} />}
                     </View>

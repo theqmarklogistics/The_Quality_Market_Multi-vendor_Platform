@@ -44,6 +44,7 @@
     "react-native-web": "^0.21.2",
     "react-native-webview": "13.16.1",
     "react-redux": "^9.2.0",
+    "rwanda-geo-structure": "^1.4.0",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {

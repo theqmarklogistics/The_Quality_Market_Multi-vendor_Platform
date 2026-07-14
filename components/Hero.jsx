@@ -9,13 +9,15 @@ import CategoriesMarquee from './CategoriesMarquee'
 const DEFAULTS = {
     main: {
         badgeText: 'Fast, Tracked Delivery Across Kigali!',
-        headline: "Gadgets you'll love. Prices you'll trust.",
-        description: 'Discover hand-picked electronics, practical accessories, and store-approved finds built for everyday use and long-term value.',
+        headline: 'Anything you need. Anyone can sell.',
+        description: 'Shop products of every kind from verified stores across Rwanda — and get them delivered to your door by our own riders, tracked live.',
         startingPrice: '4.9K',
         cta1Label: 'Shop now',
         cta1Href: '/shop',
-        cta2Label: 'Open a store',
-        cta2Href: '/create-store',
+        cta1Desc: 'Buy anything from verified stores — delivered and tracked.',
+        cta2Label: 'Delivery service',
+        cta2Href: '/external',
+        cta2Desc: 'Send your own packages across Kigali with our riders.',
         imageUrl: null,
     },
     card1: {
@@ -68,16 +70,30 @@ const Hero = () => {
                                 <p className='text-3xl font-semibold'>{currency}{main.startingPrice}</p>
                             </div>
                         )}
-                        <div className='flex flex-wrap items-center gap-3 mt-5 sm:mt-10'>
+                        <div className='flex flex-wrap items-start gap-x-4 gap-y-3 mt-5 sm:mt-10'>
                             {main.cta1Label && main.cta1Href && (
-                                <Link href={main.cta1Href} className='inline-flex items-center gap-2 bg-slate-800 text-white text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full hover:bg-slate-900 hover:-translate-y-0.5 active:scale-95 transition shadow-lg shadow-slate-800/20'>
-                                    {main.cta1Label} <ShoppingBagIcon size={16} />
-                                </Link>
+                                <div className='flex flex-col gap-1.5 w-full sm:w-auto sm:max-w-56'>
+                                    <Link href={main.cta1Href} className='inline-flex items-center justify-center gap-2 bg-slate-800 text-white text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full hover:bg-slate-900 hover:-translate-y-0.5 active:scale-95 transition shadow-lg shadow-slate-800/20'>
+                                        {main.cta1Label} <ShoppingBagIcon size={16} />
+                                    </Link>
+                                    {(main.cta1Desc ?? (main.cta1Href === DEFAULTS.main.cta1Href ? DEFAULTS.main.cta1Desc : null)) && (
+                                        <p className='text-xs leading-4 text-slate-500 text-center px-1'>
+                                            {main.cta1Desc ?? DEFAULTS.main.cta1Desc}
+                                        </p>
+                                    )}
+                                </div>
                             )}
                             {main.cta2Label && main.cta2Href && (
-                                <Link href={main.cta2Href} className='inline-flex items-center gap-2 bg-white/80 backdrop-blur text-slate-800 text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full border border-slate-200 hover:bg-white hover:-translate-y-0.5 active:scale-95 transition'>
-                                    {main.cta2Label} <ArrowRightIcon size={16} />
-                                </Link>
+                                <div className='flex flex-col gap-1.5 w-full sm:w-auto sm:max-w-56'>
+                                    <Link href={main.cta2Href} className='inline-flex items-center justify-center gap-2 bg-white/80 backdrop-blur text-slate-800 text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full border border-slate-200 hover:bg-white hover:-translate-y-0.5 active:scale-95 transition'>
+                                        {main.cta2Label} <ArrowRightIcon size={16} />
+                                    </Link>
+                                    {(main.cta2Desc ?? (main.cta2Href === DEFAULTS.main.cta2Href ? DEFAULTS.main.cta2Desc : null)) && (
+                                        <p className='text-xs leading-4 text-slate-500 text-center px-1'>
+                                            {main.cta2Desc ?? DEFAULTS.main.cta2Desc}
+                                        </p>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>

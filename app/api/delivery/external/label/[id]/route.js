@@ -37,7 +37,10 @@ const styles = StyleSheet.create({
 });
 
 function ExternalLabel({ order, senderName }) {
-    const recipientAddr = [order.address?.sector, order.address?.city].filter(Boolean).join(", ");
+    // Delivery area recorded down to the cell (village → cell → sector → district).
+    const recipientAddr = [order.address?.village, order.address?.cell, order.address?.sector, order.address?.district || order.address?.city]
+        .filter(Boolean)
+        .join(", ");
     // QR leads to the public package page (owner info, no confirmation code).
     const packageUrl = `${APP_URL}/package/${order.id}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(packageUrl)}`;
@@ -63,6 +66,8 @@ function ExternalLabel({ order, senderName }) {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Sender</Text>
+                    <View style={styles.row}><Text style={styles.label}>Name</Text><Text style={styles.value}>{order.senderName || order.pickupContactName || senderName || "—"}</Text></View>
+                    {order.senderPhone && <View style={styles.row}><Text style={styles.label}>Phone</Text><Text style={styles.value}>{order.senderPhone}</Text></View>}
                     <View style={styles.row}><Text style={styles.label}>Partner</Text><Text style={styles.value}>{senderName || "—"}</Text></View>
                     {order.pickupContactName && <View style={styles.row}><Text style={styles.label}>Pickup contact</Text><Text style={styles.value}>{order.pickupContactName}</Text></View>}
                     {order.pickupPhone && <View style={styles.row}><Text style={styles.label}>Pickup phone</Text><Text style={styles.value}>{order.pickupPhone}</Text></View>}

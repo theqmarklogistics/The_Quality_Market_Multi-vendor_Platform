@@ -87,24 +87,30 @@ export type DeliveryType = (typeof DeliveryType)[keyof typeof DeliveryType];
 
 // Kigali sector → delivery zone mapping (ported from lib/constants.js).
 export const SECTOR_ZONE_MAP: Record<string, 'A' | 'B' | 'C'> = {
-  Nyarugenge: 'A', Kiyovu: 'A', Muhima: 'A',
-  Kimisagara: 'A', Gikondo: 'A', Kicukiro: 'A',
+  Nyarugenge: 'A', Muhima: 'A', Kimisagara: 'A',
+  Gikondo: 'A', Kicukiro: 'A',
   Kacyiru: 'B', Kimironko: 'B', Remera: 'B',
   Gisozi: 'B', Niboye: 'B', Gatenga: 'B',
   Kanombe: 'B', Masaka: 'B', Mageregere: 'B',
-  Kanyinya: 'B', Nyamirambo: 'B', Nyarutarama: 'B',
-  Rugando: 'B', Kibagabaga: 'B', Kimihurura: 'B',
+  Kanyinya: 'B', Nyamirambo: 'B', Kimihurura: 'B',
+  Gatsata: 'B', Kagarama: 'B', Kigarama: 'B', Rwezamenyo: 'B',
 };
 
-// All Kigali sectors (sectors not in SECTOR_ZONE_MAP default to Zone C in pricing).
+// Kigali districts and their official NISR sectors
+// (sectors not in SECTOR_ZONE_MAP default to Zone C in pricing).
+export const KIGALI_DISTRICTS = ['Gasabo', 'Kicukiro', 'Nyarugenge'];
+
 export const KIGALI_SECTORS: string[] = [
-  'Nyarugenge', 'Kiyovu', 'Muhima', 'Kimisagara', 'Gikondo', 'Kicukiro',
-  'Kacyiru', 'Kimironko', 'Remera', 'Gisozi', 'Niboye', 'Gatenga',
-  'Kanombe', 'Masaka', 'Mageregere', 'Kanyinya', 'Nyamirambo', 'Nyarutarama',
-  'Rugando', 'Kibagabaga', 'Kimihurura',
-  'Kinyinya', 'Jabana', 'Rusororo', 'Nduba', 'Bumbogo', 'Gahanga',
-  'Ndera', 'Nyarugunga', 'Gikomero', 'Jali', 'Riruta', 'Muyunzwe',
-  'Gitega', 'Nyakabanda',
+  // Gasabo
+  'Bumbogo', 'Gatsata', 'Gikomero', 'Gisozi', 'Jabana', 'Jali', 'Kacyiru',
+  'Kimihurura', 'Kimironko', 'Kinyinya', 'Ndera', 'Nduba', 'Remera',
+  'Rusororo', 'Rutunga',
+  // Kicukiro
+  'Gahanga', 'Gatenga', 'Gikondo', 'Kagarama', 'Kanombe', 'Kicukiro',
+  'Kigarama', 'Masaka', 'Niboye', 'Nyarugunga',
+  // Nyarugenge
+  'Gitega', 'Kanyinya', 'Kigali', 'Kimisagara', 'Mageregere', 'Muhima',
+  'Nyakabanda', 'Nyamirambo', 'Nyarugenge', 'Rwezamenyo',
 ].sort();
 
 // Product categories (flat list, ported from categoryTree in lib/constants.js).

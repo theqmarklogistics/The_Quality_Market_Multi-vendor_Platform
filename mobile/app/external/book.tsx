@@ -27,7 +27,8 @@ import {
   type DeliveryQuote,
 } from '@/api/externalDelivery';
 import { Button, Field } from '@/components/ui';
-import { KIGALI_SECTORS, PaymentMethod, formatPrice } from '@/constants';
+import { EMPTY_RW_LOCATION, RwLocationSelect, type RwLocation } from '@/components/RwLocationSelect';
+import { PaymentMethod, formatPrice } from '@/constants';
 import { colors, fonts, radius, spacing } from '@/theme';
 
 const num = (v: string): number | undefined => {
@@ -39,10 +40,14 @@ const num = (v: string): number | undefined => {
 export default function ExternalBookScreen() {
   const router = useRouter();
 
+  const [senderName, setSenderName] = useState('');
+  const [senderPhone, setSenderPhone] = useState('');
+  const [senderEmail, setSenderEmail] = useState('');
+
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
-  const [sector, setSector] = useState('');
+  const [location, setLocation] = useState<RwLocation>(EMPTY_RW_LOCATION);
   const [landmark, setLandmark] = useState('');
 
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -83,6 +88,8 @@ export default function ExternalBookScreen() {
       active = false;
     };
   }, []);
+
+  const sector = location.sector;
 
   // Live quote whenever a pricing input changes (debounced).
   useEffect(() => {
@@ -162,13 +169,28 @@ export default function ExternalBookScreen() {
     return { applied, net };
   }, [quote, creditBalance, applyCredit]);
 
+  const isEmail = (v: string) => /^\S+@\S+\.\S+$/.test(v.trim());
+
   const submit = useCallback(async () => {
-    if (!recipientName.trim() || !recipientPhone.trim() || !sector || !landmark.trim()) {
-      Alert.alert('Missing details', 'Recipient name, phone, sector and landmark are required.');
+    if (!senderName.trim() || !senderPhone.trim() || !isEmail(senderEmail)) {
+      Alert.alert('Sender details', 'Sender name, phone and a valid email are required.');
+      return;
+    }
+    if (!recipientName.trim() || !recipientPhone.trim() || !isEmail(recipientEmail) || !landmark.trim()) {
+      Alert.alert('Recipient details', 'Recipient name, phone, a valid email and a landmark are required.');
+      return;
+    }
+    // Location: an exact GPS pin, or the address selected down to the cell.
+    if (!hasPin && (!location.district || !location.sector || !location.cell)) {
+      Alert.alert('Delivery location', 'Pin the exact location, or select the district, sector and cell.');
       return;
     }
     if (!num(weightKg) || Number(weightKg) <= 0) {
       Alert.alert('Weight required', 'Enter the package weight in kg.');
+      return;
+    }
+    if (!num(declaredValue) || Number(declaredValue) <= 0) {
+      Alert.alert('Declared value required', "Enter the package's declared value.");
       return;
     }
     if (intakeMethod === 'DRIVER_SWEEP' && (!pickupContactName.trim() || !pickupPhone.trim() || !pickupLandmark.trim())) {
@@ -178,10 +200,16 @@ export default function ExternalBookScreen() {
     setSubmitting(true);
     try {
       const res = await bookExternalDelivery({
+        senderName: senderName.trim(),
+        senderPhone: senderPhone.trim(),
+        senderEmail: senderEmail.trim(),
         recipientName: recipientName.trim(),
         recipientPhone: recipientPhone.trim(),
-        recipientEmail: recipientEmail.trim() || undefined,
-        recipientSector: sector,
+        recipientEmail: recipientEmail.trim(),
+        recipientDistrict: location.district,
+        recipientSector: location.sector,
+        recipientCell: location.cell,
+        recipientVillage: location.village || undefined,
         recipientLandmark: landmark.trim(),
         recipientLat: coords?.latitude,
         recipientLng: coords?.longitude,
@@ -230,7 +258,8 @@ export default function ExternalBookScreen() {
       setSubmitting(false);
     }
   }, [
-    recipientName, recipientPhone, recipientEmail, sector, landmark, hasPin, coords,
+    senderName, senderPhone, senderEmail,
+    recipientName, recipientPhone, recipientEmail, location, landmark, hasPin, coords,
     intakeMethod, pickupContactName, pickupPhone, pickupLandmark, pickupCoords,
     packageDescription, declaredValue, weightKg, lengthCm, widthCm, heightCm,
     paymentMethod, applyCredit, router,
@@ -238,12 +267,26 @@ export default function ExternalBookScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* Sender */}
+      <Text style={styles.section}>Sender</Text>
+      <Text style={styles.hint}>Who is sending this package — printed on the delivery documents.</Text>
+      <Field label="Name" value={senderName} onChangeText={setSenderName} placeholder="Sender name" />
+      <Field label="Phone" value={senderPhone} onChangeText={setSenderPhone} keyboardType="phone-pad" placeholder="07…" />
+      <Field
+        label="Email"
+        value={senderEmail}
+        onChangeText={setSenderEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        placeholder="name@example.com"
+      />
+
       {/* Recipient */}
       <Text style={styles.section}>Recipient</Text>
       <Field label="Name" value={recipientName} onChangeText={setRecipientName} placeholder="Recipient name" />
       <Field label="Phone" value={recipientPhone} onChangeText={setRecipientPhone} keyboardType="phone-pad" placeholder="07…" />
       <Field
-        label="Email (optional — for tracking link)"
+        label="Email — receives the tracking link"
         value={recipientEmail}
         onChangeText={setRecipientEmail}
         keyboardType="email-address"
@@ -251,18 +294,9 @@ export default function ExternalBookScreen() {
         placeholder="name@example.com"
       />
 
-      <Text style={styles.fieldLabel}>Kigali sector</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {KIGALI_SECTORS.map((s) => (
-          <TouchableOpacity
-            key={s}
-            style={[styles.chip, sector === s && styles.chipActive]}
-            onPress={() => setSector(s)}
-          >
-            <Text style={[styles.chipText, sector === s && styles.chipTextActive]}>{s}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <Text style={styles.fieldLabel}>Delivery area (Kigali)</Text>
+      <Text style={styles.hint}>Select down to the cell — not needed if you pin the exact location below.</Text>
+      <RwLocationSelect kigaliOnly value={location} onChange={setLocation} />
 
       <Field label="Landmark / directions" value={landmark} onChangeText={setLandmark} placeholder="Directions to the recipient" />
 
@@ -276,7 +310,7 @@ export default function ExternalBookScreen() {
             ? 'Getting location…'
             : hasPin
               ? `Pinned (${coords!.latitude.toFixed(5)}, ${coords!.longitude.toFixed(5)})`
-              : 'Use my location (optional)'}
+              : 'Pin the delivery location'}
         </Text>
       </TouchableOpacity>
       {!hasPin ? (
@@ -339,7 +373,7 @@ export default function ExternalBookScreen() {
           <Field label="Weight (kg)" value={weightKg} onChangeText={setWeightKg} keyboardType="numeric" placeholder="0.0" />
         </View>
         <View style={styles.flex}>
-          <Field label="Declared value (optional)" value={declaredValue} onChangeText={setDeclaredValue} keyboardType="numeric" placeholder="0" />
+          <Field label="Declared value (RWF)" value={declaredValue} onChangeText={setDeclaredValue} keyboardType="numeric" placeholder="0" />
         </View>
       </View>
       <Text style={styles.hint}>Dimensions (cm) — optional, used when a bulky-but-light package costs more by volume.</Text>
@@ -351,9 +385,9 @@ export default function ExternalBookScreen() {
       <View style={styles.warnBox}>
         <Ionicons name="warning-outline" size={16} color="#b45309" style={{ marginTop: 1 }} />
         <Text style={styles.warnText}>
-          Declare the weight and dimensions accurately. Every package is verified at intake — if the
-          actual weight or volume is higher than declared, the package is held until you pay the
-          difference, and unpaid differences cancel the delivery without a refund.
+          Declare the weight, size and value accurately. Every package is verified at intake — if it&apos;s
+          heavier or bigger than declared, it is held until you pay the difference, and unpaid
+          differences cancel the delivery without a refund.
         </Text>
       </View>
 
@@ -431,12 +465,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   warnText: { flex: 1, fontSize: 11, lineHeight: 16, color: '#92400e', fontFamily: fonts.medium },
-
-  chips: { gap: 8, paddingBottom: spacing.md },
-  chip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 13, color: colors.text },
-  chipTextActive: { color: colors.primaryText, fontFamily: fonts.semibold },
 
   pinBtn: {
     flexDirection: 'row',

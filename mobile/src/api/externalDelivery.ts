@@ -73,10 +73,18 @@ export function quoteExternalDelivery(params: QuoteParams): Promise<DeliveryQuot
 
 // ── Booking ────────────────────────────────────────────────────────────────
 export interface ExternalBookingPayload {
+  // Package sender — printed on the delivery documents.
+  senderName: string;
+  senderPhone: string;
+  senderEmail: string;
   recipientName: string;
   recipientPhone: string;
-  recipientEmail?: string;
+  recipientEmail: string;
+  // Official administrative location, recorded down to the cell level.
+  recipientDistrict: string;
   recipientSector: string;
+  recipientCell: string;
+  recipientVillage?: string;
   recipientLandmark: string;
   // Optional — when omitted, the client shares their location through the
   // tracking link and the fee is re-priced from those coordinates.

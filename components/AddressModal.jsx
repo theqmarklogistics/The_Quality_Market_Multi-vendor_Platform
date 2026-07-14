@@ -6,7 +6,7 @@ import { useAuth } from "@clerk/nextjs"
 import { useDispatch } from "react-redux"
 import axios from "axios"
 import { addAddress } from "@/lib/features/address/addressSlice"
-import { KIGALI_SECTORS } from "@/lib/constants"
+import RwLocationSelect from "@/components/delivery/RwLocationSelect"
 
 
 const AddressModal = ({ setShowAddressModal }) => {
@@ -17,17 +17,13 @@ const AddressModal = ({ setShowAddressModal }) => {
     const [address, setAddress] = useState({
         name: '',
         email: '',
-        street: '',
-        sector: '',
-        village: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: '',
         phone: '',
+        street: '',
         latitude: null,
         longitude: null,
     })
+    // Official administrative location: province → district → sector → cell → village.
+    const [location, setLocation] = useState({ province: '', district: '', sector: '', cell: '', village: '' });
     const [locating, setLocating] = useState(false);
 
     const handleAddressChange = (e) => {
@@ -37,8 +33,8 @@ const AddressModal = ({ setShowAddressModal }) => {
         })
     }
 
-    // Capture the customer's exact coordinates. These are required so we can
-    // measure the distance from our hub to the delivery point and route riders.
+    // Capture the customer's exact coordinates — used to measure the distance
+    // from our hub to the delivery point and to route riders.
     const captureLocation = () => {
         if (!('geolocation' in navigator)) {
             toast.error('Location is not supported on this device.');
@@ -64,16 +60,15 @@ const AddressModal = ({ setShowAddressModal }) => {
     };
 
     const hasLocation = address.latitude != null && address.longitude != null;
-    const hasVillage = address.village.trim().length > 0;
-    const canSave = hasLocation || hasVillage;
+    const hasCellLevel = location.district && location.sector && location.cell;
+    // Location is mandatory: an exact GPS pin, or the address down to the cell.
+    const canSave = hasLocation || hasCellLevel;
 
     const handleSubmit = async (e) => {
         e.preventDefault()
 
-        // Either an exact pin OR a village-level description is required — the
-        // village lets us locate the customer approximately when GPS isn't shared.
         if (!canSave) {
-            toast.error('Pin your location, or fill in your village (umudugudu) so we can locate you.');
+            toast.error('Pin your location, or select your district, sector and cell so we can locate you.');
             return;
         }
 
@@ -84,7 +79,18 @@ const AddressModal = ({ setShowAddressModal }) => {
                 return;
             }
 
-            const {data} = await axios.post('/api/address', {address}, {
+            const payload = {
+                ...address,
+                state: location.province || 'Kigali',
+                city: location.district || '-',
+                district: location.district,
+                sector: location.sector,
+                cell: location.cell,
+                village: location.village,
+                zip: '-',
+                country: 'Rwanda',
+            };
+            const {data} = await axios.post('/api/address', {address: payload}, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -98,29 +104,23 @@ const AddressModal = ({ setShowAddressModal }) => {
         }
     }
 
-    return (
-        <form onSubmit={e => toast.promise(handleSubmit(e), { loading: 'Adding Address...' })} className="fixed inset-0 z-50 bg-white/60 backdrop-blur h-screen flex items-center justify-center">
-            <div className="flex flex-col gap-5 text-slate-700 w-full max-w-sm mx-6">
-                <h2 className="text-3xl ">Add New <span className="font-semibold">Address</span></h2>
-                <input name="name" onChange={handleAddressChange} value={address.name} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Enter your name" required />
-                <input name="email" onChange={handleAddressChange} value={address.email} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="email" placeholder="Email address" required />
-                <input name="street" onChange={handleAddressChange} value={address.street} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Street" required />
-                <select name="sector" onChange={handleAddressChange} value={address.sector} className="p-2 px-4 outline-none border border-slate-200 rounded w-full text-slate-700">
-                    <option value="">Sector (Kigali) — optional</option>
-                    {KIGALI_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <input name="village" onChange={handleAddressChange} value={address.village} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Village (umudugudu) — required if you don't pin your location" />
-                <div className="flex gap-4">
-                    <input name="city" onChange={handleAddressChange} value={address.city} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="District" required />
-                    <input name="state" onChange={handleAddressChange} value={address.state} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Province" required />
-                </div>
-                <div className="flex gap-4">
-                    <input name="zip" onChange={handleAddressChange} value={address.zip} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Zip code (optional)" />
-                    <input name="country" onChange={handleAddressChange} value={address.country} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Country" required />
-                </div>
-                <input name="phone" onChange={handleAddressChange} value={address.phone} className="p-2 px-4 outline-none border border-slate-200 rounded w-full" type="text" placeholder="Phone" required />
+    const input = "p-2 px-4 outline-none border border-slate-200 rounded w-full";
 
-                {/* Geolocation — mandatory: powers hub-distance and rider routing */}
+    return (
+        <form onSubmit={e => toast.promise(handleSubmit(e), { loading: 'Adding Address...' })} className="fixed inset-0 z-50 bg-white/60 backdrop-blur h-screen overflow-y-auto flex items-start sm:items-center justify-center py-10">
+            <div className="flex flex-col gap-4 text-slate-700 w-full max-w-sm mx-6">
+                <h2 className="text-3xl ">Add New <span className="font-semibold">Address</span></h2>
+                <input name="name" onChange={handleAddressChange} value={address.name} className={input} type="text" placeholder="Full name" required />
+                <input name="email" onChange={handleAddressChange} value={address.email} className={input} type="email" placeholder="Email" required />
+                <input name="phone" onChange={handleAddressChange} value={address.phone} className={input} type="text" placeholder="Phone" required />
+                <input name="street" onChange={handleAddressChange} value={address.street} className={input} type="text" placeholder="Street / house / landmark" required />
+
+                <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-slate-500">Where should we deliver? Select down to the cell — or just pin your exact location below.</p>
+                    <RwLocationSelect value={location} onChange={setLocation} inputClass={input} />
+                </div>
+
+                {/* Exact GPS pin — replaces the dropdowns when shared */}
                 <div className="flex flex-col gap-1.5">
                     <button
                         type="button"
@@ -140,7 +140,7 @@ const AddressModal = ({ setShowAddressModal }) => {
                     </button>
                     {hasLocation
                         ? <p className="text-[11px] text-slate-400">{address.latitude.toFixed(5)}, {address.longitude.toFixed(5)}</p>
-                        : <p className="text-[11px] text-slate-400">Best option — lets us measure delivery distance exactly. No pin? Provide your village above instead.</p>}
+                        : <p className="text-[11px] text-slate-400">Best option — lets us measure the delivery distance exactly.</p>}
                 </div>
 
                 <button disabled={!canSave} className="bg-slate-800 text-white text-sm font-medium py-2.5 rounded-md hover:bg-slate-900 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100">SAVE ADDRESS</button>

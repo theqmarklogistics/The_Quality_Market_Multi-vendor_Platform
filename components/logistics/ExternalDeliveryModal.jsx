@@ -3,9 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { KIGALI_SECTORS } from "@/lib/constants";
 import { XIcon, PackagePlusIcon, Loader2Icon, CopyIcon, CheckIcon, CrosshairIcon, MapPinIcon, CheckCircleIcon } from "lucide-react";
 import LocationPicker from "@/components/delivery/LocationPicker";
+import RwLocationSelect from "@/components/delivery/RwLocationSelect";
 
 const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "RWF";
@@ -30,7 +30,10 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
 
     function blankForm() {
         return {
-            recipientName: "", recipientPhone: "", recipientEmail: "", recipientSector: "", recipientLandmark: "",
+            senderName: "", senderPhone: "", senderEmail: "",
+            recipientName: "", recipientPhone: "", recipientEmail: "",
+            recipientDistrict: "", recipientSector: "", recipientCell: "", recipientVillage: "",
+            recipientLandmark: "",
             intakeMethod: "HUB_DROP_OFF", pickupContactName: "", pickupPhone: "", pickupLandmark: "",
             packageDescription: "", declaredValue: "", paymentMethod: "MTN_MOMO",
             packageWeightKg: "", packageLengthCm: "", packageWidthCm: "", packageHeightCm: "",
@@ -102,13 +105,22 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
         } catch (err) { toast.error(err?.response?.data?.error || err.message); } finally { setCreatingPartner(false); }
     };
 
+    const isEmail = (v) => /^\S+@\S+\.\S+$/.test(v.trim());
+
     const submit = async () => {
         if (!partnerId) return toast.error("Select or create a partner");
-        if (!form.recipientName || !form.recipientPhone || !form.recipientSector || !form.recipientLandmark) {
-            return toast.error("Recipient name, phone, sector and landmark are required");
+        if (!form.senderName || !form.senderPhone || !isEmail(form.senderEmail)) {
+            return toast.error("Sender name, phone and a valid email are required");
         }
-        if (!hasPin) return toast.error("Pin the delivery location on the map");
+        if (!form.recipientName || !form.recipientPhone || !isEmail(form.recipientEmail) || !form.recipientLandmark) {
+            return toast.error("Recipient name, phone, email and landmark are required");
+        }
+        // Location: an exact GPS pin, or the address selected down to the cell.
+        if (!hasPin && (!form.recipientDistrict || !form.recipientSector || !form.recipientCell)) {
+            return toast.error("Pin the delivery location on the map, or select the district, sector and cell");
+        }
         if (!form.packageWeightKg || Number(form.packageWeightKg) <= 0) return toast.error("Enter the package weight (kg)");
+        if (!form.declaredValue || Number(form.declaredValue) <= 0) return toast.error("Enter the declared value of the package");
         if (form.intakeMethod === "DRIVER_SWEEP" && (!form.pickupContactName || !form.pickupPhone || !form.pickupLandmark)) {
             return toast.error("Pickup contact, phone and location are required for a sweep");
         }
@@ -193,6 +205,16 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                             </div>
                         </div>
 
+                        {/* Sender */}
+                        <div className="rounded-2xl border border-slate-100 p-3 space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sender</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input value={form.senderName} onChange={(e) => set("senderName", e.target.value)} placeholder="Sender name" className={inp} />
+                                <input value={form.senderPhone} onChange={(e) => set("senderPhone", e.target.value)} placeholder="Sender phone" className={inp} />
+                            </div>
+                            <input type="email" value={form.senderEmail} onChange={(e) => set("senderEmail", e.target.value)} placeholder="Sender email" className={`w-full ${inp}`} />
+                        </div>
+
                         {/* Recipient */}
                         <div className="rounded-2xl border border-slate-100 p-3 space-y-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Recipient</p>
@@ -200,11 +222,20 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                                 <input value={form.recipientName} onChange={(e) => set("recipientName", e.target.value)} placeholder="Name" className={inp} />
                                 <input value={form.recipientPhone} onChange={(e) => set("recipientPhone", e.target.value)} placeholder="Phone" className={inp} />
                             </div>
-                            <input value={form.recipientEmail} onChange={(e) => set("recipientEmail", e.target.value)} placeholder="Email (optional — for tracking link)" className={`w-full ${inp}`} />
-                            <select value={form.recipientSector} onChange={(e) => set("recipientSector", e.target.value)} className={`w-full ${inp}`}>
-                                <option value="">Kigali sector…</option>
-                                {KIGALI_SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
-                            </select>
+                            <input type="email" value={form.recipientEmail} onChange={(e) => set("recipientEmail", e.target.value)} placeholder="Email — receives the tracking link" className={`w-full ${inp}`} />
+                            <p className="text-[11px] text-slate-400">Delivery area — select down to the cell (not needed with a map pin).</p>
+                            <RwLocationSelect
+                                kigaliOnly
+                                inputClass={`w-full ${inp}`}
+                                value={{ district: form.recipientDistrict, sector: form.recipientSector, cell: form.recipientCell, village: form.recipientVillage }}
+                                onChange={(loc) => setForm((f) => ({
+                                    ...f,
+                                    recipientDistrict: loc.district,
+                                    recipientSector: loc.sector,
+                                    recipientCell: loc.cell,
+                                    recipientVillage: loc.village,
+                                }))}
+                            />
                             <input value={form.recipientLandmark} onChange={(e) => set("recipientLandmark", e.target.value)} placeholder="Landmark / directions" className={`w-full ${inp}`} />
                         </div>
 
@@ -261,7 +292,7 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                                 <input type="number" min="0" value={form.packageWidthCm} onChange={(e) => set("packageWidthCm", e.target.value)} placeholder="Width" className={inp} />
                                 <input type="number" min="0" value={form.packageHeightCm} onChange={(e) => set("packageHeightCm", e.target.value)} placeholder="Height" className={inp} />
                             </div>
-                            <input type="number" min="0" value={form.declaredValue} onChange={(e) => set("declaredValue", e.target.value)} placeholder="Declared value (optional)" className={`w-full ${inp}`} />
+                            <input type="number" min="0" value={form.declaredValue} onChange={(e) => set("declaredValue", e.target.value)} placeholder={`Declared value (${currency})`} className={`w-full ${inp}`} />
                         </div>
 
                         <select value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)} className={`w-full ${inp}`}>
