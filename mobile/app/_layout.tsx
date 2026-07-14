@@ -1,7 +1,7 @@
 // Root layout: wires Clerk auth, the API token bridge, and the Redux store, then
 // gates navigation between the (auth) and (tabs) route groups based on session state.
 import { useEffect } from 'react';
-import { ActivityIndicator, Platform, Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
@@ -21,6 +21,7 @@ import { store } from '@/store';
 import { CartSync } from '@/store/CartSync';
 import { PushManager } from '@/push/PushManager';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { BootSplash } from '@/components/BootSplash';
 import { installGlobalErrorHandler } from '@/lib/crashReporting';
 import { colors, fonts } from '@/theme';
 
@@ -64,11 +65,8 @@ function InitialLayout() {
   }, [isLoaded, isSignedIn, segments, router]);
 
   if (!isLoaded || (!fontsLoaded && !fontError)) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    // Brand mark + green loading line, continuing the native splash seamlessly.
+    return <BootSplash />;
   }
 
   return (

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, radius, shadows, spacing } from '@/theme';
 import { formatPrice } from '@/constants';
+import { BrandLogo } from './BrandLogo';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -292,10 +294,45 @@ export function EmptyState({
   );
 }
 
+/** Indeterminate brand-green loading line (the app's signature loader). */
+export function LoadingLine({ width = 168 }: { width?: number }) {
+  const [progress] = useState(() => new Animated.Value(0));
+  const barW = Math.round(width * 0.36);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 1100,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [progress]);
+
+  // Slide the green segment across (and past) the track, then wrap around.
+  const translateX = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-barW, width],
+  });
+
+  return (
+    <View style={[styles.loadingTrack, { width }]}>
+      <Animated.View
+        style={[styles.loadingBar, { width: barW, transform: [{ translateX }] }]}
+      />
+    </View>
+  );
+}
+
+/** Full-screen branded loading state: brand mark over the green loading line. */
 export function Loader() {
   return (
-    <View style={styles.loader}>
-      <ActivityIndicator size="large" color={colors.primary} />
+    <View style={styles.loader} accessibilityLabel="Loading">
+      <BrandLogo size={72} />
+      <LoadingLine width={148} />
     </View>
   );
 }
@@ -400,5 +437,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: fonts.regular,
   },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  loader: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: 22,
+  },
+  loadingTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.primaryTint,
+    overflow: 'hidden',
+  },
+  loadingBar: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
 });

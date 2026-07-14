@@ -1,211 +1,306 @@
-// Home: brand hero, delivery-service CTA, quick actions, value props, and the
-// searchable, category-filterable, paginated product grid.
-// Branded like the web home: wordmark header, green hero banner, pill search.
+// Home: the service landing for The Quality Market.
+// - Auto-rotating advertisement carousel fed by the admin-managed /api/hero
+//   slots (same campaigns as the web hero — editable without an app release).
+// - Explicit service sections with branded illustrations: Shop the market,
+//   Delivery service (riders + trucks), and Open your store (sellers).
+// - "Popular right now" product rail deep-linking into the Shop tab.
+// The product grid itself lives on the Shop tab (app/(tabs)/shop.tsx).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  AccessibilityInfo,
   FlatList,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { getBestSelling, getCategories, listProducts } from '@/api/products';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { getBestSelling } from '@/api/products';
+import { getHeroConfig, HERO_DEFAULTS, type HeroCard, type HeroConfig, type HeroMain } from '@/api/hero';
 import type { Product } from '@/api/types';
 import { ProductCard } from '@/components/ProductCard';
 import { BrandLogo } from '@/components/BrandLogo';
-import { EmptyState, Skeleton } from '@/components/ui';
-import { PRODUCT_CATEGORIES } from '@/constants';
-import { colors, fonts, radius, spacing } from '@/theme';
+import { BrandArt } from '@/components/BrandArt';
+import { Button, SectionTitle } from '@/components/ui';
+import { colors, fonts, radius, shadows, spacing } from '@/theme';
 
-const PAGE_SIZE = 20;
+const AD_INTERVAL_MS = 5000;
+const AD_HEIGHT = 240;
+
+type AdSlide =
+  | { key: string; kind: 'main'; main: HeroMain }
+  | {
+      key: string;
+      kind: 'card';
+      card: HeroCard;
+      fallbackIcon: keyof typeof MaterialCommunityIcons.glyphMap;
+    };
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>(PRODUCT_CATEGORIES);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { width: winW } = useWindowDimensions();
+  const slideW = winW - spacing.lg * 2;
+  const slideStep = slideW + spacing.md;
+
+  const [hero, setHero] = useState<HeroConfig>(HERO_DEFAULTS);
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Debounce the search input → search term used for fetching.
-  useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => setSearch(searchInput.trim()), 400);
-    return () => {
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-    };
-  }, [searchInput]);
-
-  useEffect(() => {
-    getCategories()
-      .then((res) => {
-        if (res.categories?.length) setCategories(res.categories.map((c) => c.name));
-      })
-      .catch(() => {
-        // Fall back to the ported PRODUCT_CATEGORIES already in state.
-      });
-    getBestSelling(10)
-      .then((res) => setBestSellers(res.products ?? []))
-      .catch(() => {
-        // Rail is optional — hidden if the request fails.
-      });
+  const load = useCallback(async () => {
+    const [heroRes, bestRes] = await Promise.allSettled([getHeroConfig(), getBestSelling(8)]);
+    if (heroRes.status === 'fulfilled') setHero(heroRes.value);
+    if (bestRes.status === 'fulfilled') setBestSellers(bestRes.value.products ?? []);
+    // On failure the built-in defaults / empty rail keep the screen useful.
   }, []);
 
-  const fetchPage = useCallback(
-    async (nextPage: number, replace: boolean) => {
-      try {
-        setError(null);
-        const res = await listProducts({
-          page: nextPage,
-          limit: PAGE_SIZE,
-          search: search || undefined,
-          category: activeCategory || undefined,
-        });
-        setTotalPages(res.totalPages);
-        setPage(res.page);
-        setProducts((prev) => (replace ? res.products : [...prev, ...res.products]));
-      } catch (err: any) {
-        setError(err?.message ?? 'Could not load products');
-      }
-    },
-    [search, activeCategory],
-  );
-
-  // Reload from page 1 whenever search/category changes.
   useEffect(() => {
-    setLoading(true);
-    fetchPage(1, true).finally(() => setLoading(false));
-  }, [fetchPage]);
+    load();
+  }, [load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchPage(1, true);
+    await load();
     setRefreshing(false);
-  }, [fetchPage]);
+  }, [load]);
 
-  const onEndReached = useCallback(async () => {
-    if (loadingMore || loading || page >= totalPages) return;
-    setLoadingMore(true);
-    await fetchPage(page + 1, false);
-    setLoadingMore(false);
-  }, [loadingMore, loading, page, totalPages, fetchPage]);
+  // Map the admin-configured web hrefs onto native destinations.
+  const openWebHref = useCallback(
+    (href: string | null | undefined, title = 'The Quality Market') => {
+      if (!href) return;
+      if (href.startsWith('/shop')) {
+        router.push('/(tabs)/shop');
+      } else if (href === '/create-store') {
+        router.push({ pathname: '/web-dashboard', params: { path: '/create-store', title: 'Create your store' } });
+      } else {
+        router.push({ pathname: '/web-dashboard', params: { path: href, title } });
+      }
+    },
+    [router],
+  );
 
-  const sectionLabel = search
-    ? `Results for “${search}”`
-    : activeCategory ?? 'All products';
+  const slides = useMemo<AdSlide[]>(
+    () => [
+      { key: 'main', kind: 'main', main: hero.main },
+      { key: 'card1', kind: 'card', card: hero.card1, fallbackIcon: 'shopping-outline' },
+      { key: 'card2', kind: 'card', card: hero.card2, fallbackIcon: 'sale' },
+    ],
+    [hero],
+  );
 
-  const header = useMemo(
-    () => (
-      <View>
-        {/* Search */}
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={colors.subtle} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search products"
-            placeholderTextColor={colors.subtle}
-            value={searchInput}
-            onChangeText={setSearchInput}
-            returnKeyType="search"
+  // ---- Carousel autoplay (paused while dragging, disabled with reduce-motion) ----
+  const adListRef = useRef<FlatList<AdSlide>>(null);
+  const adIndexRef = useRef(0);
+  const adPausedRef = useRef(false);
+  const [adIndex, setAdIndex] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(setReduceMotion)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const timer = setInterval(() => {
+      if (adPausedRef.current) return;
+      const next = (adIndexRef.current + 1) % slides.length;
+      adListRef.current?.scrollToOffset({ offset: next * slideStep, animated: true });
+    }, AD_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [reduceMotion, slides.length, slideStep]);
+
+  const onAdScrollEnd = useCallback(
+    (offsetX: number) => {
+      const idx = Math.min(slides.length - 1, Math.max(0, Math.round(offsetX / slideStep)));
+      adIndexRef.current = idx;
+      setAdIndex(idx);
+      adPausedRef.current = false;
+    },
+    [slides.length, slideStep],
+  );
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
-          {searchInput ? (
-            <TouchableOpacity
-              onPress={() => setSearchInput('')}
-              hitSlop={10}
-              accessibilityLabel="Clear search"
-            >
-              <Ionicons name="close-circle" size={18} color={colors.subtle} />
-            </TouchableOpacity>
-          ) : null}
+        }
+      >
+        {/* Brand header + messages shortcut (Messages left the tab bar for Shop) */}
+        <View style={styles.brandRow}>
+          <BrandLogo direction="row" size={32} gap={8} showWordmark wordmarkSize={21} />
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={() => router.push('/(tabs)/chat')}
+            accessibilityRole="button"
+            accessibilityLabel="Messages"
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
         </View>
 
-        {/* Promo hero — mirrors the web hero banner */}
-        {!search && !activeCategory ? (
-          <View style={styles.hero}>
-            <View style={styles.heroBadge}>
-              <Ionicons name="flash" size={12} color={colors.primaryDark} />
-              <Text style={styles.heroBadgeText}>Fast, tracked delivery across Kigali</Text>
-            </View>
-            <Text style={styles.heroTitle}>Gadgets you’ll love.{'\n'}Prices you’ll trust.</Text>
-            <Text style={styles.heroSub}>
-              Hand-picked products, verified sellers, fast delivery in Kigali.
-            </Text>
-            <View style={styles.heroIcon}>
-              <Ionicons name="bag-handle" size={30} color={colors.primary} />
-            </View>
-          </View>
-        ) : null}
+        {/* ---- Advertisement carousel (admin-managed hero slots) ---- */}
+        <FlatList
+          ref={adListRef}
+          data={slides}
+          keyExtractor={(s) => s.key}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={slideStep}
+          decelerationRate="fast"
+          contentContainerStyle={styles.adRail}
+          onScrollBeginDrag={() => {
+            adPausedRef.current = true;
+          }}
+          onMomentumScrollEnd={(e) => onAdScrollEnd(e.nativeEvent.contentOffset.x)}
+          renderItem={({ item }) =>
+            item.kind === 'main' ? (
+              <MainAd main={item.main} width={slideW} onCta={openWebHref} />
+            ) : (
+              <CardAd card={item.card} width={slideW} fallbackIcon={item.fallbackIcon} onPress={openWebHref} />
+            )
+          }
+        />
+        <View style={styles.dotsRow} accessibilityLabel={`Ad ${adIndex + 1} of ${slides.length}`}>
+          {slides.map((s, i) => (
+            <View key={s.key} style={[styles.dot, i === adIndex && styles.dotActive]} />
+          ))}
+        </View>
 
-        {/* Delivery service CTA — mirrors the web DeliveryCTA banner */}
-        {!search && !activeCategory ? (
-          <TouchableOpacity
-            style={styles.deliveryCta}
-            activeOpacity={0.85}
-            onPress={() => router.push('/external')}
-            accessibilityRole="button"
-          >
-            <View style={styles.deliveryIconWrap}>
-              <Ionicons name="bicycle" size={26} color={colors.primary} />
-            </View>
+        {/* ---- Services ---- */}
+        <Text style={styles.kicker}>OUR SERVICES</Text>
+        <Text style={styles.servicesTitle}>One app for shopping, delivery & selling</Text>
+
+        {/* 1 — Shop the market */}
+        <View style={styles.serviceCard}>
+          <View style={styles.serviceHead}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.deliveryTitle}>Need something delivered?</Text>
-              <Text style={styles.deliverySub}>
-                Book a rider on our shared Kigali routes — pay by MoMo, track every drop live. Your
-                client shares their location through a link, and it sets the delivery fee.
-              </Text>
+              <Text style={styles.serviceTag}>EVERYDAY TECH & ESSENTIALS</Text>
+              <Text style={styles.serviceTitle}>Shop the market</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.subtle} />
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Quick actions */}
-        {!search && !activeCategory ? (
-          <View style={styles.quickRow}>
-            <QuickAction icon="cube-outline" label="Book delivery" onPress={() => router.push('/external/book')} />
-            <QuickAction icon="time-outline" label="Departures" onPress={() => router.push('/schedule')} />
-            <QuickAction icon="receipt-outline" label="My orders" onPress={() => router.push('/(tabs)/orders')} />
+            <BrandArt variant="bags" size={92} />
           </View>
-        ) : null}
-
-        {/* Value props */}
-        {!search && !activeCategory ? (
-          <View style={styles.propsRow}>
-            <ValueProp icon="flash-outline" label="Fast, tracked delivery" />
-            <ValueProp icon="shield-checkmark-outline" label="Verified sellers" />
-            <ValueProp icon="wallet-outline" label="Pay by MoMo or bank" />
+          <Text style={styles.serviceDesc}>
+            Browse hand-picked electronics, accessories and everyday essentials. Every seller is
+            verified by our staff, and every order is delivered by our own riders — tracked live
+            from checkout to your door.
+          </Text>
+          <Bullet text="Store-approved products at honest prices" />
+          <Bullet text="Pay with MTN MoMo or bank transfer" />
+          <Bullet text="Shipping calculated and paid at checkout — no surprises" />
+          <View style={styles.serviceActions}>
+            <Button
+              label="Start shopping"
+              icon="bag-handle-outline"
+              size="md"
+              onPress={() => router.push('/(tabs)/shop')}
+            />
           </View>
-        ) : null}
+        </View>
 
-        {/* Best selling — horizontal rail, mirrors the web BestSelling section */}
-        {!search && !activeCategory && bestSellers.length > 0 ? (
-          <View style={styles.bestWrap}>
-            <View style={styles.bestHead}>
-              <Ionicons name="flame" size={16} color={colors.primaryDark} />
-              <Text style={styles.bestTitle}>Best selling</Text>
+        {/* 2 — Delivery service */}
+        <View style={[styles.serviceCard, styles.serviceCardBrand]}>
+          <View style={styles.serviceHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.serviceTag}>SEND ANYTHING ACROSS KIGALI</Text>
+              <Text style={styles.serviceTitle}>Delivery service</Text>
             </View>
+            <BrandArt variant="motorbike" size={92} />
+          </View>
+          <Text style={styles.serviceDesc}>
+            Not just for our shop — book our riders and trucks for your own packages. Your client
+            shares their live location through a link, that pin sets the exact delivery fee, and
+            you both track the drop in real time.
+          </Text>
+          <View style={styles.stepsRow}>
+            <Step icon="package-variant-closed" label={'Book in\nminutes'} />
+            <StepArrow />
+            <Step icon="truck-fast" label={'Shared rider &\ntruck routes'} />
+            <StepArrow />
+            <Step icon="map-marker-radius" label={'Live GPS\ntracking'} />
+          </View>
+          <Bullet text="Pay by MoMo — delivery documents issued by our staff" />
+          <Bullet text="Scheduled departures on every corridor, every day" />
+          <View style={styles.serviceActions}>
+            <Button
+              label="Book a delivery"
+              icon="cube-outline"
+              variant="brand"
+              size="md"
+              onPress={() => router.push('/external/book')}
+            />
+            <Button
+              label="See departure times"
+              icon="time-outline"
+              variant="ghost"
+              size="md"
+              onPress={() => router.push('/schedule')}
+            />
+          </View>
+        </View>
+
+        {/* 3 — Open your store */}
+        <View style={styles.serviceCard}>
+          <View style={styles.serviceHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.serviceTag}>FOR SELLERS</Text>
+              <Text style={styles.serviceTitle}>Open your store</Text>
+            </View>
+            <BrandArt variant="storefront" size={92} />
+          </View>
+          <Text style={styles.serviceDesc}>
+            Turn your products into a storefront buyers across Rwanda can reach. Choose Local
+            Seller — you pack and ship your own orders — or Full Managed, where our warehouse
+            stores, packs and delivers for you.
+          </Text>
+          <Bullet text="Quick application, reviewed by our staff" />
+          <Bullet text="Manage products, orders and payouts in the seller console" />
+          <Bullet text="Chat with your buyers right inside the app" />
+          <View style={styles.serviceActions}>
+            <Button
+              label="Create your store"
+              icon="storefront-outline"
+              size="md"
+              onPress={() =>
+                router.push({
+                  pathname: '/web-dashboard',
+                  params: { path: '/create-store', title: 'Create your store' },
+                })
+              }
+            />
+          </View>
+        </View>
+
+        {/* ---- Popular right now ---- */}
+        {bestSellers.length > 0 ? (
+          <View style={styles.popularWrap}>
+            <SectionTitle
+              title="Popular right now"
+              action="See all"
+              onAction={() => router.push('/(tabs)/shop')}
+              style={{ marginBottom: spacing.sm }}
+            />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.bestRail}
+              contentContainerStyle={styles.popularRail}
             >
               {bestSellers.map((p) => (
-                <View key={p.id} style={styles.bestCard}>
+                <View key={p.id} style={styles.popularCard}>
                   <ProductCard product={p} />
                 </View>
               ))}
@@ -213,188 +308,224 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Categories */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}
-        >
-          <Chip
-            label="All"
-            active={activeCategory === null}
-            onPress={() => setActiveCategory(null)}
-          />
-          {categories.map((c) => (
-            <Chip
-              key={c}
-              label={c}
-              active={activeCategory === c}
-              onPress={() => setActiveCategory(c)}
-            />
-          ))}
-        </ScrollView>
-
-        <Text style={styles.sectionLabel}>{sectionLabel}</Text>
-      </View>
-    ),
-    [searchInput, categories, activeCategory, search, sectionLabel, bestSellers, router],
-  );
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Brand lockup — logo mark + two-tone wordmark, mirroring the web header */}
-      <View style={styles.brandRow}>
-        <BrandLogo direction="row" size={32} gap={8} showWordmark wordmarkSize={21} />
-      </View>
-
-      {loading ? (
-        <View style={styles.skeletonWrap}>
-          <Skeleton height={48} borderRadius={radius.full} />
-          <Skeleton height={148} borderRadius={radius.lg} style={{ marginTop: spacing.md }} />
-          <View style={styles.skeletonRow}>
-            <SkeletonCard />
-            <SkeletonCard />
-          </View>
-          <View style={styles.skeletonRow}>
-            <SkeletonCard />
-            <SkeletonCard />
-          </View>
+        {/* Trust strip */}
+        <View style={styles.trustRow}>
+          <Trust icon="shield-checkmark-outline" label="Verified sellers" />
+          <Trust icon="wallet-outline" label="MoMo & bank" />
+          <Trust icon="navigate-outline" label="Live tracking" />
         </View>
-      ) : error ? (
-        <EmptyState
-          icon="cloud-offline-outline"
-          title="Couldn't load products"
-          subtitle={error}
-          actionLabel="Try again"
-          onAction={onRefresh}
-        />
-      ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.list}
-          ListHeaderComponent={header}
-          renderItem={({ item }) => <ProductCard product={item} />}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          onEndReached={onEndReached}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={
-            <EmptyState title="No products found" subtitle="Try a different search or category." />
-          }
-          ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator style={{ marginVertical: 16 }} color={colors.primary} />
-            ) : null
-          }
-        />
-      )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-function QuickAction({
-  icon,
-  label,
-  onPress,
+/* ---------- Advertisement slides ---------- */
+
+function MainAd({
+  main,
+  width,
+  onCta,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
+  main: HeroMain;
+  width: number;
+  onCta: (href: string | null | undefined, title?: string) => void;
 }) {
   return (
-    <TouchableOpacity style={styles.quickCard} onPress={onPress} activeOpacity={0.8} accessibilityRole="button">
-      <Ionicons name={icon} size={20} color={colors.primary} />
-      <Text style={styles.quickLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function ValueProp({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
-  return (
-    <View style={styles.propItem}>
-      <Ionicons name={icon} size={14} color={colors.primaryDark} />
-      <Text style={styles.propLabel}>{label}</Text>
+    <View style={[styles.mainAd, { width }]}>
+      {/* Decorative brand circles */}
+      <View style={styles.mainAdCircleLg} />
+      <View style={styles.mainAdCircleSm} />
+      {main.badgeText ? (
+        <View style={styles.adBadge}>
+          <Ionicons name="flash" size={12} color={colors.primaryDark} />
+          <Text style={styles.adBadgeText} numberOfLines={1}>
+            {main.badgeText}
+          </Text>
+        </View>
+      ) : null}
+      <Text style={styles.adHeadline} numberOfLines={2}>
+        {main.headline}
+      </Text>
+      <Text style={styles.adDesc} numberOfLines={3}>
+        {main.description}
+      </Text>
+      <View style={styles.adBottomRow}>
+        <View style={{ flex: 1 }}>
+          {main.startingPrice ? (
+            <>
+              <Text style={styles.adPriceLabel}>Starts from</Text>
+              <Text style={styles.adPrice}>RWF {main.startingPrice}</Text>
+            </>
+          ) : null}
+        </View>
+        {main.imageUrl ? (
+          <Image source={{ uri: main.imageUrl }} alt="Featured product" style={styles.adImage} resizeMode="contain" />
+        ) : null}
+      </View>
+      <View style={styles.adCtaRow}>
+        {main.cta1Label && main.cta1Href ? (
+          <TouchableOpacity
+            style={styles.adCtaDark}
+            onPress={() => onCta(main.cta1Href, main.cta1Label ?? undefined)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            <Text style={styles.adCtaDarkText}>{main.cta1Label}</Text>
+            <Ionicons name="bag-handle-outline" size={14} color={colors.onInk} />
+          </TouchableOpacity>
+        ) : null}
+        {main.cta2Label && main.cta2Href ? (
+          <TouchableOpacity
+            style={styles.adCtaLight}
+            onPress={() => onCta(main.cta2Href, main.cta2Label ?? undefined)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            <Text style={styles.adCtaLightText}>{main.cta2Label}</Text>
+            <Ionicons name="arrow-forward" size={14} color={colors.text} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 }
 
-function SkeletonCard() {
-  return (
-    <View style={styles.skeletonCard}>
-      <Skeleton height={150} borderRadius={radius.md} />
-      <Skeleton height={13} width="90%" style={{ marginTop: 10 }} />
-      <Skeleton height={13} width="55%" style={{ marginTop: 6 }} />
-    </View>
-  );
-}
-
-function Chip({
-  label,
-  active,
+function CardAd({
+  card,
+  width,
+  fallbackIcon,
   onPress,
 }: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
+  card: HeroCard;
+  width: number;
+  fallbackIcon: keyof typeof MaterialCommunityIcons.glyphMap;
+  onPress: (href: string | null | undefined, title?: string) => void;
 }) {
+  const accent = card.accentColor || '#FFAD51';
   return (
     <TouchableOpacity
-      style={[styles.chip, active && styles.chipActive]}
-      onPress={onPress}
-      activeOpacity={0.8}
+      style={[styles.cardAd, { width, borderColor: `${accent}55` }]}
+      onPress={() => onPress(card.linkHref, card.cardTitle ?? undefined)}
+      activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityState={{ selected: active }}
+      accessibilityLabel={card.cardTitle ?? 'Offer'}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      <View style={{ flex: 1 }}>
+        <View style={[styles.cardAdAccentBar, { backgroundColor: accent }]} />
+        <Text style={styles.cardAdTitle} numberOfLines={2}>
+          {card.cardTitle}
+        </Text>
+        <View style={styles.cardAdLinkRow}>
+          <Text style={styles.cardAdLink}>{card.linkLabel || 'View more'}</Text>
+          <Ionicons name="arrow-forward" size={15} color={colors.muted} />
+        </View>
+      </View>
+      {card.imageUrl ? (
+        <Image source={{ uri: card.imageUrl }} alt={card.cardTitle ?? ''} style={styles.cardAdImage} resizeMode="contain" />
+      ) : (
+        <View style={[styles.cardAdIconWrap, { backgroundColor: `${accent}22` }]}>
+          <MaterialCommunityIcons name={fallbackIcon} size={44} color={colors.ink} />
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
 
+/* ---------- Small pieces ---------- */
+
+function Bullet({ text }: { text: string }) {
+  return (
+    <View style={styles.bulletRow}>
+      <Ionicons name="checkmark-circle" size={16} color={colors.primary} style={{ marginTop: 1 }} />
+      <Text style={styles.bulletText}>{text}</Text>
+    </View>
+  );
+}
+
+function Step({
+  icon,
+  label,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  label: string;
+}) {
+  return (
+    <View style={styles.step}>
+      <View style={styles.stepIcon}>
+        <MaterialCommunityIcons name={icon} size={22} color={colors.primaryDark} />
+      </View>
+      <Text style={styles.stepLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function StepArrow() {
+  return <Ionicons name="chevron-forward" size={14} color={colors.subtle} style={{ marginTop: 12 }} />;
+}
+
+function Trust({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
+  return (
+    <View style={styles.trustItem}>
+      <Ionicons name={icon} size={15} color={colors.primaryDark} />
+      <Text style={styles.trustLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/* ---------- Styles ---------- */
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  scroll: { paddingBottom: spacing.xxl },
   brandRow: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
-  },
-  list: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.md },
-  row: { gap: spacing.md },
-  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  headerBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.borderLight,
-    borderRadius: radius.full,
-    paddingHorizontal: 16,
-    minHeight: 48,
-    marginBottom: spacing.md,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.text,
-    fontFamily: fonts.regular,
-    paddingVertical: 12,
-  },
-  hero: {
+
+  // Ads
+  adRail: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  mainAd: {
+    height: AD_HEIGHT,
     backgroundColor: colors.primarySoft,
     borderWidth: 1,
     borderColor: colors.primaryBorder,
     borderRadius: radius.xl,
     padding: spacing.lg,
-    marginBottom: spacing.md,
     overflow: 'hidden',
   },
-  heroBadge: {
+  mainAdCircleLg: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: colors.primaryTint,
+    opacity: 0.5,
+    top: -70,
+    right: -50,
+  },
+  mainAdCircleSm: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: colors.primaryTint,
+    opacity: 0.4,
+    bottom: -30,
+    left: -25,
+  },
+  adBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -404,107 +535,194 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     alignSelf: 'flex-start',
   },
-  heroBadgeText: { fontSize: 11, color: colors.primaryDark, fontFamily: fonts.semibold },
-  heroTitle: {
-    fontSize: 22,
-    lineHeight: 28,
+  adBadgeText: { fontSize: 11, color: colors.primaryDark, fontFamily: fonts.semibold },
+  adHeadline: {
+    fontSize: 21,
+    lineHeight: 26,
     color: colors.text,
     fontFamily: fonts.bold,
     marginTop: spacing.sm,
-    maxWidth: '80%',
   },
-  heroSub: {
-    fontSize: 13,
-    lineHeight: 19,
+  adDesc: {
+    fontSize: 12.5,
+    lineHeight: 18,
     color: colors.muted,
     fontFamily: fonts.regular,
-    marginTop: 6,
-    maxWidth: '75%',
+    marginTop: 4,
+    maxWidth: '88%',
   },
-  heroIcon: {
-    position: 'absolute',
-    right: spacing.lg,
-    bottom: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primaryTint,
+  adBottomRow: { flexDirection: 'row', alignItems: 'flex-end', flex: 1 },
+  adPriceLabel: { fontSize: 11, color: colors.muted, fontFamily: fonts.regular },
+  adPrice: {
+    fontSize: 20,
+    color: colors.text,
+    fontFamily: fonts.bold,
+    fontVariant: ['tabular-nums'],
+  },
+  adImage: { width: 92, height: 92 },
+  adCtaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  adCtaDark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.ink,
+    borderRadius: radius.full,
+    paddingHorizontal: 18,
+    minHeight: 44,
+  },
+  adCtaDarkText: { color: colors.onInk, fontSize: 13.5, fontFamily: fonts.semibold },
+  adCtaLight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: 18,
+    minHeight: 44,
+  },
+  adCtaLightText: { color: colors.text, fontSize: 13.5, fontFamily: fonts.semibold },
+  cardAd: {
+    height: AD_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    ...shadows.card,
+  },
+  cardAdAccentBar: { width: 34, height: 5, borderRadius: 3, marginBottom: spacing.sm },
+  cardAdTitle: { fontSize: 26, lineHeight: 32, color: colors.text, fontFamily: fonts.bold },
+  cardAdLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.md },
+  cardAdLink: { fontSize: 14, color: colors.muted, fontFamily: fonts.medium },
+  cardAdImage: { width: 120, height: 120 },
+  cardAdIconWrap: {
+    width: 104,
+    height: 104,
+    borderRadius: 52,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deliveryCta: {
+  dotsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  dotActive: { width: 18, backgroundColor: colors.primary },
+
+  // Services
+  kicker: {
+    fontSize: 12,
+    color: colors.primaryDark,
+    fontFamily: fonts.semibold,
+    letterSpacing: 1.2,
+    marginTop: spacing.xl,
+    marginBottom: 2,
+    paddingHorizontal: spacing.lg,
+  },
+  servicesTitle: {
+    fontSize: 20,
+    lineHeight: 26,
+    color: colors.text,
+    fontFamily: fonts.bold,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  serviceCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  serviceCardBrand: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryBorder,
+  },
+  serviceHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  serviceTag: {
+    fontSize: 10.5,
+    color: colors.primaryDark,
+    fontFamily: fonts.semibold,
+    letterSpacing: 1,
+  },
+  serviceTitle: { fontSize: 19, color: colors.text, fontFamily: fonts.bold, marginTop: 2 },
+  serviceDesc: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    color: colors.body,
+    fontFamily: fonts.regular,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    marginBottom: 7,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: colors.body,
+    fontFamily: fonts.medium,
+  },
+  serviceActions: { gap: spacing.xs, marginTop: spacing.sm },
+  stepsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.primaryBorder,
     borderRadius: radius.lg,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     marginBottom: spacing.md,
   },
-  deliveryIconWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  step: { flex: 1, alignItems: 'center', gap: 6 },
+  stepIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deliveryTitle: { fontSize: 14, color: colors.text, fontFamily: fonts.semibold },
-  deliverySub: { fontSize: 11, lineHeight: 15, color: colors.muted, fontFamily: fonts.regular, marginTop: 2 },
-  quickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  quickCard: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
+  stepLabel: {
+    fontSize: 10.5,
+    lineHeight: 14,
+    color: colors.body,
+    fontFamily: fonts.medium,
+    textAlign: 'center',
   },
-  quickLabel: { fontSize: 11, color: colors.body, fontFamily: fonts.medium },
-  propsRow: {
+
+  // Popular rail + trust strip
+  popularWrap: { paddingHorizontal: spacing.lg, marginTop: spacing.sm },
+  popularRail: { gap: spacing.md, paddingRight: spacing.xs },
+  popularCard: { width: 150 },
+  trustRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  propItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  propLabel: { fontSize: 11, color: colors.muted, fontFamily: fonts.medium },
-  bestWrap: { marginBottom: spacing.md },
-  bestHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
-  bestTitle: { fontSize: 16, color: colors.text, fontFamily: fonts.semibold },
-  bestRail: { gap: spacing.md, paddingRight: spacing.xs },
-  bestCard: { width: 150 },
-  chips: { gap: 8, paddingBottom: spacing.md },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: radius.full,
-    paddingHorizontal: 14,
-    minHeight: 36,
     justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.lg,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontSize: 13, color: colors.body, fontFamily: fonts.medium },
-  chipTextActive: { color: colors.primaryText, fontFamily: fonts.semibold },
-  sectionLabel: {
-    fontSize: 16,
-    color: colors.text,
-    fontFamily: fonts.semibold,
-    marginBottom: spacing.sm,
-  },
-  skeletonWrap: { padding: spacing.lg, paddingTop: spacing.sm },
-  skeletonRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
-  skeletonCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    padding: spacing.sm,
-  },
+  trustItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  trustLabel: { fontSize: 12, color: colors.muted, fontFamily: fonts.medium },
 });

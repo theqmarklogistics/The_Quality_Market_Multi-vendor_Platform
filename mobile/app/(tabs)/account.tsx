@@ -83,8 +83,15 @@ function AccountScreenInner() {
           </View>
         </View>
 
-        {/* Public rider departure schedule — available to everyone */}
-        <View style={{ marginTop: spacing.lg }}>
+        {/* Everyone: messages (no longer a tab) + public rider departure schedule */}
+        <View style={{ marginTop: spacing.lg, gap: spacing.sm }}>
+          <Shortcut
+            icon="chatbubbles"
+            iconBg={colors.primary}
+            title="Messages"
+            subtitle="Chats with sellers & support"
+            onPress={() => router.push('/(tabs)/chat')}
+          />
           <Shortcut
             icon="calendar"
             iconBg={colors.info}

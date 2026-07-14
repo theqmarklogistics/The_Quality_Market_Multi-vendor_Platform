@@ -7,10 +7,12 @@
 // Auth: the WebView keeps its own Clerk session cookie — the user signs in once
 // inside it and stays signed in across visits.
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { BrandLogo } from '@/components/BrandLogo';
+import { LoadingLine } from '@/components/ui';
 import { API_URL } from '@/constants';
 import { colors, fonts, spacing } from '@/theme';
 
@@ -71,7 +73,8 @@ export default function WebDashboardScreen() {
       />
       {loading ? (
         <View style={styles.loader} pointerEvents="none">
-          <ActivityIndicator size="large" color={colors.primary} />
+          <BrandLogo size={72} />
+          <LoadingLine width={148} />
         </View>
       ) : null}
     </View>
@@ -107,5 +110,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 22,
+    backgroundColor: colors.bg, // hide the WebView's white flash behind the brand loader
   },
 });

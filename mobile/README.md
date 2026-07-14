@@ -20,8 +20,13 @@ plan summary). **Phases 0 (foundations), 1 (customer core), 2 (tracking, chat, p
 
 ## What's in Phase 1 (customer core)
 
-- **Shop** tab: searchable, category-filtered, paginated product grid (`/api/product`,
-  `/api/categories`).
+- **Home** tab (`app/(tabs)/index.tsx`): service landing — auto-rotating ad carousel fed
+  by the admin-managed `/api/hero` slots (`src/api/hero.ts`), explicit service sections
+  with branded illustrations (`src/components/BrandArt.tsx`) and CTAs for shopping, the
+  delivery service, and opening a store (web `/create-store` via the in-app WebView),
+  plus a best-selling rail.
+- **Shop** tab (`app/(tabs)/shop.tsx`): searchable, category-filtered, paginated product
+  grid (`/api/product`, `/api/categories`).
 - **Product detail**: gallery, wholesale pricing note, reviews, add-to-cart.
 - **Cart** tab: quantity steppers, per-line + subtotal, live tab badge. The cart map
   (`{productId: qty}`) syncs to `/api/cart` (ported `cartSlice`).
@@ -255,7 +260,7 @@ mobile/
     _layout.tsx            # Clerk + Redux + API bridge + auth gate + root Stack
     index.tsx              # entry redirect
     (auth)/                # sign-in / sign-up
-    (tabs)/                # Shop, Cart, Orders, Account
+    (tabs)/                # Home, Shop, Cart, Orders, Account (+ hidden Messages route)
     product/[id].tsx       # product detail (+ message seller)
     checkout.tsx           # checkout
     address/new.tsx        # add address (GPS pin)

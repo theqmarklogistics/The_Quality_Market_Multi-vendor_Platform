@@ -1,4 +1,6 @@
-// Tab navigator: Shop, Cart (with live count badge), Orders, Messages, Account.
+// Tab navigator: Home (service landing), Shop, Cart (with live count badge),
+// Orders, Account. Messages stays routable at /(tabs)/chat (reached from the
+// Home header and Account) but is hidden from the bar to keep it at 5 items.
 // Brand styling: green-600 active tint, filled icon when focused, Outfit labels.
 import { Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
@@ -19,6 +21,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      initialRouteName="shop"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -44,6 +47,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="shop"
+        options={{
+          title: 'Shop',
+          tabBarIcon: tabIcon('storefront-outline', 'storefront'),
+        }}
+      />
+      <Tabs.Screen
         name="cart"
         options={{
           title: 'Cart',
@@ -62,7 +72,9 @@ export default function TabsLayout() {
         name="chat"
         options={{
           title: 'Messages',
-          tabBarIcon: tabIcon('chatbubbles-outline', 'chatbubbles'),
+          // Hidden from the tab bar (5-item max) — opened from the Home header
+          // icon, the Account shortcut, and the seller console.
+          href: null,
         }}
       />
       <Tabs.Screen
