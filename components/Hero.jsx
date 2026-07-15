@@ -8,7 +8,7 @@ import CategoriesMarquee from './CategoriesMarquee'
 
 const DEFAULTS = {
     main: {
-        badgeText: 'Fast, Tracked Delivery Across Kigali!',
+        badgeText: 'Fast, Trackable Delivery Across Kigali!',
         headline: 'Anything you need. Anyone can sell.',
         description: 'Shop products of every kind from verified stores across Rwanda — and get them delivered to your door by our own riders, tracked live.',
         cta1Label: 'Shop now',
