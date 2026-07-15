@@ -27,20 +27,26 @@ export async function POST(request, { params }) {
             );
         }
 
-        // Restore stock first (in parallel), then cancel the order.
-        // If the order update fails after stock is restored, the order remains PENDING
-        // and admin can correct it — better than cancelling without restoring stock.
+        // Atomic claim (same pattern as the expiry sweep): only the caller that
+        // flips PENDING→CANCELLED owns the stock restore. Without this, a cancel
+        // racing the expiry sweep could restore the same stock twice.
+        const claim = await prisma.order.updateMany({
+            where: { id, userId, paymentStatus: 'PENDING', isPaid: false },
+            data: { paymentStatus: 'CANCELLED' }
+        });
+        if (claim.count !== 1) {
+            return NextResponse.json(
+                { error: "Only unpaid orders can be cancelled" },
+                { status: 400 }
+            );
+        }
+
         await Promise.all(
             order.orderItems.map(item => prisma.product.update({
                 where: { id: item.productId },
                 data: { warehouseQuantity: { increment: item.quantity }, inStock: true }
             }))
         );
-
-        await prisma.order.update({
-            where: { id },
-            data: { paymentStatus: 'CANCELLED' }
-        });
 
         return NextResponse.json({ message: "Order cancelled successfully" });
     } catch (error) {

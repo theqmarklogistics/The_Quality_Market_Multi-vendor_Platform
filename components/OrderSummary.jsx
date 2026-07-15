@@ -276,8 +276,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 className='mt-1 accent-slate-700'
                             />
                             <div>
-                                <span className='block font-medium text-slate-800'>Standard Delivery</span>
-                                <span className='block text-xs text-slate-500 mt-0.5'>Your order ships via standard vendor fulfillment.</span>
+                                <div className='flex items-center gap-2'>
+                                    <span className='block font-medium text-slate-800'>Standard Delivery</span>
+                                    <span className='rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700'>Free</span>
+                                </div>
+                                <span className='block text-xs text-slate-500 mt-0.5'>Free shipping — your order ships via standard vendor fulfillment.</span>
                             </div>
                         </label>
 
@@ -350,7 +353,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 {quoting
                                     ? <p className='text-green-700 text-xs'>Calculating…</p>
                                     : shippingQuote?.shipping != null
-                                        ? <p className='text-green-700'>{formatAmount(shippingQuote.shipping)}</p>
+                                        ? <p className='text-green-700'>{shippingQuote.shipping === 0 ? 'Free' : formatAmount(shippingQuote.shipping)}</p>
                                         : <p className='text-slate-400 text-xs'>Select an address</p>}
 
                                 {coupon && <p>{`-${formatAmount((coupon.discount / 100) * totalPrice)}`}</p>}
@@ -385,7 +388,9 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                         </div>
                         {shippingQuote?.shipping != null && (
                             <p className='mt-1 text-[11px] text-white/60'>
-                                Includes {formatAmount(shippingQuote.shipping)} shipping, paid now at checkout{deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : '.'}
+                                {shippingQuote.shipping === 0
+                                    ? 'Standard delivery is free — no shipping charge.'
+                                    : `Includes ${formatAmount(shippingQuote.shipping)} shipping, paid now at checkout${deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : '.'}`}
                             </p>
                         )}
                     </div>

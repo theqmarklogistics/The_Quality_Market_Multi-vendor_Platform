@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authAdmin from "@/middlewares/authAdmin";
 import { logAdminAction } from "@/lib/auditLog";
+import { invalidateCorridorRateCache } from "@/lib/externalDelivery";
 
 // POST { name, hubId, description?, areas?, landmarks? } — register a corridor
 // served from a hub. Registered corridors are the building blocks of the public
@@ -33,6 +34,18 @@ export async function POST(request) {
             ? body.landmarks.map((l) => String(l).trim()).filter(Boolean)
             : String(body?.landmarks || "").split(",").map((l) => l.trim()).filter(Boolean);
 
+        // Optional lane pricing: non-negative numbers, blank/null clears the rate.
+        const parseRate = (v) => {
+            if (v === undefined || v === null || v === "") return null;
+            const n = Number(v);
+            return Number.isFinite(n) && n >= 0 ? n : NaN;
+        };
+        const fixedRate = parseRate(body?.fixedRate);
+        const perKmRate = parseRate(body?.perKmRate);
+        if (Number.isNaN(fixedRate) || Number.isNaN(perKmRate)) {
+            return NextResponse.json({ error: "Rates must be non-negative numbers" }, { status: 400 });
+        }
+
         const corridor = await prisma.corridorRoute.create({
             data: {
                 name,
@@ -40,9 +53,12 @@ export async function POST(request) {
                 description: (body?.description || "").trim() || null,
                 areas,
                 landmarks,
+                fixedRate,
+                perKmRate,
             },
         });
 
+        invalidateCorridorRateCache();
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
         logAdminAction({ adminId: userId, adminName: admin?.name || "", action: "CORRIDOR_REGISTERED", targetType: "CorridorRoute", targetId: corridor.id, notes: name });
 

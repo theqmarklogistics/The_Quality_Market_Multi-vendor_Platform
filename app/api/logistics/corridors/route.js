@@ -3,7 +3,9 @@ import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authLogistics from "@/middlewares/authLogistics";
 import { emitDelivery } from "@/lib/deliveryRealtime";
-import { KIGALI_HUB, nearestNeighborRoute, resolveRouteDistances } from "@/lib/deliveryEta";
+import { KIGALI_HUB } from "@/lib/deliveryEta";
+import { routeMatrixKm, fullRouteKm } from "@/lib/distanceProvider";
+import { orderStopsByDistance } from "@/lib/batchOrdering";
 import { computeRouteShares, splitByRatio } from "@/lib/deliveryPricing";
 import { orderChargeableKg } from "@/lib/poolBatching"; // shared with the auto-batcher
 import { getExternalDeliveryConfig } from "@/lib/externalDelivery";
@@ -162,8 +164,14 @@ export async function POST(request) {
                 lng: o.recipientLng ?? o.address?.longitude ?? null,
                 chargeableKg: orderChargeableKg(o, volumetricFactor),
             }));
-            ordered = nearestNeighborRoute(KIGALI_HUB, points);
-            const distOpts = await resolveRouteDistances(ordered, KIGALI_HUB);
+            // Nearest-first: stops sorted by ascending hub→drop road distance
+            // (persisted per order below so batch listings never recompute it).
+            const dropKm = await routeMatrixKm(KIGALI_HUB, points.map((p) => ({ lat: p.lat, lng: p.lng })));
+            ordered = orderStopsByDistance(points, dropKm);
+            const dropDistances = ordered.map((s) => s.deliveryDistanceKm);
+            const distOpts = dropDistances.every((d) => d != null)
+                ? { dropDistances, routeKm: await fullRouteKm(ordered, KIGALI_HUB) }
+                : {};
             const res = computeRouteShares(ordered, config, KIGALI_HUB, distOpts);
             if (costOverride != null) {
                 routePrice = costOverride;
@@ -196,6 +204,7 @@ export async function POST(request) {
                     deliveryStatus: "SORTING",
                     deliveryFeeShare: feeShare,
                     stopSequence: i + 1,
+                    deliveryDistanceKm: ordered[i].deliveryDistanceKm ?? null,
                 },
             });
         }

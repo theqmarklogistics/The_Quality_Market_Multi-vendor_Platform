@@ -228,6 +228,9 @@ model Order {
     locationSharedAt  DateTime?
     // Explicit position within the corridor route
     stopSequence      Int?
+    // Hub→drop road distance (km), computed once at corridor build/assignment
+    // and persisted so rider batches sort nearest-first without recomputing.
+    deliveryDistanceKm Float?
     deliveredAt       DateTime?
     failureReason     String?
     // Number of completed (failed) delivery attempts for this pooled order
@@ -275,8 +278,37 @@ model Order {
     conversations Conversation[]
     returnRequest Return?
     corridor      DeliveryCorridor? @relation(fields: [corridorId], references: [id])
+    invoice       Invoice?
 
     @@index([paymentProofStatus, createdAt])
+    // Rider batch listing: stops of a corridor sorted nearest-first.
+    @@index([corridorId, deliveryDistanceKm])
+}
+
+// Sequential, race-safe invoice issued the moment a Bank Transfer order is
+// placed (proforma — before payment confirmation). `invoiceNumber` is drawn from
+// the Postgres sequence `invoice_number_seq` (single-statement nextval, so
+// concurrent checkouts can never collide); `paymentReference` is the formatted
+// number (INV-YYYY-00042) the customer must quote on the transfer. `snapshot`
+// freezes everything the PDF needs (items, bank details, customer, address) so
+// the document stays reproducible even if the order changes later.
+model Invoice {
+    id               String   @id @default(cuid())
+    invoiceNumber    Int      @unique
+    paymentReference String   @unique
+    orderId          String   @unique
+    subtotal         Float
+    shippingFee      Float    @default(0)
+    discount         Float    @default(0)
+    total            Float
+    chargeableKg     Float?
+    shippingTier     String?
+    snapshot         Json     @default("{}")
+    issuedAt         DateTime @default(now())
+
+    order Order @relation(fields: [orderId], references: [id])
+
+    @@index([issuedAt])
 }
 
 // Required for creating an OrderItem: orderId, productId, quantity, price
@@ -588,6 +620,12 @@ model ExternalDeliveryConfig {
     // Sliding-scale tiers: [{ maxKm, multiplier }, …], open final tier has maxKm:null.
     // Empty → code falls back to DEFAULT_TIERS in lib/deliveryPricing.js.
     distanceTiers    Json   @default("[]")
+    // Active shipping-fee strategy for pooled/external delivery quotes:
+    // "LEGACY" (kg×km×tier formula above) | "ZONE_WEIGHT" | "DISTANCE_WEIGHT" | "HYBRID_MARGIN".
+    // Defaults to LEGACY so live pricing never changes until an admin switches.
+    activeStrategy   String @default("LEGACY")
+    // Per-strategy parameters, see lib/shipping/strategies.js for shapes/defaults.
+    strategyParams   Json   @default("{}")
     updatedAt DateTime @updatedAt
 }
 
@@ -684,6 +722,11 @@ model CorridorRoute {
     // Ordered landmarks the rider passes on this route, recorded from the
     // beginning of the corridor to its end (array order IS the route order).
     landmarks   String[] @default([])
+    // Optional lane pricing: a fixed fee for any drop in this corridor's areas,
+    // or a per-km rate on the road distance. Fixed wins when both are set.
+    // When either is set, it overrides the formula/strategy fee for matching drops.
+    fixedRate   Float?
+    perKmRate   Float?
     isActive    Boolean  @default(true)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
@@ -711,6 +754,79 @@ model CorridorSchedule {
     rider         User?         @relation("ScheduleRider", fields: [riderId], references: [id])
 
     @@index([corridorRouteId, dayOfWeek])
+}
+
+enum EmailDirection {
+    INBOUND
+    OUTBOUND
+}
+
+// Admin ↔ customer EMAIL conversation (distinct from the in-app Conversation/
+// Message chat). Outbound mail sets Reply-To to inbox+<token>@INBOUND_EMAIL_DOMAIN;
+// the Resend inbound webhook (/api/email/inbound) matches replies back to the
+// thread by that token (falling back to the References/In-Reply-To headers).
+model EmailThread {
+    id            String   @id @default(cuid())
+    token         String   @unique @default(cuid())
+    subject       String
+    customerEmail String
+    userId        String?
+    orderId       String?
+    lastMessageAt DateTime @default(now())
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    messages EmailMessage[]
+
+    @@index([customerEmail])
+    @@index([lastMessageAt])
+}
+
+model EmailMessage {
+    id                String         @id @default(cuid())
+    threadId          String
+    direction         EmailDirection
+    fromEmail         String
+    toEmail           String
+    subject           String?
+    bodyText          String?
+    bodyHtml          String?
+    // Resend message id (outbound) / RFC-5322 Message-ID (inbound) — used to
+    // match replies via their References / In-Reply-To headers.
+    providerMessageId String?
+    sentById          String? // admin user id, outbound only
+    isRead            Boolean        @default(false)
+    createdAt         DateTime       @default(now())
+
+    thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+    @@index([threadId, createdAt])
+    @@index([providerMessageId])
+}
+
+// Geocoding results cached by normalized address string ("village|sector|district|province")
+// so repeat lookups of the same Rwandan address never re-bill the Google Geocoding API.
+model GeocodeCache {
+    id        String   @id @default(cuid())
+    query     String   @unique
+    lat       Float
+    lng       Float
+    precision String? // "village" | "sector" | "district"
+    provider  String? // "google" | "nominatim"
+    createdAt DateTime @default(now())
+}
+
+// Road-network route distances cached by rounded origin/destination coords
+// (4 dp ≈ 11 m) so repeat quotes for the same lane never re-bill the Google
+// Routes API. `provider` records which backend produced the figure.
+model RouteCache {
+    id         String   @id @default(cuid())
+    key        String   @unique // "lat,lng->lat,lng" rounded to 4 dp
+    distanceKm Float
+    durationMin Float?
+    provider   String // "google" | "osrm" | "haversine"
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
 }
 
 // Admin-configurable hero/banner slots ("main" | "card1" | "card2")

@@ -63,12 +63,15 @@ function fmt(amount) {
     return `${currency} ${Number(amount || 0).toLocaleString()}`;
 }
 
-function InvoiceDocument({ order, paymentConfig, logoSrc }) {
+function InvoiceDocument({ order, paymentConfig, logoSrc, invoice }) {
     const isMomo = order.paymentMethod === 'MTN_MOMO';
     const subtotal = order.orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const coupon = order.coupon && typeof order.coupon === 'object' ? order.coupon : null;
     const couponDiscount = coupon?.discount ? (coupon.discount / 100) * subtotal : 0;
     const shipping = Number(order.shippingCost || 0);
+    // Sequential invoice reference (INV-YYYY-00042) when a stored invoice backs
+    // this document; legacy ad-hoc PDFs fall back to the order id.
+    const paymentRef = invoice?.paymentReference || order.id.slice(0, 16).toUpperCase();
 
     return (
         <Document>
@@ -89,8 +92,11 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                     </View>
                     <View>
                         <Text style={styles.invoiceLabel}>INVOICE</Text>
+                        {invoice?.paymentReference && (
+                            <Text style={[styles.invoiceNum, { fontFamily: 'Helvetica-Bold', color: '#0f172a' }]}>Invoice No: {invoice.paymentReference}</Text>
+                        )}
                         <Text style={styles.invoiceNum}>Order ID: {order.id.slice(0, 16).toUpperCase()}</Text>
-                        <Text style={styles.invoiceNum}>Issued: {new Date().toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+                        <Text style={styles.invoiceNum}>Issued: {(invoice?.issuedAt ? new Date(invoice.issuedAt) : new Date()).toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
                     </View>
                 </View>
 
@@ -133,14 +139,20 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
 
                 {/* Totals */}
                 <View style={styles.totalsBox}>
+                    {invoice?.chargeableKg != null && invoice.chargeableKg > 0 && (
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>Chargeable weight</Text>
+                            <Text style={styles.totalValue}>{invoice.chargeableKg} kg</Text>
+                        </View>
+                    )}
                     <View style={styles.totalRow}>
                         <Text style={styles.totalLabel}>Subtotal</Text>
                         <Text style={styles.totalValue}>{fmt(subtotal)}</Text>
                     </View>
-                    {shipping > 0 && (
+                    {(shipping > 0 || invoice?.shippingTier) && (
                         <View style={styles.totalRow}>
-                            <Text style={styles.totalLabel}>Shipping</Text>
-                            <Text style={styles.totalValue}>{fmt(shipping)}</Text>
+                            <Text style={styles.totalLabel}>{invoice?.shippingTier ? `Shipping — ${invoice.shippingTier}` : 'Shipping'}</Text>
+                            <Text style={styles.totalValue}>{shipping > 0 ? fmt(shipping) : 'FREE'}</Text>
                         </View>
                     )}
                     {couponDiscount > 0 && (
@@ -162,7 +174,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                         <View style={styles.row}><Text style={styles.label}>Account Name:</Text><Text style={styles.value}>{paymentConfig?.momoAccountName || '—'}</Text></View>
                         <View style={styles.row}><Text style={styles.label}>Pay Code:</Text><Text style={styles.value}>{paymentConfig?.momoPayCode || '—'}</Text></View>
                         <View style={styles.row}><Text style={styles.label}>Amount to Pay:</Text><Text style={styles.value}>{fmt(order.total)}</Text></View>
-                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{order.id.slice(0, 16).toUpperCase()}</Text> as the payment note.</Text>
+                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{paymentRef}</Text> as the payment note.</Text>
                     </View>
                 ) : (
                     <View style={styles.paymentBoxBank}>
@@ -174,7 +186,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
                             <View style={styles.row}><Text style={styles.label}>Branch:</Text><Text style={styles.value}>{paymentConfig.bankBranch}</Text></View>
                         )}
                         <View style={styles.row}><Text style={styles.label}>Amount to Transfer:</Text><Text style={styles.value}>{fmt(order.total)}</Text></View>
-                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{order.id.slice(0, 16).toUpperCase()}</Text> as the transfer description.</Text>
+                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{paymentRef}</Text> as the transfer description.</Text>
                     </View>
                 )}
 
@@ -189,7 +201,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc }) {
     );
 }
 
-export async function generateInvoice({ order, paymentConfig }) {
+export async function generateInvoice({ order, paymentConfig, invoice = null }) {
     let logoSrc = null;
     try {
         const filePath = path.join(process.cwd(), 'public', 'the-quality-market-logo.png');
@@ -197,7 +209,7 @@ export async function generateInvoice({ order, paymentConfig }) {
     } catch {}
 
     const buffer = await renderToBuffer(
-        <InvoiceDocument order={order} paymentConfig={paymentConfig} logoSrc={logoSrc} />
+        <InvoiceDocument order={order} paymentConfig={paymentConfig} logoSrc={logoSrc} invoice={invoice} />
     );
     return buffer;
 }

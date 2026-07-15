@@ -69,6 +69,10 @@ export async function PATCH(request, { params }) {
             if (isNaN(fee) || fee < 0) {
                 return NextResponse.json({ error: "Invalid shipping fee" }, { status: 400 });
             }
+            // Standard delivery ships free — a seller can no longer add a fee.
+            if (order.deliveryType !== 'KIGALI_POOL' && fee > 0) {
+                return NextResponse.json({ error: "Standard delivery is free — a shipping fee cannot be added to this order." }, { status: 400 });
+            }
             const oldFee = order.shippingCost ?? 0;
             const newTotal = parseFloat((order.total - oldFee + fee).toFixed(2));
             await prisma.order.update({

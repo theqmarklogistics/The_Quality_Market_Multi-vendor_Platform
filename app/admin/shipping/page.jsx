@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { GlobeIcon, SaveIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ExternalDeliveryPricingForm from '@/components/admin/ExternalDeliveryPricingForm'
+import ShippingStrategyForm from '@/components/admin/ShippingStrategyForm'
 
 const ZONES = ['A', 'B', 'C', 'CHINA_RWANDA']
 const ZONE_LABELS = { A: 'Zone A — Central Kigali', B: 'Zone B — Intermediate Kigali', C: 'Zone C — Periphery', CHINA_RWANDA: 'China → Rwanda (International Freight)' }
@@ -62,6 +63,10 @@ export default function ShippingPage() {
 
       <div className="mb-8">
         <ExternalDeliveryPricingForm />
+      </div>
+
+      <div className="mb-8">
+        <ShippingStrategyForm />
       </div>
 
       <div className="flex items-center justify-between mb-4 max-w-5xl">

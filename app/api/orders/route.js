@@ -3,8 +3,13 @@ import { getAuth } from "@clerk/nextjs/server";
 import { randomBytes, randomInt } from "crypto";
 import prisma from "@/lib/prisma";
 import { paymentMethod } from "@/lib/constants";
-import { calculateOrderShippingForStore, calculateItemCommission } from '@/lib/pricing';
-import { quotePooledCartFee } from '@/lib/externalDelivery';
+import { calculateItemCommission } from '@/lib/pricing';
+import { computeOrderTotal, shippingCostForOrder } from '@/lib/orderTotals';
+import { quotePooledCartFee, getExternalDeliveryConfig } from '@/lib/externalDelivery';
+import { chargeableWeightKg } from '@/lib/deliveryPricing';
+import { createInvoiceForOrder, shippingTierLabel } from '@/lib/invoices';
+import { generateInvoice } from '@/lib/generateInvoice';
+import { sendInvoiceEmail } from '@/lib/email';
 import { getSocketServer } from "@/lib/socketServer";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
@@ -179,6 +184,8 @@ export async function POST(request) {
         }
 
         const orderIds = [];
+        // Per-order context kept for the Bank Transfer auto-invoice issued below.
+        const invoiceContexts = [];
         const paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000);
 
         // ── Phase 1: Reserve stock (optimistic locking, no transaction) ──────────
@@ -274,16 +281,14 @@ export async function POST(request) {
         const now = new Date();
         try {
             for (const [storeId, storeItems] of orderByStore.entries()) {
-                let total = storeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-                if (couponCode && coupon) total -= (total * coupon.discount / 100);
+                const itemsSubtotal = storeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-                // Shipping is always charged at checkout. Pooled orders pay the
-                // distance × weight pooled fee (batch of one — the final shared
-                // route can only be cheaper); standard orders pay the zone × weight
-                // tariff (with the flat base-fee fallback).
-                let shippingCost = 0;
-                let shippingRuleId = null;
-                let shippingQuoted = true;
+                // Standard delivery ships FREE. Pooled orders pay the distance ×
+                // weight pooled fee (batch of one — the final shared route can
+                // only be cheaper).
+                const shippingRuleId = null;
+                const shippingQuoted = true;
+                let quotedFee = 0;
                 if (deliveryType === 'KIGALI_POOL') {
                     const pooled = await quotePooledCartFee({
                         items: storeItems,
@@ -291,14 +296,14 @@ export async function POST(request) {
                         lng: recipientLng ?? address.longitude ?? null,
                         sector: address.sector || null,
                     });
-                    shippingCost = pooled?.fee || 0;
-                } else {
-                    const shippingRes = await calculateOrderShippingForStore(prisma, storeId, address, storeItems);
-                    shippingCost = shippingRes?.cost || 0;
-                    shippingRuleId = shippingRes?.ruleId || null;
-                    shippingQuoted = shippingRes?.shippingQuoted ?? true;
+                    quotedFee = pooled?.fee || 0;
                 }
-                total += shippingCost;
+                const shippingCost = shippingCostForOrder(deliveryType, quotedFee);
+                const total = computeOrderTotal({
+                    itemsSubtotal,
+                    couponPercent: couponCode && coupon ? coupon.discount : 0,
+                    shippingCost,
+                });
 
                 const commissionBreakdown = [];
                 for (const item of storeItems) {
@@ -360,6 +365,15 @@ export async function POST(request) {
                 }
 
                 orderIds.push(orderId);
+                invoiceContexts.push({
+                    orderId,
+                    storeItems,
+                    itemsSubtotal,
+                    shippingCost,
+                    total,
+                    discount: couponCode && coupon ? parseFloat(((itemsSubtotal * coupon.discount) / 100).toFixed(2)) : 0,
+                    couponJson: couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : null,
+                });
             }
         } catch (orderError) {
             await Promise.all(decremented.map(d =>
@@ -376,6 +390,98 @@ export async function POST(request) {
                 `.catch(console.error);
             }
             throw orderError;
+        }
+
+        // ── Phase 2.5: Auto-issue invoices for Bank Transfer orders ─────────────
+        // The invoice (sequential number + PDF + email with bank details and the
+        // payment reference) is generated the moment the order is placed, before
+        // payment confirmation. Failures are logged but never fail the order.
+        if (selectedPaymentMethod === paymentMethod.BANK_TRANSFER && invoiceContexts.length) {
+            try {
+                const [buyer, paymentConfig, deliveryConfig] = await Promise.all([
+                    prisma.user.findUnique({ where: { id: userId }, select: { name: true, email: true } }),
+                    prisma.paymentConfig.findUnique({ where: { id: 'default' } }),
+                    getExternalDeliveryConfig(),
+                ]);
+
+                for (const ctx of invoiceContexts) {
+                    // Chargeable weight = Σ max(actual, volumetric) per unit (1 kg
+                    // fallback for weightless items) — informational on the invoice.
+                    let chargeableKg = 0;
+                    for (const item of ctx.storeItems) {
+                        const perUnit = chargeableWeightKg(item.weightKg, item.lengthCm, item.widthCm, item.heightCm, deliveryConfig.volumetricFactor);
+                        chargeableKg += (perUnit > 0 ? perUnit : 1) * item.quantity;
+                    }
+
+                    const invoice = await createInvoiceForOrder({
+                        orderId: ctx.orderId,
+                        subtotal: ctx.itemsSubtotal,
+                        shippingFee: ctx.shippingCost,
+                        discount: ctx.discount,
+                        total: ctx.total,
+                        chargeableKg,
+                        shippingTier: shippingTierLabel(deliveryType),
+                        snapshot: {
+                            paymentMethod: selectedPaymentMethod,
+                            coupon: ctx.couponJson || {},
+                            customer: { name: buyer?.name || '', email: buyer?.email || '' },
+                            address: {
+                                street: address.street, city: address.city, state: address.state,
+                                country: address.country, phone: address.phone,
+                            },
+                            items: ctx.storeItems.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
+                            bank: {
+                                bankName: paymentConfig?.bankName || null,
+                                bankAccountNumber: paymentConfig?.bankAccountNumber || null,
+                                bankAccountName: paymentConfig?.bankAccountName || null,
+                                bankBranch: paymentConfig?.bankBranch || null,
+                            },
+                            momo: {
+                                momoAccountName: paymentConfig?.momoAccountName || null,
+                                momoPayCode: paymentConfig?.momoPayCode || null,
+                            },
+                        },
+                    });
+
+                    // Surface in the admin invoices dashboard immediately.
+                    prisma.$executeRaw`
+                        UPDATE "Order"
+                        SET "invoiceRequested" = true, "invoiceRequestedAt" = NOW(), "updatedAt" = NOW()
+                        WHERE id = ${ctx.orderId}
+                    `.catch(console.error);
+
+                    // PDF + email delivered out-of-band; the order response never waits.
+                    if (buyer?.email) {
+                        const orderView = {
+                            id: ctx.orderId,
+                            paymentMethod: selectedPaymentMethod,
+                            createdAt: now,
+                            total: ctx.total,
+                            shippingCost: ctx.shippingCost,
+                            coupon: ctx.couponJson || {},
+                            user: { name: buyer.name },
+                            address,
+                            orderItems: ctx.storeItems.map(i => ({ price: i.price, quantity: i.quantity, product: { name: i.name } })),
+                        };
+                        generateInvoice({ order: orderView, paymentConfig, invoice })
+                            .then(pdfBuffer => sendInvoiceEmail({
+                                to: buyer.email,
+                                subject: `Invoice ${invoice.paymentReference} — The Quality Market`,
+                                filename: `${invoice.paymentReference}.pdf`,
+                                orderId: ctx.orderId,
+                                pdfBuffer,
+                            }))
+                            .then(() => prisma.$executeRaw`
+                                UPDATE "Order"
+                                SET "invoiceStatus" = 'SENT', "invoiceSentAt" = NOW(), "updatedAt" = NOW()
+                                WHERE id = ${ctx.orderId}
+                            `)
+                            .catch(err => console.error('Auto-invoice email error:', err?.message || err));
+                    }
+                }
+            } catch (invoiceError) {
+                console.error('Auto-invoice error:', invoiceError?.message || invoiceError);
+            }
         }
 
         // ── Phase 3: Cleanup — raw SQL so the JS engine cannot wrap in a transaction
@@ -433,15 +539,19 @@ export async function GET(request) {
         const orderIds = rawOrders.map(o => o.id);
         const addressIds = [...new Set(rawOrders.map(o => o.addressId).filter(Boolean))];
 
-        // Parallel: orderItems, addresses, returnRequests, user
-        const [orderItems, addresses, returnRequests, user] = await Promise.all([
+        // Parallel: orderItems, addresses, returnRequests, user, invoices
+        const [orderItems, addresses, returnRequests, user, invoices] = await Promise.all([
             prisma.orderItem.findMany({ where: { orderId: { in: orderIds } } }),
             prisma.address.findMany({ where: { id: { in: addressIds } } }),
             prisma.return.findMany({
                 where: { orderId: { in: orderIds } },
                 select: { id: true, status: true, reason: true, createdAt: true, orderId: true }
             }),
-            prisma.user.findUnique({ where: { id: userId } })
+            prisma.user.findUnique({ where: { id: userId } }),
+            prisma.invoice.findMany({
+                where: { orderId: { in: orderIds } },
+                select: { orderId: true, invoiceNumber: true, paymentReference: true, issuedAt: true }
+            }).catch(() => [])
         ]);
 
         // Fetch products for all order items
@@ -451,6 +561,7 @@ export async function GET(request) {
         const productMap = new Map(products.map(p => [p.id, p]));
         const addressMap = new Map(addresses.map(a => [a.id, a]));
         const returnMap = new Map(returnRequests.map(r => [r.orderId, r]));
+        const invoiceMap = new Map(invoices.map(i => [i.orderId, i]));
         const orderItemsByOrder = new Map();
         for (const item of orderItems) {
             if (!orderItemsByOrder.has(item.orderId)) orderItemsByOrder.set(item.orderId, []);
@@ -462,7 +573,8 @@ export async function GET(request) {
             orderItems: orderItemsByOrder.get(o.id) || [],
             user,
             address: addressMap.get(o.addressId) || null,
-            returnRequest: returnMap.get(o.id) || null
+            returnRequest: returnMap.get(o.id) || null,
+            invoice: invoiceMap.get(o.id) || null
         }));
         return NextResponse.json({ orders, page, limit, total }, { status: 200 });
     } catch (error) {

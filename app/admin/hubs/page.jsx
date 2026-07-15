@@ -6,7 +6,7 @@ import { useAuth } from "@clerk/nextjs"
 import { useCallback, useEffect, useState } from "react"
 import axios from "axios"
 import toast from "react-hot-toast"
-import { WarehouseIcon, PlusIcon, Trash2Icon, RouteIcon, CalendarClockIcon, PowerIcon, MapPinIcon, ArrowUpIcon, ArrowDownIcon, XIcon } from "lucide-react"
+import { WarehouseIcon, PlusIcon, Trash2Icon, RouteIcon, CalendarClockIcon, PowerIcon, MapPinIcon, ArrowUpIcon, ArrowDownIcon, XIcon, BanknoteIcon } from "lucide-react"
 import { KIGALI_SECTORS } from "@/lib/constants"
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -70,9 +70,11 @@ export default function AdminHubs() {
     const [hubForm, setHubForm] = useState({ name: '', sector: '', landmark: '' })
     // New corridor form (keyed open per hub)
     const [corridorHub, setCorridorHub] = useState(null)
-    const [corridorForm, setCorridorForm] = useState({ name: '', areas: '', description: '', landmarks: [] })
+    const [corridorForm, setCorridorForm] = useState({ name: '', areas: '', description: '', landmarks: [], fixedRate: '', perKmRate: '' })
     // Route-landmark editor (keyed open per corridor) for existing corridors
     const [editingRoute, setEditingRoute] = useState(null) // { id, landmarks } | null
+    // Lane-rate editor (keyed open per corridor)
+    const [editingRates, setEditingRates] = useState(null) // { id, fixedRate, perKmRate } | null
     // New schedule form (keyed open per corridor)
     const [scheduleCorridor, setScheduleCorridor] = useState(null)
     const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: '1', departTime: '09:00', riderId: '' })
@@ -151,6 +153,21 @@ export default function AdminHubs() {
             await axios.patch(`/api/admin/corridor-routes/${editingRoute.id}`, { landmarks: editingRoute.landmarks }, { headers: await authHeaders() })
             toast.success('Route landmarks saved')
             setEditingRoute(null)
+            load()
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
+    }
+
+    const saveRates = async () => {
+        if (!editingRates) return
+        try {
+            await axios.patch(`/api/admin/corridor-routes/${editingRates.id}`, {
+                fixedRate: editingRates.fixedRate === '' ? null : Number(editingRates.fixedRate),
+                perKmRate: editingRates.perKmRate === '' ? null : Number(editingRates.perKmRate),
+            }, { headers: await authHeaders() })
+            toast.success('Corridor rates saved')
+            setEditingRates(null)
             load()
         } catch (error) {
             toast.error(error?.response?.data?.error || error.message)
@@ -271,8 +288,18 @@ export default function AdminHubs() {
                                         </p>
                                         {corridor.areas?.length > 0 && <p className="text-xs text-slate-400 mt-0.5">Areas: {corridor.areas.join(', ')}</p>}
                                         {corridor.description && <p className="text-xs text-slate-400">{corridor.description}</p>}
+                                        {(corridor.fixedRate != null || corridor.perKmRate != null) && (
+                                            <p className="text-xs text-emerald-700 mt-0.5">
+                                                {corridor.fixedRate != null && <>Fixed rate: RWF {Number(corridor.fixedRate).toLocaleString()}</>}
+                                                {corridor.fixedRate != null && corridor.perKmRate != null && ' · '}
+                                                {corridor.perKmRate != null && <>Per km: RWF {Number(corridor.perKmRate).toLocaleString()}</>}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="flex gap-2">
+                                        <button onClick={() => setEditingRates(editingRates?.id === corridor.id ? null : { id: corridor.id, fixedRate: corridor.fixedRate ?? '', perKmRate: corridor.perKmRate ?? '' })} title="Edit corridor rates" className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-600">
+                                            <BanknoteIcon size={13} />
+                                        </button>
                                         <button onClick={() => setEditingRoute(editingRoute?.id === corridor.id ? null : { id: corridor.id, landmarks: corridor.landmarks || [] })} title="Edit route landmarks" className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:border-green-400 hover:text-green-600">
                                             <MapPinIcon size={13} />
                                         </button>
@@ -284,6 +311,20 @@ export default function AdminHubs() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Lane pricing (fixed / per-km rate) */}
+                                {editingRates?.id === corridor.id && (
+                                    <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                                        <p className="text-xs font-medium text-slate-600 mb-2 flex items-center gap-1"><BanknoteIcon size={12} className="text-emerald-600" /> Corridor pricing — overrides the formula fee for drops in this corridor&apos;s areas</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <input type="number" min="0" value={editingRates.fixedRate} onChange={e => setEditingRates(r => ({ ...r, fixedRate: e.target.value }))} placeholder="Fixed rate (RWF, optional)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-500 bg-white w-44" />
+                                            <input type="number" min="0" value={editingRates.perKmRate} onChange={e => setEditingRates(r => ({ ...r, perKmRate: e.target.value }))} placeholder="Per-km rate (RWF, optional)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-emerald-500 bg-white w-44" />
+                                            <button onClick={saveRates} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700">Save rates</button>
+                                            <button onClick={() => setEditingRates(null)} className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600">Cancel</button>
+                                        </div>
+                                        <p className="mt-1.5 text-[11px] text-slate-400">Fixed wins when both are set. Leave both blank to price this corridor by the normal formula/strategy.</p>
+                                    </div>
+                                )}
 
                                 {/* Ordered route landmarks (start → end) */}
                                 {editingRoute?.id === corridor.id ? (
@@ -349,6 +390,10 @@ export default function AdminHubs() {
                                     <input value={corridorForm.areas} onChange={e => setCorridorForm(f => ({ ...f, areas: e.target.value }))} placeholder="Areas (comma-separated)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
                                     <input value={corridorForm.description} onChange={e => setCorridorForm(f => ({ ...f, description: e.target.value }))} placeholder="Notes (optional)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
                                 </div>
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                    <input type="number" min="0" value={corridorForm.fixedRate} onChange={e => setCorridorForm(f => ({ ...f, fixedRate: e.target.value }))} placeholder="Fixed rate (RWF, optional)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
+                                    <input type="number" min="0" value={corridorForm.perKmRate} onChange={e => setCorridorForm(f => ({ ...f, perKmRate: e.target.value }))} placeholder="Per-km rate (RWF, optional)" className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white" />
+                                </div>
                                 <div>
                                     <p className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1"><MapPinIcon size={12} className="text-green-600" /> Route landmarks — in the order the rider passes them</p>
                                     <LandmarkListEditor landmarks={corridorForm.landmarks} onChange={(landmarks) => setCorridorForm(f => ({ ...f, landmarks }))} />
@@ -359,7 +404,7 @@ export default function AdminHubs() {
                                 </div>
                             </form>
                         ) : (
-                            <button onClick={() => { setCorridorHub(hub.id); setCorridorForm({ name: '', areas: '', description: '', landmarks: [] }) }} className="inline-flex items-center gap-1.5 text-sm text-green-700 hover:underline">
+                            <button onClick={() => { setCorridorHub(hub.id); setCorridorForm({ name: '', areas: '', description: '', landmarks: [], fixedRate: '', perKmRate: '' }) }} className="inline-flex items-center gap-1.5 text-sm text-green-700 hover:underline">
                                 <PlusIcon size={14} /> Record a corridor from this hub
                             </button>
                         )}

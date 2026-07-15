@@ -384,14 +384,7 @@ function MainAd({
         {main.description}
       </Text>
       <View style={styles.adBottomRow}>
-        <View style={{ flex: 1 }}>
-          {main.startingPrice ? (
-            <>
-              <Text style={styles.adPriceLabel}>Starts from</Text>
-              <Text style={styles.adPrice}>RWF {main.startingPrice}</Text>
-            </>
-          ) : null}
-        </View>
+        <View style={{ flex: 1 }} />
         {main.imageUrl ? (
           <Image source={{ uri: main.imageUrl }} alt="Featured product" style={styles.adImage} resizeMode="contain" />
         ) : null}
@@ -619,13 +612,6 @@ const styles = StyleSheet.create({
     maxWidth: '88%',
   },
   adBottomRow: { flexDirection: 'row', alignItems: 'flex-end', flex: 1 },
-  adPriceLabel: { fontSize: 11, color: colors.muted, fontFamily: fonts.regular },
-  adPrice: {
-    fontSize: 20,
-    color: colors.text,
-    fontFamily: fonts.bold,
-    fontVariant: ['tabular-nums'],
-  },
   adImage: { width: 92, height: 92 },
   adCtaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   adCtaDark: {

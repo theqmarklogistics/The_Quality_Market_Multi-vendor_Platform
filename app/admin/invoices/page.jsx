@@ -77,7 +77,7 @@ const AdminInvoicesPage = () => {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                    <th className="text-left px-4 py-3 text-slate-500 font-medium">Order ID</th>
+                                    <th className="text-left px-4 py-3 text-slate-500 font-medium">Invoice / Order</th>
                                     <th className="text-left px-4 py-3 text-slate-500 font-medium">Customer</th>
                                     <th className="text-left px-4 py-3 text-slate-500 font-medium">Method</th>
                                     <th className="text-left px-4 py-3 text-slate-500 font-medium">Amount</th>
@@ -88,7 +88,10 @@ const AdminInvoicesPage = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {pending.map(order => (
                                     <tr key={order.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">#{order.id.slice(0, 16)}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                                            {order.invoice?.paymentReference && <div className="font-semibold text-slate-800">{order.invoice.paymentReference}</div>}
+                                            #{order.id.slice(0, 16)}
+                                        </td>
                                         <td className="px-4 py-3 text-slate-700">
                                             <div>{order.user?.name || '—'}</div>
                                             <div className="text-xs text-slate-400">{order.user?.email}</div>
@@ -127,7 +130,7 @@ const AdminInvoicesPage = () => {
                         <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-b border-slate-200">
                                 <tr>
-                                    <th className="text-left px-4 py-3 text-slate-500 font-medium">Order ID</th>
+                                    <th className="text-left px-4 py-3 text-slate-500 font-medium">Invoice / Order</th>
                                     <th className="text-left px-4 py-3 text-slate-500 font-medium">Customer</th>
                                     <th className="text-left px-4 py-3 text-slate-500 font-medium">Method</th>
                                     <th className="text-left px-4 py-3 text-slate-500 font-medium">Amount</th>
@@ -138,7 +141,10 @@ const AdminInvoicesPage = () => {
                             <tbody className="divide-y divide-slate-100">
                                 {sent.map(order => (
                                     <tr key={order.id} className="hover:bg-slate-50">
-                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">#{order.id.slice(0, 16)}</td>
+                                        <td className="px-4 py-3 font-mono text-xs text-slate-600">
+                                            {order.invoice?.paymentReference && <div className="font-semibold text-slate-800">{order.invoice.paymentReference}</div>}
+                                            #{order.id.slice(0, 16)}
+                                        </td>
                                         <td className="px-4 py-3 text-slate-700">
                                             <div>{order.user?.name || '—'}</div>
                                             <div className="text-xs text-slate-400">{order.user?.email}</div>

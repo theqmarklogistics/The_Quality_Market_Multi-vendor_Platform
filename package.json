@@ -12,6 +12,10 @@
     "lint": "eslint .",
     "test:pricing": "node scripts/check-pricing.mjs",
     "test:delivery-pricing": "node scripts/check-delivery-pricing.mjs",
+    "test:order-totals": "node scripts/check-order-totals.mjs",
+    "test:chargeable-weight": "node scripts/check-chargeable-weight.mjs",
+    "test:shipping-strategies": "node scripts/check-shipping-strategies.mjs",
+    "test:batch-ordering": "node scripts/check-batch-ordering.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

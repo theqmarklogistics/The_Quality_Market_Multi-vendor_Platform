@@ -203,7 +203,7 @@ function ConfirmationContent() {
                 {isBankTransfer && (
                     <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 mb-6">
                         <p className="font-semibold text-blue-800 mb-1">Bank Transfer Payment</p>
-                        <p className="text-sm text-blue-700 mb-4">Request your payment invoice to receive full bank account details by email. An invoice is required to complete a bank transfer.</p>
+                        <p className="text-sm text-blue-700 mb-4">Your invoice — with the bank account details and your payment reference number — has been generated and emailed to you automatically. You can also download it any time from <strong>My Orders</strong>.</p>
                         <div className="space-y-2">
                             {orders.map(order => {
                                 const requested = requestedIds.has(order.id) || order.invoiceRequested
@@ -215,7 +215,7 @@ function ConfirmationContent() {
                                         </div>
                                         {requested ? (
                                             <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
-                                                <CheckIcon size={13} /> Invoice Requested — Admin will send it shortly
+                                                <CheckIcon size={13} /> Invoice sent to your email
                                             </span>
                                         ) : (
                                             <button

@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/nextjs/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { getExternalDeliveryConfig } from "@/lib/externalDelivery";
+import { STRATEGIES } from "@/lib/shipping/strategies";
 
 // GET — current external-delivery pricing (admin).
 export async function GET(request) {
@@ -37,6 +38,25 @@ export async function POST(request) {
                 .filter((t) => t && (t.maxKm == null || Number.isFinite(t.maxKm)) && Number.isFinite(t.multiplier) && t.multiplier > 0)
                 .map((t) => ({ maxKm: t.maxKm == null ? null : Number(t.maxKm), multiplier: Number(t.multiplier) }));
             data.distanceTiers = tiers;
+        }
+        if (typeof body?.activeStrategy === "string") {
+            if (!STRATEGIES.includes(body.activeStrategy)) {
+                return NextResponse.json({ error: `activeStrategy must be one of: ${STRATEGIES.join(", ")}` }, { status: 400 });
+            }
+            data.activeStrategy = body.activeStrategy;
+        }
+        if (body?.strategyParams && typeof body.strategyParams === "object" && !Array.isArray(body.strategyParams)) {
+            // Numeric-only params, keyed by strategy name.
+            const clean = {};
+            for (const [strategy, params] of Object.entries(body.strategyParams)) {
+                if (!STRATEGIES.includes(strategy) || !params || typeof params !== "object") continue;
+                clean[strategy] = {};
+                for (const [k, v] of Object.entries(params)) {
+                    const n = Number(v);
+                    if (Number.isFinite(n) && n >= 0) clean[strategy][k] = n;
+                }
+            }
+            data.strategyParams = clean;
         }
 
         if (!Object.keys(data).length) {

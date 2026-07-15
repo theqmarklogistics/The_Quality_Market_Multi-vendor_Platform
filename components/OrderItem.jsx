@@ -1,7 +1,7 @@
 'use client'
 import Image from "next/image";
 import Link from "next/link";
-import { DotIcon, MessageCircleIcon, RotateCcwIcon, FileTextIcon, CheckIcon, TruckIcon } from "lucide-react";
+import { DotIcon, MessageCircleIcon, RotateCcwIcon, FileTextIcon, CheckIcon, TruckIcon, DownloadIcon } from "lucide-react";
 import { useSelector } from "react-redux";
 import Rating from "./Rating";
 import { useState } from "react";
@@ -97,6 +97,26 @@ const OrderItem = ({ order, onProofUploaded }) => {
         }
     };
 
+    const downloadInvoice = async () => {
+        try {
+            const token = await getToken()
+            const res = await axios.get(`/api/orders/${order.id}/invoice`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob',
+            })
+            const url = URL.createObjectURL(res.data)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${order.invoice?.paymentReference || 'invoice'}.pdf`
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+        } catch (err) {
+            toast.error(err?.response?.data?.error || 'Failed to download invoice')
+        }
+    }
+
     const requestInvoice = async () => {
         setInvoiceRequesting(true)
         try {
@@ -163,13 +183,21 @@ const OrderItem = ({ order, onProofUploaded }) => {
                                             />
                                         </label>
                                     )}
+                                    {order.invoice && (
+                                        <button
+                                            onClick={() => toast.promise(downloadInvoice(), { loading: 'Preparing invoice…' })}
+                                            className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                                        >
+                                            <DownloadIcon size={11} /> Download Invoice {order.invoice.paymentReference}
+                                        </button>
+                                    )}
                                     {showInvoiceAction && (
                                         <div className="mt-1">
                                             {invoiceSent ? (
                                                 <span className="inline-flex items-center gap-1 text-xs text-green-600">
                                                     <CheckIcon size={11} /> Invoice sent to your email
                                                 </span>
-                                            ) : invoiceRequested ? (
+                                            ) : order.invoice ? null : invoiceRequested ? (
                                                 <span className="inline-flex items-center gap-1 text-xs text-slate-500">
                                                     <FileTextIcon size={11} /> Invoice requested, awaiting admin
                                                 </span>
@@ -180,7 +208,7 @@ const OrderItem = ({ order, onProofUploaded }) => {
                                                     className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline disabled:opacity-60"
                                                 >
                                                     <FileTextIcon size={11} />
-                                                    {order.paymentMethod === 'BANK_TRANSFER' ? 'Request Invoice (required)' : 'Request Invoice'}
+                                                    Request Invoice
                                                 </button>
                                             )}
                                         </div>

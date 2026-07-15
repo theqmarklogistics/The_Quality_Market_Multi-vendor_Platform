@@ -40,7 +40,7 @@ export const HERO_DEFAULTS: HeroConfig = {
     headline: 'Anything you need. Anyone can sell.',
     description:
       'Shop products of every kind from verified stores across Rwanda — and get them delivered to your door by our own riders, tracked live.',
-    startingPrice: '4.9K',
+    startingPrice: null,
     cta1Label: 'Shop now',
     cta1Href: '/shop',
     cta2Label: 'Delivery service',

@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getSocketServer } from "@/lib/socketServer";
 import { generateInvoice } from "@/lib/generateInvoice";
 import { sendInvoiceEmail } from "@/lib/email";
+import { orderViewFromInvoice, paymentConfigFromInvoice } from "@/lib/invoices";
 
 export async function POST(request, { params }) {
     try {
@@ -51,7 +52,39 @@ export async function POST(request, { params }) {
             return NextResponse.json({ message: 'Invoice sent to your email!' });
         }
 
-        // Bank Transfer: queue for admin review as before
+        // Bank Transfer: invoices are auto-issued at order placement — re-send the
+        // stored one when it exists (renders from its frozen snapshot).
+        const storedInvoice = await prisma.invoice.findUnique({ where: { orderId } });
+        if (storedInvoice) {
+            if (!order.user?.email) return NextResponse.json({ error: 'No email on file for this account' }, { status: 400 });
+
+            const pdfBuffer = await generateInvoice({
+                order: orderViewFromInvoice(storedInvoice),
+                paymentConfig: paymentConfigFromInvoice(storedInvoice),
+                invoice: storedInvoice,
+            });
+            await sendInvoiceEmail({
+                to: order.user.email,
+                subject: `Invoice ${storedInvoice.paymentReference} — The Quality Market`,
+                filename: `${storedInvoice.paymentReference}.pdf`,
+                orderId,
+                pdfBuffer,
+            });
+
+            await prisma.$executeRaw`
+                UPDATE "Order"
+                SET "invoiceRequested" = true,
+                    "invoiceRequestedAt" = NOW(),
+                    "invoiceStatus" = 'SENT',
+                    "invoiceSentAt" = NOW(),
+                    "updatedAt" = NOW()
+                WHERE id = ${orderId}
+            `;
+
+            return NextResponse.json({ message: 'Invoice sent to your email!' });
+        }
+
+        // Legacy Bank Transfer orders (placed before auto-invoicing): queue for admin review.
         await prisma.$executeRaw`
             UPDATE "Order"
             SET "invoiceRequested" = true,

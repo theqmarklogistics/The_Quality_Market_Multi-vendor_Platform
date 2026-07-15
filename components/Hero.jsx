@@ -11,7 +11,6 @@ const DEFAULTS = {
         badgeText: 'Fast, Tracked Delivery Across Kigali!',
         headline: 'Anything you need. Anyone can sell.',
         description: 'Shop products of every kind from verified stores across Rwanda — and get them delivered to your door by our own riders, tracked live.',
-        startingPrice: '4.9K',
         cta1Label: 'Shop now',
         cta1Href: '/shop',
         imageUrl: null,
@@ -33,7 +32,6 @@ const DEFAULTS = {
 }
 
 const Hero = () => {
-    const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || 'RWF'
     const [config, setConfig] = useState(DEFAULTS)
 
     useEffect(() => {
@@ -60,12 +58,6 @@ const Hero = () => {
                         <p className='max-w-md text-slate-600 text-sm sm:text-base leading-7'>
                             {main.description}
                         </p>
-                        {main.startingPrice && (
-                            <div className='text-slate-800 text-sm font-medium mt-5 sm:mt-8'>
-                                <p className='text-slate-500'>Starts from</p>
-                                <p className='text-3xl font-semibold'>{currency}{main.startingPrice}</p>
-                            </div>
-                        )}
                         <div className='flex flex-wrap items-start gap-x-4 gap-y-3 mt-5 sm:mt-10'>
                             {main.cta1Label && main.cta1Href && (
                                 <Link href={main.cta1Href} className='inline-flex items-center justify-center gap-2 bg-slate-800 text-white text-sm py-2.5 px-6 sm:py-4 sm:px-10 rounded-full hover:bg-slate-900 hover:-translate-y-0.5 active:scale-95 transition shadow-lg shadow-slate-800/20'>

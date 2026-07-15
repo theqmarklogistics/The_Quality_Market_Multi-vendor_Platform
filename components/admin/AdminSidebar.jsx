@@ -29,6 +29,7 @@ const AdminSidebar = () => {
         { name: 'Orders', href: '/admin/orders', icon: TagsIcon, badge: counts.newOrders },
         { name: 'Payments', href: '/admin/payments', icon: TicketPercentIcon, badge: counts.pendingPaymentProofs },
         { name: 'Chats', href: '/admin/chat', icon: MessageCircleIcon, badge: counts.unreadChatMessages },
+        { name: 'Email Inbox', href: '/admin/inbox', icon: MailIcon },
         { name: 'Coupons', href: '/admin/coupons', icon: TicketPercentIcon },
         { name: 'Returns', href: '/admin/returns', icon: RotateCcwIcon },
         { name: 'Payouts', href: '/admin/payouts', icon: CircleDollarSignIcon },

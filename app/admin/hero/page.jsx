@@ -53,7 +53,6 @@ export default function AdminHero() {
                     badgeText: data.main?.badgeText || '',
                     headline: data.main?.headline || '',
                     description: data.main?.description || '',
-                    startingPrice: data.main?.startingPrice || '',
                     cta1Label: data.main?.cta1Label || '',
                     cta1Href: data.main?.cta1Href || '',
                     cta2Label: data.main?.cta2Label || '',
@@ -123,7 +122,6 @@ export default function AdminHero() {
                             <Field label="Badge text" value={forms.main?.badgeText} onChange={v => setField('main', 'badgeText', v)} />
                             <Field label="Headline" value={forms.main?.headline} onChange={v => setField('main', 'headline', v)} multiline />
                             <Field label="Description" value={forms.main?.description} onChange={v => setField('main', 'description', v)} multiline />
-                            <Field label="Starting price (number only)" value={forms.main?.startingPrice} onChange={v => setField('main', 'startingPrice', v)} placeholder="e.g. 4.9K" />
                             <div className="grid grid-cols-2 gap-3">
                                 <Field label="CTA 1 label" value={forms.main?.cta1Label} onChange={v => setField('main', 'cta1Label', v)} />
                                 <Field label="CTA 1 link" value={forms.main?.cta1Href} onChange={v => setField('main', 'cta1Href', v)} placeholder="/shop" />

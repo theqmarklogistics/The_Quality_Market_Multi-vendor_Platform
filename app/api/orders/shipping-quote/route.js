@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import { calculateOrderShippingForStore } from "@/lib/pricing";
 import { quotePooledCartFee } from "@/lib/externalDelivery";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 
@@ -13,7 +12,7 @@ const quoteLimiter = createRateLimiter({ max: 30, windowMs: 60_000 });
 // Checkout-time shipping quote for the whole cart, computed exactly like order
 // creation (per store, then summed) so the amount shown at checkout is the
 // amount charged. Pooled carts use the distance × weight pooled fee; standard
-// carts use the zone × weight tariff with the flat base-fee fallback.
+// delivery ships FREE (fee is always 0).
 export async function POST(request) {
     try {
         const rl = quoteLimiter(`shipping-quote:${getClientIp(request)}`);
@@ -66,8 +65,8 @@ export async function POST(request) {
 
         let shipping = 0;
         let basis = null;
-        for (const [storeId, storeItems] of byStore.entries()) {
-            if (deliveryType === "KIGALI_POOL") {
+        if (deliveryType === "KIGALI_POOL") {
+            for (const storeItems of byStore.values()) {
                 const pooled = await quotePooledCartFee({
                     items: storeItems,
                     lat: pinLat ?? address.latitude ?? null,
@@ -76,10 +75,10 @@ export async function POST(request) {
                 });
                 shipping += pooled?.fee || 0;
                 basis = basis || pooled?.basis || null;
-            } else {
-                const res = await calculateOrderShippingForStore(prisma, storeId, address, storeItems);
-                shipping += res?.cost || 0;
             }
+        } else {
+            // Standard delivery is free — no per-store fee.
+            basis = "free";
         }
 
         return NextResponse.json({

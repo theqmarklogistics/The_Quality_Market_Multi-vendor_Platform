@@ -14,13 +14,27 @@ export async function GET(request) {
             orderBy: { invoiceRequestedAt: 'desc' },
         });
 
-        // Hydrate users separately (no include — avoids driverAdapters transaction)
+        // Hydrate users + stored invoices separately (no include — avoids driverAdapters transaction)
         const userIds = [...new Set(rawOrders.map(o => o.userId).filter(Boolean))];
-        const users = userIds.length
-            ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true } })
-            : [];
+        const orderIds = rawOrders.map(o => o.id);
+        const [users, invoices] = await Promise.all([
+            userIds.length
+                ? prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true, email: true } })
+                : [],
+            orderIds.length
+                ? prisma.invoice.findMany({
+                    where: { orderId: { in: orderIds } },
+                    select: { orderId: true, invoiceNumber: true, paymentReference: true, issuedAt: true, total: true },
+                })
+                : [],
+        ]);
         const userMap = new Map(users.map(u => [u.id, u]));
-        const orders = rawOrders.map(o => ({ ...o, user: userMap.get(o.userId) || null }));
+        const invoiceMap = new Map(invoices.map(i => [i.orderId, i]));
+        const orders = rawOrders.map(o => ({
+            ...o,
+            user: userMap.get(o.userId) || null,
+            invoice: invoiceMap.get(o.id) || null,
+        }));
 
         return NextResponse.json({ orders });
     } catch (error) {

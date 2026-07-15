@@ -11,7 +11,6 @@ const DEFAULTS = {
         badgeText: 'Fast, Tracked Delivery Across Kigali!',
         headline: 'Anything you need. Anyone can sell.',
         description: 'Shop products of every kind from verified stores across Rwanda — and get them delivered to your door by our own riders, tracked live.',
-        startingPrice: '4.9K',
         cta1Label: 'Shop now',
         cta1Href: '/shop',
         cta2Label: 'Delivery service',
@@ -59,10 +58,9 @@ export async function GET(request) {
         for (const key of ['main', 'card1', 'card2']) {
             result[key] = { ...DEFAULTS[key], ...(bySlot[key] || {}) };
         }
-        // Shipping is never free — scrub any stale admin-saved free-shipping copy.
-        if (/free\s*(shipping|delivery)/i.test(result.main.badgeText || '')) {
-            result.main.badgeText = DEFAULTS.main.badgeText;
-        }
+        // The "Starts from <price>" hero badge was retired — never surface it,
+        // even from a stale admin-saved row (web + mobile read this endpoint).
+        result.main.startingPrice = null;
         for (const slot of ['card1', 'card2']) {
             if (LEGACY_CARD_TITLES[slot].test(result[slot].cardTitle || '')) {
                 result[slot] = { ...DEFAULTS[slot] };

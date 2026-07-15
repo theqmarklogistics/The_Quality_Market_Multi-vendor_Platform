@@ -33,7 +33,12 @@ export async function GET(request) {
             orderBy: { runDate: "desc" },
             include: {
                 orders: {
-                    orderBy: { stopSequence: "asc" },
+                    // Nearest first: ascending persisted hub→drop road distance,
+                    // with stopSequence as the tie-break / legacy fallback.
+                    orderBy: [
+                        { deliveryDistanceKm: { sort: "asc", nulls: "last" } },
+                        { stopSequence: "asc" },
+                    ],
                     include: {
                         address: true,
                         store: { select: { name: true } },
@@ -61,6 +66,7 @@ export async function GET(request) {
             lat: o.recipientLat ?? o.address?.latitude ?? null,
             lng: o.recipientLng ?? o.address?.longitude ?? null,
             deliveryFeeShare: o.deliveryFeeShare,
+            deliveryDistanceKm: o.deliveryDistanceKm ?? null,
         }));
 
         return NextResponse.json({
