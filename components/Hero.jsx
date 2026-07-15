@@ -16,7 +16,7 @@ const DEFAULTS = {
         imageUrl: null,
     },
     card1: {
-        cardTitle: 'Fast, tracked delivery',
+        cardTitle: 'Fast, trackable delivery',
         accentColor: '#16A34A',
         linkLabel: 'Book a delivery',
         linkHref: '/external',
