@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { CornerDownRightIcon, PencilIcon, PlusIcon, SaveIcon, TagIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { MAX_CATEGORY_DEPTH, flattenCategoryOptions, isSelfOrDescendant } from '@/lib/categoryTree'
 
-const EMPTY_FORM = { name: '', sortOrder: '', parentId: '' }
+const EMPTY_FORM = { name: '', subName: '', subSubName: '', sortOrder: '', parentId: '' }
 
 export default function AdminCategories() {
     const { getToken } = useAuth()
@@ -52,6 +52,8 @@ export default function AdminCategories() {
         setEditId(cat.id)
         setForm({
             name: cat.name,
+            subName: '',
+            subSubName: '',
             sortOrder: cat.sortOrder,
             parentId: cat.parentId || '',
         })
@@ -60,8 +62,16 @@ export default function AdminCategories() {
     // "+ Sub" shortcut: prefill the add-form with this category as the parent.
     const startAddChild = (cat) => {
         setEditId(null)
-        setForm({ name: '', sortOrder: '', parentId: cat.id })
+        setForm({ ...EMPTY_FORM, parentId: cat.id })
     }
+
+    // How many levels the chain (name → sub → sub-sub) can still occupy under
+    // the selected parent. No parent → 3; parent at level 1 → 2; level 2 → 1.
+    const chainCapacity = useMemo(() => {
+        if (!form.parentId) return MAX_CATEGORY_DEPTH
+        const parent = treeRows.find(r => r.id === form.parentId)
+        return MAX_CATEGORY_DEPTH - (parent?.depth ?? 0)
+    }, [form.parentId, treeRows])
 
     const cancelEdit = () => {
         setEditId(null)
@@ -85,10 +95,15 @@ export default function AdminCategories() {
                 })
                 toast.success('Category updated')
             } else {
-                await axios.post('/api/admin/categories', payload, {
+                // Creating: the optional sub / sub-sub fields record a whole
+                // branch in one go (respecting the depth cap under the parent).
+                if (chainCapacity >= 2 && form.subName.trim()) payload.subName = form.subName.trim()
+                if (chainCapacity >= 3 && form.subSubName.trim()) payload.subSubName = form.subSubName.trim()
+                const { data } = await axios.post('/api/admin/categories', payload, {
                     headers: { Authorization: `Bearer ${token}` },
                 })
-                toast.success('Category created')
+                const n = data?.created?.length || 1
+                toast.success(n > 1 ? `Created ${n} categories (${data.created.map(c => c.name).join(' → ')})` : 'Category created')
             }
             setEditId(null)
             setForm(EMPTY_FORM)
@@ -214,9 +229,29 @@ export default function AdminCategories() {
                 {/* Add / Edit form */}
                 <div className="border border-slate-200 rounded-2xl bg-white p-5 h-fit">
                     <h2 className="text-sm font-medium text-slate-700 mb-5">
-                        {editId ? `Edit: ${form.name || '…'}` : 'Add Category'}
+                        {editId
+                            ? `Edit: ${form.name || '…'}`
+                            : form.parentId
+                                ? `Add under: ${treeRows.find(r => r.id === form.parentId)?.name || '…'}`
+                                : 'Add Category'}
                     </h2>
                     <form onSubmit={handleSave} className="flex flex-col gap-4">
+                        <div>
+                            <label className="block text-xs text-slate-500 font-medium mb-1">
+                                Parent category <span className="font-normal text-slate-400">(optional — file this under an existing category)</span>
+                            </label>
+                            <select
+                                className={inputCls}
+                                value={form.parentId}
+                                onChange={e => setForm(f => ({ ...f, parentId: e.target.value, subName: '', subSubName: '' }))}
+                            >
+                                <option value="">None — top-level category</option>
+                                {parentOptions.map(opt => (
+                                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div>
                             <label className="block text-xs text-slate-500 font-medium mb-1">Category name</label>
                             <input
@@ -229,21 +264,39 @@ export default function AdminCategories() {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-xs text-slate-500 font-medium mb-1">
-                                Parent category <span className="font-normal text-slate-400">(optional — makes this a subcategory, up to {MAX_CATEGORY_DEPTH} levels)</span>
-                            </label>
-                            <select
-                                className={inputCls}
-                                value={form.parentId}
-                                onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))}
-                            >
-                                <option value="">None — top-level category</option>
-                                {parentOptions.map(opt => (
-                                    <option key={opt.id} value={opt.id}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </div>
+                        {!editId && chainCapacity >= 2 && (
+                            <div>
+                                <label className="block text-xs text-slate-500 font-medium mb-1">
+                                    Subcategory <span className="font-normal text-slate-400">(optional — created under the category above)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    className={inputCls}
+                                    value={form.subName}
+                                    onChange={e => setForm(f => ({ ...f, subName: e.target.value, ...(e.target.value.trim() ? {} : { subSubName: '' }) }))}
+                                    placeholder="e.g. Phones"
+                                />
+                            </div>
+                        )}
+
+                        {!editId && chainCapacity >= 3 && (
+                            <div>
+                                <label className="block text-xs text-slate-500 font-medium mb-1">
+                                    Sub-subcategory <span className="font-normal text-slate-400">(optional — created under the subcategory)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    className={inputCls}
+                                    value={form.subSubName}
+                                    onChange={e => setForm(f => ({ ...f, subSubName: e.target.value }))}
+                                    placeholder="e.g. Smartphones"
+                                    disabled={!form.subName.trim()}
+                                />
+                                {!form.subName.trim() && (
+                                    <p className="mt-1 text-[11px] text-slate-400">Fill the subcategory first.</p>
+                                )}
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-xs text-slate-500 font-medium mb-1">
