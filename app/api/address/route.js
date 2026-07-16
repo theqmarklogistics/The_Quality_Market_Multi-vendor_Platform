@@ -36,11 +36,21 @@ export async function POST(request) {
 
         // Preferred: an exact pinned location (powers hub-distance and rider routing).
         // Fallback: geocode an approximate point from the cell/village description.
-        let latitude = Number(input.latitude);
-        let longitude = Number(input.longitude);
+        // Parse strictly: Number(null|"") is 0, so a missing pin must never become
+        // (0,0) — that priced deliveries as if the drop were 4,700 km away. A pin
+        // only counts when it actually falls inside Rwanda's bounding box.
+        const parseCoord = (v) => {
+            if (v == null || v === "") return null;
+            const n = Number(v);
+            return Number.isFinite(n) ? n : null;
+        };
+        let latitude = parseCoord(input.latitude);
+        let longitude = parseCoord(input.longitude);
         const hasPin =
-            Number.isFinite(latitude) && Number.isFinite(longitude) &&
-            latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+            latitude != null && longitude != null &&
+            latitude >= -3.0 && latitude <= -1.0 &&
+            longitude >= 28.8 && longitude <= 31.0;
+        if (!hasPin) { latitude = null; longitude = null; }
 
         if (!hasPin && (!district || !sector || !cell)) {
             return NextResponse.json(
