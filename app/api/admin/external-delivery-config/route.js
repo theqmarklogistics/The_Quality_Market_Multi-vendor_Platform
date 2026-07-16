@@ -3,7 +3,6 @@ import { getAuth } from "@clerk/nextjs/server";
 import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { getExternalDeliveryConfig } from "@/lib/externalDelivery";
-import { STRATEGIES } from "@/lib/shipping/strategies";
 
 // GET — current external-delivery pricing (admin).
 export async function GET(request) {
@@ -19,7 +18,7 @@ export async function GET(request) {
 }
 
 // POST { basePrice?, perSector?, baseRatePerKgKm?, minimumFloor?, volumetricFactor?,
-//        distanceTiers? } — update external-delivery pricing (admin).
+//        taperStepKm?, taperDropPerStep?, taperFloorPct? } — update delivery pricing (admin).
 export async function POST(request) {
     try {
         const { userId } = getAuth(request);
@@ -32,32 +31,11 @@ export async function POST(request) {
         if (Number.isFinite(body?.baseRatePerKgKm) && body.baseRatePerKgKm > 0) data.baseRatePerKgKm = body.baseRatePerKgKm;
         if (Number.isFinite(body?.minimumFloor) && body.minimumFloor >= 0) data.minimumFloor = body.minimumFloor;
         if (Number.isFinite(body?.volumetricFactor) && body.volumetricFactor > 0) data.volumetricFactor = body.volumetricFactor;
-        if (Array.isArray(body?.distanceTiers)) {
-            // Keep only well-formed tiers: { maxKm: number|null, multiplier: number>0 }.
-            const tiers = body.distanceTiers
-                .filter((t) => t && (t.maxKm == null || Number.isFinite(t.maxKm)) && Number.isFinite(t.multiplier) && t.multiplier > 0)
-                .map((t) => ({ maxKm: t.maxKm == null ? null : Number(t.maxKm), multiplier: Number(t.multiplier) }));
-            data.distanceTiers = tiers;
-        }
-        if (typeof body?.activeStrategy === "string") {
-            if (!STRATEGIES.includes(body.activeStrategy)) {
-                return NextResponse.json({ error: `activeStrategy must be one of: ${STRATEGIES.join(", ")}` }, { status: 400 });
-            }
-            data.activeStrategy = body.activeStrategy;
-        }
-        if (body?.strategyParams && typeof body.strategyParams === "object" && !Array.isArray(body.strategyParams)) {
-            // Numeric-only params, keyed by strategy name.
-            const clean = {};
-            for (const [strategy, params] of Object.entries(body.strategyParams)) {
-                if (!STRATEGIES.includes(strategy) || !params || typeof params !== "object") continue;
-                clean[strategy] = {};
-                for (const [k, v] of Object.entries(params)) {
-                    const n = Number(v);
-                    if (Number.isFinite(n) && n >= 0) clean[strategy][k] = n;
-                }
-            }
-            data.strategyParams = clean;
-        }
+        // Distance-taper knobs. Step must be positive; drop is a fraction 0–1;
+        // floor is a positive fraction ≤ 1 (the rate never decays below it).
+        if (Number.isFinite(body?.taperStepKm) && body.taperStepKm > 0) data.taperStepKm = body.taperStepKm;
+        if (Number.isFinite(body?.taperDropPerStep) && body.taperDropPerStep >= 0 && body.taperDropPerStep <= 1) data.taperDropPerStep = body.taperDropPerStep;
+        if (Number.isFinite(body?.taperFloorPct) && body.taperFloorPct > 0 && body.taperFloorPct <= 1) data.taperFloorPct = body.taperFloorPct;
 
         if (!Object.keys(data).length) {
             return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

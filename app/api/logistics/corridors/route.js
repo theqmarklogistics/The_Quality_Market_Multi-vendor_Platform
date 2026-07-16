@@ -8,7 +8,7 @@ import { routeMatrixKm, fullRouteKm } from "@/lib/distanceProvider";
 import { orderStopsByDistance } from "@/lib/batchOrdering";
 import { computeRouteShares, splitByRatio } from "@/lib/deliveryPricing";
 import { orderChargeableKg } from "@/lib/poolBatching"; // shared with the auto-batcher
-import { getExternalDeliveryConfig } from "@/lib/externalDelivery";
+import { getExternalDeliveryConfig, getWeightRanges } from "@/lib/externalDelivery";
 
 // GET ?date=YYYY-MM-DD — all corridors running that day, with stops + assigned rider.
 export async function GET(request) {
@@ -152,6 +152,7 @@ export async function POST(request) {
         // explicit cost), then split it across stops by (chargeableKg × distance).
         const config = await getExternalDeliveryConfig();
         const volumetricFactor = config.volumetricFactor ?? 200;
+        const weightRanges = await getWeightRanges();
 
         let ordered = [];
         let shares = [];
@@ -172,7 +173,7 @@ export async function POST(request) {
             const distOpts = dropDistances.every((d) => d != null)
                 ? { dropDistances, routeKm: await fullRouteKm(ordered, KIGALI_HUB) }
                 : {};
-            const res = computeRouteShares(ordered, config, KIGALI_HUB, distOpts);
+            const res = computeRouteShares(ordered, config, weightRanges, KIGALI_HUB, distOpts);
             if (costOverride != null) {
                 routePrice = costOverride;
                 shares = splitByRatio(routePrice, res.loads.some((l) => l > 0) ? res.loads : ordered.map(() => 1));

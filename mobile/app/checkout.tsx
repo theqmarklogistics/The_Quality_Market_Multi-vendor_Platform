@@ -347,9 +347,11 @@ function CheckoutScreenInner() {
               <Text style={styles.quoteText}>
                 {quoting
                   ? 'Calculating delivery fee…'
-                  : shippingQuote
-                    ? `Delivery fee: ${formatPrice(shippingQuote.shipping)} — paid at checkout; sharing the route can only make it cheaper.`
-                    : 'Delivery fee is calculated from your address location.'}
+                  : shippingQuote?.needsReview
+                    ? "This package's weight is outside our standard ranges — our team will confirm your delivery fee after you order."
+                    : shippingQuote && shippingQuote.shipping != null
+                      ? `Delivery fee: ${formatPrice(shippingQuote.shipping)} — paid at checkout; sharing the route can only make it cheaper.`
+                      : 'Delivery fee is calculated from your address location.'}
               </Text>
             </View>
           </View>
@@ -429,7 +431,13 @@ function CheckoutScreenInner() {
             {deliveryType === DeliveryType.KIGALI_POOL ? 'Shipping (pooled)' : 'Shipping'}
           </Text>
           <Text style={styles.sumVal}>
-            {quoting ? 'Calculating…' : shippingQuote ? formatPrice(shippingFee) : '—'}
+            {quoting
+              ? 'Calculating…'
+              : shippingQuote?.needsReview
+                ? 'Confirmed by our team'
+                : shippingQuote && shippingQuote.shipping != null
+                  ? formatPrice(shippingFee)
+                  : '—'}
           </Text>
         </View>
         <View style={styles.sumRow}>
@@ -437,9 +445,11 @@ function CheckoutScreenInner() {
           <Money value={estimatedTotal} style={{ fontSize: 20 }} />
         </View>
         <Text style={styles.note}>
-          {deliveryType === DeliveryType.KIGALI_POOL && shippingQuote
-            ? 'Shipping is paid at checkout — the final pooled fee can only be lower when your route is shared.'
-            : 'Shipping is calculated and paid at checkout.'}
+          {shippingQuote?.needsReview
+            ? "Your delivery fee will be confirmed by our team after you place the order."
+            : deliveryType === DeliveryType.KIGALI_POOL && shippingQuote
+              ? 'Shipping is paid at checkout — the final pooled fee can only be lower when your route is shared.'
+              : 'Shipping is calculated and paid at checkout.'}
         </Text>
         <Button label="Place order" icon="bag-check-outline" onPress={placeOrder} loading={placing} />
       </View>

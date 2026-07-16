@@ -11,8 +11,10 @@ const quoteLimiter = createRateLimiter({ max: 30, windowMs: 60_000 });
 // POST { addressId, items: [{ id, quantity }], deliveryType?, lat?, lng? }
 // Checkout-time shipping quote for the whole cart, computed exactly like order
 // creation (per store, then summed) so the amount shown at checkout is the
-// amount charged. Pooled carts use the distance × weight pooled fee; standard
-// delivery ships FREE (fee is always 0).
+// amount charged. Every delivery type (standard + pooled) uses the segmented
+// distance-taper + weight-range formula. If any store's package weight falls
+// outside the configured ranges, the quote returns needsReview (no fee) so the
+// customer is told the fee will be confirmed by our team.
 export async function POST(request) {
     try {
         const rl = quoteLimiter(`shipping-quote:${getClientIp(request)}`);
@@ -63,26 +65,35 @@ export async function POST(request) {
             });
         }
 
+        // Every delivery type is priced by the same formula (per store, summed).
         let shipping = 0;
         let basis = null;
-        if (deliveryType === "KIGALI_POOL") {
-            for (const storeItems of byStore.values()) {
-                const pooled = await quotePooledCartFee({
-                    items: storeItems,
-                    lat: pinLat ?? address.latitude ?? null,
-                    lng: pinLng ?? address.longitude ?? null,
-                    sector: address.sector || null,
-                });
-                shipping += pooled?.fee || 0;
-                basis = basis || pooled?.basis || null;
+        let needsReview = false;
+        let volumetricKg = 0;
+        let chargeableKg = 0;
+        for (const storeItems of byStore.values()) {
+            const quote = await quotePooledCartFee({
+                items: storeItems,
+                lat: pinLat ?? address.latitude ?? null,
+                lng: pinLng ?? address.longitude ?? null,
+                sector: address.sector || null,
+            });
+            volumetricKg += quote?.volumetricKg || 0;
+            chargeableKg += quote?.greaterWeightKg || 0;
+            if (quote?.needsReview) {
+                needsReview = true;
+                basis = "needs_review";
+                continue;
             }
-        } else {
-            // Standard delivery is free — no per-store fee.
-            basis = "free";
+            shipping += quote?.fee || 0;
+            if (!needsReview) basis = basis || quote?.basis || null;
         }
 
         return NextResponse.json({
-            shipping: parseFloat(shipping.toFixed(2)),
+            shipping: needsReview ? null : parseFloat(shipping.toFixed(2)),
+            needsReview,
+            volumetricKg: parseFloat(volumetricKg.toFixed(2)),
+            chargeableKg: parseFloat(chargeableKg.toFixed(2)),
             stores: byStore.size,
             deliveryType,
             basis,

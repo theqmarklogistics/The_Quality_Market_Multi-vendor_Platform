@@ -352,9 +352,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 <p>{formatAmount(totalPrice)}</p>
                                 {quoting
                                     ? <p className='text-green-700 text-xs'>Calculating…</p>
-                                    : shippingQuote?.shipping != null
-                                        ? <p className='text-green-700'>{shippingQuote.shipping === 0 ? 'Free' : formatAmount(shippingQuote.shipping)}</p>
-                                        : <p className='text-slate-400 text-xs'>Select an address</p>}
+                                    : shippingQuote?.needsReview
+                                        ? <p className='text-amber-600 text-xs'>Confirmed by our team</p>
+                                        : shippingQuote?.shipping != null
+                                            ? <p className='text-green-700'>{formatAmount(shippingQuote.shipping)}</p>
+                                            : <p className='text-slate-400 text-xs'>Select an address</p>}
 
                                 {coupon && <p>{`-${formatAmount((coupon.discount / 100) * totalPrice)}`}</p>}
                             </div>
@@ -386,11 +388,13 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 )}
                             </p>
                         </div>
-                        {shippingQuote?.shipping != null && (
+                        {shippingQuote?.needsReview ? (
+                            <p className='mt-1 text-[11px] text-amber-300'>
+                                This package&apos;s weight is outside our standard ranges — our team will confirm your delivery fee after you place the order.
+                            </p>
+                        ) : shippingQuote?.shipping != null && (
                             <p className='mt-1 text-[11px] text-white/60'>
-                                {shippingQuote.shipping === 0
-                                    ? 'Standard delivery is free — no shipping charge.'
-                                    : `Includes ${formatAmount(shippingQuote.shipping)} shipping, paid now at checkout${deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : '.'}`}
+                                {`Includes ${formatAmount(shippingQuote.shipping)} shipping, paid now at checkout${deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : '.'}`}
                             </p>
                         )}
                     </div>

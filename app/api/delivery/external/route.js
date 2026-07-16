@@ -9,6 +9,7 @@ import { paymentMethod } from "@/lib/constants";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
 import { geocodeRwAddress } from "@/lib/geocode";
 import { getSocketServer } from "@/lib/socketServer";
+import { sendDeliveryReviewAlertEmail } from "@/lib/email";
 
 const ALLOWED_PAYMENT = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
 const ALLOWED_INTAKE = ["HUB_DROP_OFF", "DRIVER_SWEEP"];
@@ -224,12 +225,17 @@ export async function POST(request) {
             originLat: pickupLat ?? undefined,
             originLng: pickupLng ?? undefined,
         });
-        const fee = quote.fee;
+        // When the weight falls outside every configured range the fee can't be
+        // auto-computed: create the booking with a provisional 0 fee, flag it for
+        // manual review, and alert admin to contact the sender and set the fee.
+        const needsReview = !!quote.needsReview;
+        const fee = needsReview ? 0 : (quote.fee || 0);
 
         // Redeem the partner's accrued pooling credit (opt-in, default on) against
-        // this booking's fee. A fully-covered booking needs no cash payment.
+        // this booking's fee. A fully-covered booking needs no cash payment. Credit
+        // is never applied to a needs-review booking (fee is not yet known).
         let creditApplied = 0;
-        if (body?.applyCredit !== false) {
+        if (!needsReview && body?.applyCredit !== false) {
             const partner = await prisma.user.findUnique({ where: { id: ownerId }, select: { deliveryCreditBalance: true } });
             creditApplied = Math.min(partner?.deliveryCreditBalance ?? 0, fee);
         }
@@ -246,9 +252,12 @@ export async function POST(request) {
         const paymentExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
         // Credit-covered bookings are paid up-front; otherwise unpaid + a 24h window.
+        // Needs-review bookings have no fee to pay yet, so no expiry window runs
+        // until admin sets the fee (the cron only expires NOT_SUBMITTED bookings
+        // that still have a paymentExpiresAt).
         const paymentStatusVal = fullyCovered ? "PAID" : "PENDING";
         const proofStatusVal = fullyCovered ? "APPROVED" : "NOT_SUBMITTED";
-        const expiresVal = fullyCovered ? null : paymentExpiresAt;
+        const expiresVal = (fullyCovered || needsReview) ? null : paymentExpiresAt;
 
         // Delivery-only order: no storeId, no OrderItems, escrow NOT_HELD.
         // Raw single-statement insert mirrors app/api/orders/route.js.
@@ -256,7 +265,7 @@ export async function POST(request) {
             INSERT INTO "Order" (
                 id, "userId", "storeId", "addressId",
                 total, status,
-                "shippingCost", "shippingQuoted",
+                "shippingCost", "shippingQuoted", "shippingNeedsReview",
                 commission,
                 "paymentMethod", "paymentStatus", "paymentExpiresAt",
                 "isPaid", "isCouponUsed", coupon,
@@ -273,7 +282,7 @@ export async function POST(request) {
             ) VALUES (
                 ${orderId}, ${ownerId}, ${null}, ${address.id},
                 ${fee}, 'ORDER_PLACED'::"OrderStatus",
-                ${0}, ${true},
+                ${0}, ${true}, ${needsReview},
                 '{}'::jsonb,
                 ${selectedPaymentMethod}::"PaymentMethod", ${paymentStatusVal}::"PaymentStatus", ${expiresVal},
                 ${fullyCovered}, false, '{}'::jsonb,
@@ -310,7 +319,21 @@ export async function POST(request) {
             });
         } catch (_) { /* socket optional */ }
 
-        return NextResponse.json({ success: true, orderId, fee, creditApplied, amountDue, fullyCovered, trackingToken, deliveryOtp });
+        if (needsReview) {
+            sendDeliveryReviewAlertEmail({
+                orderId,
+                kind: 'booking',
+                customerName: senderName,
+                customerPhone: senderPhone || pickupPhone,
+                sector: recipientSector,
+                actualKg: quote.actualKg,
+                volumetricKg: quote.volumetricKg,
+                greaterWeightKg: quote.greaterWeightKg,
+                distanceKm: quote.distanceKm,
+            }).catch((e) => console.error('Review alert email failed', e));
+        }
+
+        return NextResponse.json({ success: true, orderId, fee, needsReview, creditApplied, amountDue, fullyCovered, trackingToken, deliveryOtp });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

@@ -196,6 +196,9 @@ model Order {
     shippingCost  Float?        @default(0)
     // Whether the shipping fee has been confirmed (false = seller still needs to set it for LOCAL_SELLER)
     shippingQuoted Boolean      @default(false)
+    // True when the package weight fell outside every configured DeliveryWeightRange,
+    // so the fee could not be auto-computed — admin must contact the customer and set it.
+    shippingNeedsReview Boolean  @default(false)
     // Reference to the shipping rule applied (if any)
     shippingRuleId String?
     // Commission breakdown stored as JSON per-item
@@ -612,21 +615,33 @@ model ExternalDeliveryConfig {
     id        String   @id @default("default")
     basePrice Float    @default(2000)
     perSector Json     @default("{}")
-    // Distance + weight pricing knobs (admin-tunable).
-    // Fee = max(minimumFloor, round(baseRatePerKgKm × chargeableKg × distanceKm × tierMultiplier)).
-    baseRatePerKgKm  Float  @default(8)      // RWF per kg·km
-    minimumFloor     Float  @default(2000)   // RWF floor for short/light trips
+    // Segmented distance-taper pricing knobs (admin-tunable). See lib/deliveryPricing.js:
+    //   effectiveDist = Σ per taperStepKm segment: segLen × max(taperFloorPct, 1 − i × taperDropPerStep)
+    //   fee           = max(minimumFloor, round(baseRatePerKgKm × chargeableWeight × effectiveDist))
+    // where chargeableWeight is the DeliveryWeightRange value for max(actual, volumetric) kg.
+    baseRatePerKgKm  Float  @default(8)      // RWF per km · chargeable-weight unit
+    minimumFloor     Float  @default(2000)   // RWF global floor for short/light trips
     volumetricFactor Float  @default(200)    // kg per 1 m³ (1 CBM = 200 kg)
-    // Sliding-scale tiers: [{ maxKm, multiplier }, …], open final tier has maxKm:null.
-    // Empty → code falls back to DEFAULT_TIERS in lib/deliveryPricing.js.
-    distanceTiers    Json   @default("[]")
-    // Active shipping-fee strategy for pooled/external delivery quotes:
-    // "LEGACY" (kg×km×tier formula above) | "ZONE_WEIGHT" | "DISTANCE_WEIGHT" | "HYBRID_MARGIN".
-    // Defaults to LEGACY so live pricing never changes until an admin switches.
-    activeStrategy   String @default("LEGACY")
-    // Per-strategy parameters, see lib/shipping/strategies.js for shapes/defaults.
-    strategyParams   Json   @default("{}")
+    taperStepKm      Float  @default(5)      // km per taper step
+    taperDropPerStep Float  @default(0.10)   // fractional rate reduction per step (10%)
+    taperFloorPct    Float  @default(0.50)   // minimum multiplier the taper decays to (50%)
     updatedAt DateTime @updatedAt
+}
+
+// Admin-defined weight ranges mapping a kg bracket to the CHARGEABLE weight value
+// used in the shipping-fee formula. The greater of the package's actual vs
+// volumetric weight is looked up here; a value outside every range flags the
+// order for manual review (admin contacts the customer). maxWeightKg = null is
+// the open top tier.
+model DeliveryWeightRange {
+    id           String   @id @default(cuid())
+    minWeightKg  Float
+    maxWeightKg  Float?
+    chargeableKg Float
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([minWeightKg])
 }
 
 // Admin-configurable announcement banner (single row, id = "default")

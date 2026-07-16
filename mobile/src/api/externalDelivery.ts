@@ -62,10 +62,16 @@ export interface QuoteParams {
 }
 
 export interface DeliveryQuote {
-  fee: number;
+  // null when the weight is outside every configured range (needsReview).
+  fee: number | null;
+  needsReview?: boolean;
   chargeableKg?: number;
+  chargeableWeightUsed?: number | null;
+  actualKg?: number;
+  volumetricKg?: number;
+  greaterWeightKg?: number;
   distanceKm?: number;
-  basis: 'formula' | 'flat' | string;
+  basis: 'formula' | 'flat' | 'needs_review' | 'corridor' | string;
   // 'pin' when priced from a shared/pinned point, 'address' when priced from
   // the geocoded address location.
   locationSource?: 'pin' | 'address' | string;
@@ -120,6 +126,9 @@ export interface BookingResult {
   success: boolean;
   orderId: string;
   fee: number;
+  // True when the weight was outside every range: fee is 0/provisional and our
+  // team will confirm the real fee out of band.
+  needsReview?: boolean;
   creditApplied: number;
   amountDue: number;
   fullyCovered: boolean;

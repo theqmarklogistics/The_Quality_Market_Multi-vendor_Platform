@@ -184,7 +184,14 @@ export default function AdminOrders() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">{order.store?.name}</td>
-                                        <td className="px-4 py-3">{currency} {Number(order.total).toLocaleString()}</td>
+                                        <td className="px-4 py-3">
+                                            {currency} {Number(order.total).toLocaleString()}
+                                            {order.shippingNeedsReview && (
+                                                <span className="ml-1 block w-fit text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700" title="Package weight is outside the configured ranges — contact the customer and set the delivery fee.">
+                                                    Needs pricing
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3">
                                             <span className={`text-xs px-2 py-1 rounded-full ${order.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                                 {order.paymentStatus}

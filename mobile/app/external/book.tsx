@@ -168,7 +168,7 @@ export default function ExternalBookScreen() {
   };
 
   const creditPreview = useMemo(() => {
-    if (!quote || creditBalance <= 0 || !applyCredit) return null;
+    if (!quote || quote.needsReview || quote.fee == null || creditBalance <= 0 || !applyCredit) return null;
     const applied = Math.min(creditBalance, quote.fee);
     const net = Math.max(0, quote.fee - applied);
     return { applied, net };
@@ -233,9 +233,11 @@ export default function ExternalBookScreen() {
         paymentMethod,
         applyCredit,
       });
-      const msg = res.fullyCovered
-        ? `Fee ${formatPrice(res.fee)} fully covered by credit. Delivery code: ${res.deliveryOtp}.`
-        : `Fee ${formatPrice(res.fee)}${res.creditApplied > 0 ? ` (credit −${formatPrice(res.creditApplied)}, pay ${formatPrice(res.amountDue)})` : ''}. Upload your payment proof to start it.`;
+      const msg = res.needsReview
+        ? "This package's weight is outside our standard ranges — our team will confirm the delivery fee and contact you. No payment is due yet."
+        : res.fullyCovered
+          ? `Fee ${formatPrice(res.fee)} fully covered by credit. Delivery code: ${res.deliveryOtp}.`
+          : `Fee ${formatPrice(res.fee)}${res.creditApplied > 0 ? ` (credit −${formatPrice(res.creditApplied)}, pay ${formatPrice(res.amountDue)})` : ''}. Upload your payment proof to start it.`;
       // Hand the partner the client link first — the location the client shares
       // through it is what the delivery fee is calculated from.
       const clientLink = res.trackingToken ? trackingLink(res.orderId, res.trackingToken) : null;
@@ -425,11 +427,20 @@ export default function ExternalBookScreen() {
       <View style={styles.quoteCard}>
         <View style={styles.quoteRow}>
           <Text style={styles.quoteLabel}>Delivery fee</Text>
-          <Text style={styles.quoteFee}>{quote?.fee != null ? formatPrice(quote.fee) : '—'}</Text>
+          <Text style={styles.quoteFee}>
+            {quote?.needsReview ? 'Confirmed by our team' : quote?.fee != null ? formatPrice(quote.fee) : '—'}
+          </Text>
         </View>
+        {quote?.needsReview ? (
+          <Text style={[styles.quoteHint, { color: '#b45309' }]}>
+            This package&apos;s weight ({quote.greaterWeightKg} kg) is outside our standard ranges. Book it and
+            our team will confirm the fee and contact you — no payment is due until then.
+          </Text>
+        ) : null}
         {quote?.basis === 'formula' ? (
           <Text style={styles.quoteHint}>
-            Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from {pickupCoords ? 'pickup point' : 'hub'}
+            Chargeable {quote.chargeableWeightUsed ?? quote.chargeableKg} kg (greater of {quote.actualKg} kg actual,{' '}
+            {quote.volumetricKg} kg volumetric) · {quote.distanceKm} km from {pickupCoords ? 'pickup point' : 'hub'}
             {quote.locationSource === 'address' ? " — measured to the recorded address's location" : ''}
           </Text>
         ) : null}
@@ -440,7 +451,7 @@ export default function ExternalBookScreen() {
           </Text>
         ) : null}
 
-        {creditBalance > 0 && quote?.fee != null ? (
+        {creditBalance > 0 && quote?.fee != null && !quote?.needsReview ? (
           <View style={styles.creditToggleRow}>
             <Text style={styles.creditToggleText}>Apply my credit ({formatPrice(creditBalance)})</Text>
             <Switch value={applyCredit} onValueChange={setApplyCredit} />

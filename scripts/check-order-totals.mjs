@@ -2,25 +2,23 @@ import assert from 'node:assert/strict';
 import { computeOrderTotal, shippingCostForOrder } from '../lib/orderTotals.js';
 
 function run() {
-  // ── Standard delivery ships FREE, whatever the quoted fee was ─────────────
-  assert.equal(shippingCostForOrder('STANDARD_UNPOOLED', 3500), 0);
-  assert.equal(shippingCostForOrder('STANDARD_UNPOOLED', 0), 0);
-  assert.equal(shippingCostForOrder(undefined, 2000), 0); // unknown type → free (standard)
-
-  // Pooled delivery still pays the quoted fee.
+  // ── Every delivery type pays its quoted fee (Standard is no longer free) ──
+  assert.equal(shippingCostForOrder('STANDARD_UNPOOLED', 3500), 3500);
+  assert.equal(shippingCostForOrder('STANDARD_UNPOOLED', 0), 0); // manual-review order → 0 until set
+  assert.equal(shippingCostForOrder(undefined, 2000), 2000);
   assert.equal(shippingCostForOrder('KIGALI_POOL', 3500), 3500);
   assert.equal(shippingCostForOrder('KIGALI_POOL', -5), 0); // never negative
   assert.equal(shippingCostForOrder('KIGALI_POOL', 2000.005), 2000.01); // 2dp
 
-  // ── Grand total with Standard selected: subtotal − coupon + 0 ─────────────
+  // ── Grand total with Standard selected: subtotal − coupon + shipping ──────
   const standardShipping = shippingCostForOrder('STANDARD_UNPOOLED', 2800);
   assert.equal(
     computeOrderTotal({ itemsSubtotal: 10000, couponPercent: 0, shippingCost: standardShipping }),
-    10000
+    12800
   );
   assert.equal(
     computeOrderTotal({ itemsSubtotal: 10000, couponPercent: 20, shippingCost: standardShipping }),
-    8000
+    10800 // 8000 items + 2800 shipping (coupon never touches shipping)
   );
 
   // ── Pooled/other tiers unaffected: shipping still added on top ────────────

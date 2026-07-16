@@ -33,10 +33,14 @@ export function getPoolQuote(payload: {
 // Checkout-time shipping quote for the whole cart — computed server-side exactly
 // like order creation, so the amount shown is the amount charged at checkout.
 export interface ShippingQuote {
-  shipping: number;
+  // null when a package weight is outside the configured ranges (needsReview).
+  shipping: number | null;
+  needsReview?: boolean;
+  volumetricKg?: number;
+  chargeableKg?: number;
   stores: number;
   deliveryType: string;
-  basis: 'formula' | 'flat' | null;
+  basis: 'formula' | 'flat' | 'needs_review' | 'corridor' | null;
 }
 
 export function getShippingQuote(payload: {

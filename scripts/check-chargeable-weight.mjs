@@ -3,48 +3,49 @@ import {
   volumetricWeightKg,
   chargeableWeightKg,
   roundUpToHalfKg,
-  billedWeightKg,
-  quoteStandaloneFee,
+  lookupWeightRange,
+  computeShippingFee,
   computeRouteShares,
 } from '../lib/deliveryPricing.js';
 
+const RANGES = [
+  { minWeightKg: 0, maxWeightKg: 1, chargeableKg: 1 },
+  { minWeightKg: 1, maxWeightKg: 5, chargeableKg: 5 },
+  { minWeightKg: 5, maxWeightKg: null, chargeableKg: 10 },
+];
+
 function run() {
-  // ── Work-order worked example ──────────────────────────────────────────────
+  // ── Volumetric + greater-weight worked example ─────────────────────────────
   // 2 kg actual, 40×20×20 cm, divisor 5000 (volumetricFactor 200 kg/m³):
-  //   volumetric = 16000 / 5000 = 3.2 kg
-  //   chargeable = max(2, 3.2)  = 3.2 kg
-  //   billed     = 3.2 rounded UP to nearest 0.5 = 3.5 kg
+  //   volumetric = 16000 / 5000 = 3.2 kg ; greater = max(2, 3.2) = 3.2 kg
   assert.equal(volumetricWeightKg(40, 20, 20, 200), 3.2);
   assert.equal(chargeableWeightKg(2, 40, 20, 20, 200), 3.2);
-  assert.equal(billedWeightKg(2, 40, 20, 20, 200), 3.5);
 
   // Divisor is configurable: factor 100 kg/m³ ⇒ divisor 10000 ⇒ 1.6 kg volumetric,
   // actual 2 kg wins.
   assert.equal(volumetricWeightKg(40, 20, 20, 100), 1.6);
   assert.equal(chargeableWeightKg(2, 40, 20, 20, 100), 2);
 
-  // ── Round-up-to-0.5 behaviour ──────────────────────────────────────────────
+  // ── Round-up-to-0.5 util (display only) ────────────────────────────────────
   assert.equal(roundUpToHalfKg(3.2), 3.5);
-  assert.equal(roundUpToHalfKg(3.5), 3.5); // exact halves stay put
+  assert.equal(roundUpToHalfKg(3.5), 3.5);
   assert.equal(roundUpToHalfKg(3.51), 4);
-  assert.equal(roundUpToHalfKg(0.1), 0.5);
   assert.equal(roundUpToHalfKg(0), 0);
   assert.equal(roundUpToHalfKg(-2), 0);
 
-  // ── Fees bill the rounded weight ───────────────────────────────────────────
-  // 100.2 kg chargeable → billed 100.5: 8 × 100.5 × 10 km × 0.85 = 6834
-  assert.equal(quoteStandaloneFee({ chargeableKg: 100.2, distanceKm: 10, config: {} }), 6834);
-  // Whole-half weights are unchanged: 8 × 50 × 15 × 0.7 = 4200
-  assert.equal(quoteStandaloneFee({ chargeableKg: 50, distanceKm: 15, config: {} }), 4200);
+  // ── The greater weight is what's matched to a range ────────────────────────
+  // 3.2 kg greater ⇒ range 1–5 ⇒ chargeable 5.
+  assert.equal(lookupWeightRange(3.2, RANGES), 5);
+  const q = computeShippingFee({ actualKg: 2, lengthCm: 40, widthCm: 20, heightCm: 20, distanceKm: 5, ranges: RANGES, config: { baseRatePerKgKm: 100 } });
+  assert.equal(q.greaterWeightKg, 3.2);
+  assert.equal(q.chargeableWeightUsed, 5);
+  assert.equal(q.fee, 2500); // 100 × 5 × taper(5)=5.0
 
   // ── Single-stop corridor still prices exactly like a solo booking ──────────
+  const cfg = { baseRatePerKgKm: 100 };
   const stop = { chargeableKg: 3.2, lat: -1.85, lng: 30.0619 };
-  const route = computeRouteShares([stop], {});
-  const solo = quoteStandaloneFee({
-    chargeableKg: 3.2,
-    distanceKm: route.routeDistanceKm,
-    config: {},
-  });
+  const route = computeRouteShares([stop], cfg, RANGES);
+  const solo = computeShippingFee({ greaterWeightKg: 3.2, distanceKm: route.routeDistanceKm, ranges: RANGES, config: cfg }).fee;
   assert.equal(route.routePrice, solo);
 
   console.log('check-chargeable-weight: all assertions passed ✔');

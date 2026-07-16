@@ -1,22 +1,19 @@
 "use client"
 import { useEffect, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { SaveIcon, PlusIcon, Trash2Icon, TruckIcon } from 'lucide-react'
+import { SaveIcon, TruckIcon } from 'lucide-react'
 
-const DEFAULT_TIERS = [
-  { maxKm: 5, multiplier: 1.0 },
-  { maxKm: 10, multiplier: 0.85 },
-  { maxKm: 20, multiplier: 0.7 },
-  { maxKm: null, multiplier: 0.6 },
-]
-
-// Admin editor for the distance × weight pooled-delivery pricing formula:
-// Fee = max(floor, round(baseRate × chargeableKg × distanceKm × tierMultiplier)).
+// Admin editor for the segmented distance-taper delivery pricing formula:
+//   effectiveDist = Σ per taperStepKm segment: segLen × max(taperFloorPct, 1 − i·taperDropPerStep)
+//   Fee           = max(minimumFloor, round(baseRate × chargeableWeight × effectiveDist))
+// The chargeable weight comes from the Weight Ranges table (edited separately).
 export default function ExternalDeliveryPricingForm() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ baseRatePerKgKm: '', minimumFloor: '', volumetricFactor: '', basePrice: '' })
-  const [tiers, setTiers] = useState(DEFAULT_TIERS)
+  const [form, setForm] = useState({
+    baseRatePerKgKm: '', minimumFloor: '', volumetricFactor: '', basePrice: '',
+    taperStepKm: '', taperDropPct: '', taperFloorPct: '',
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -30,8 +27,11 @@ export default function ExternalDeliveryPricingForm() {
         minimumFloor: c.minimumFloor ?? 2000,
         volumetricFactor: c.volumetricFactor ?? 200,
         basePrice: c.basePrice ?? 2000,
+        taperStepKm: c.taperStepKm ?? 5,
+        // Stored as fractions (0.10, 0.50); shown as whole percents.
+        taperDropPct: Math.round((c.taperDropPerStep ?? 0.10) * 100),
+        taperFloorPct: Math.round((c.taperFloorPct ?? 0.50) * 100),
       })
-      setTiers(Array.isArray(c.distanceTiers) && c.distanceTiers.length ? c.distanceTiers : DEFAULT_TIERS)
     } catch (err) {
       toast.error('Failed to load delivery pricing')
     } finally { setLoading(false) }
@@ -40,9 +40,6 @@ export default function ExternalDeliveryPricingForm() {
   useEffect(() => { load() }, [load])
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const setTier = (i, k, v) => setTiers(t => t.map((row, idx) => idx === i ? { ...row, [k]: v } : row))
-  const addTier = () => setTiers(t => [...t, { maxKm: '', multiplier: 1 }])
-  const removeTier = (i) => setTiers(t => t.filter((_, idx) => idx !== i))
 
   async function save() {
     setSaving(true)
@@ -52,10 +49,9 @@ export default function ExternalDeliveryPricingForm() {
         minimumFloor: Number(form.minimumFloor),
         volumetricFactor: Number(form.volumetricFactor),
         basePrice: Number(form.basePrice),
-        distanceTiers: tiers.map(t => ({
-          maxKm: t.maxKm === '' || t.maxKm == null ? null : Number(t.maxKm),
-          multiplier: Number(t.multiplier),
-        })),
+        taperStepKm: Number(form.taperStepKm),
+        taperDropPerStep: Number(form.taperDropPct) / 100,
+        taperFloorPct: Number(form.taperFloorPct) / 100,
       }
       const res = await fetch('/api/admin/external-delivery-config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
@@ -72,12 +68,12 @@ export default function ExternalDeliveryPricingForm() {
   return (
     <div className="rounded-xl border border-slate-200 shadow-sm bg-white p-5 max-w-3xl">
       <div className="flex items-center justify-between mb-1">
-        <h2 className="font-semibold text-slate-800 flex items-center gap-2"><TruckIcon size={18} /> External / Pooled Delivery Pricing</h2>
+        <h2 className="font-semibold text-slate-800 flex items-center gap-2"><TruckIcon size={18} /> Delivery Pricing Formula</h2>
         <button onClick={save} disabled={saving || loading} className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 transition disabled:opacity-60">
           <SaveIcon size={14} /> {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
-      <p className="text-xs text-slate-400 mb-4">Fee = max(Floor, round(BaseRate × chargeableKg × distanceKm × tierMultiplier)). Chargeable kg = max(actual, volume × factor).</p>
+      <p className="text-xs text-slate-400 mb-4">Fee = max(Floor, round(BaseRate × ChargeableWeight × EffectiveDistance)). The per-km rate starts at 100%, drops each step, and never falls below the floor — applied per distance segment and summed. Chargeable weight comes from the ranges below.</p>
 
       {loading ? (
         <div className="flex items-center justify-center h-24">
@@ -87,7 +83,7 @@ export default function ExternalDeliveryPricingForm() {
         <div className="space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <label className={lbl}>Base rate (Rwf/kg·km)</label>
+              <label className={lbl}>Base rate (Rwf/km·kg)</label>
               <input type="number" min="0" step="0.5" className={inp} value={form.baseRatePerKgKm} onChange={e => setField('baseRatePerKgKm', e.target.value)} />
             </div>
             <div>
@@ -105,35 +101,22 @@ export default function ExternalDeliveryPricingForm() {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className={lbl + ' mb-0'}>Distance tiers (sliding-scale multiplier)</label>
-              <button type="button" onClick={addTier} className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-800"><PlusIcon size={13} /> Add tier</button>
+            <label className={lbl + ' mb-2'}>Distance taper</label>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">Step size (km)</label>
+                <input type="number" min="1" step="1" className={inp} value={form.taperStepKm} onChange={e => setField('taperStepKm', e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">Drop per step (%)</label>
+                <input type="number" min="0" max="100" step="1" className={inp} value={form.taperDropPct} onChange={e => setField('taperDropPct', e.target.value)} />
+              </div>
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">Rate floor (%)</label>
+                <input type="number" min="0" max="100" step="1" className={inp} value={form.taperFloorPct} onChange={e => setField('taperFloorPct', e.target.value)} />
+              </div>
             </div>
-            <div className="space-y-2">
-              {tiers.map((t, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 w-14">up to</span>
-                  <input
-                    type="number" min="0" step="1"
-                    className={inp + ' max-w-28'}
-                    placeholder="∞ (open)"
-                    value={t.maxKm == null ? '' : t.maxKm}
-                    onChange={e => setTier(i, 'maxKm', e.target.value)}
-                  />
-                  <span className="text-xs text-slate-400">km →</span>
-                  <input
-                    type="number" min="0" step="0.05"
-                    className={inp + ' max-w-28'}
-                    placeholder="multiplier"
-                    value={t.multiplier}
-                    onChange={e => setTier(i, 'multiplier', e.target.value)}
-                  />
-                  <span className="text-xs text-slate-400">×</span>
-                  <button type="button" onClick={() => removeTier(i)} className="ml-auto text-slate-300 hover:text-red-500" aria-label="Remove tier"><Trash2Icon size={15} /></button>
-                </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2">Leave a tier&apos;s km blank for the open final tier (applies to any longer distance). Tiers are auto-sorted by distance.</p>
+            <p className="text-[11px] text-slate-400 mt-2">e.g. 5&nbsp;km step, 10% drop, 50% floor → the rate is 100% for the first 5&nbsp;km, then 90%, 80%… down to a 50% minimum for the rest of the trip.</p>
           </div>
         </div>
       )}

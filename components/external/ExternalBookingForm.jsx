@@ -171,10 +171,16 @@ export default function ExternalBookingForm() {
                 <div className="rounded-2xl border-2 border-green-300 bg-green-50 p-5 text-center">
                     <CheckCircleIcon size={36} className="mx-auto text-green-600" />
                     <h1 className="text-xl font-bold text-slate-800 mt-2">Delivery booked</h1>
-                    <p className="text-sm text-slate-600 mt-1">
-                        Fee: <b>{currency} {Number(booked.fee).toLocaleString()}</b>
-                        {booked.amountDue != null && booked.amountDue !== booked.fee && <> · you pay <b>{currency} {Number(booked.amountDue).toLocaleString()}</b></>}
-                    </p>
+                    {booked.needsReview ? (
+                        <p className="text-sm text-amber-700 mt-1">
+                            Our team will confirm the delivery fee for this package and contact you — no payment is due yet.
+                        </p>
+                    ) : (
+                        <p className="text-sm text-slate-600 mt-1">
+                            Fee: <b>{currency} {Number(booked.fee).toLocaleString()}</b>
+                            {booked.amountDue != null && booked.amountDue !== booked.fee && <> · you pay <b>{currency} {Number(booked.amountDue).toLocaleString()}</b></>}
+                        </p>
+                    )}
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-slate-200 p-5">
@@ -316,6 +322,20 @@ export default function ExternalBookingForm() {
                         <input className={input} type="number" min="0" placeholder="Width" value={form.packageWidthCm} onChange={(e) => set("packageWidthCm", e.target.value)} />
                         <input className={input} type="number" min="0" placeholder="Height" value={form.packageHeightCm} onChange={(e) => set("packageHeightCm", e.target.value)} />
                     </div>
+                    {(() => {
+                        const l = Number(form.packageLengthCm), w = Number(form.packageWidthCm), h = Number(form.packageHeightCm);
+                        const a = Number(form.packageWeightKg);
+                        if (!(l > 0 && w > 0 && h > 0)) return null;
+                        const vol = (l * w * h) / 5000; // 1 m³ = 200 kg
+                        const greater = Math.max(a > 0 ? a : 0, vol);
+                        return (
+                            <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-[11px] text-slate-600">
+                                Volumetric weight: <b>{vol.toFixed(2)} kg</b>
+                                {a > 0 && <> · actual: <b>{a} kg</b></>}
+                                <span className="text-slate-400"> — you&apos;re charged on the greater: </span><b>{greater.toFixed(2)} kg</b>
+                            </div>
+                        );
+                    })()}
                     <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
                         <AlertTriangleIcon size={16} className="text-amber-600 shrink-0 mt-0.5" />
                         <p className="text-[11px] leading-relaxed text-amber-800">
@@ -335,18 +355,28 @@ export default function ExternalBookingForm() {
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-slate-500">Delivery fee</span>
-                        <span className="text-lg font-bold text-slate-800">{quote?.fee != null ? `${currency} ${Number(quote.fee).toLocaleString()}` : "—"}</span>
+                        <span className="text-lg font-bold text-slate-800">
+                            {quote?.needsReview
+                                ? <span className="text-sm font-semibold text-amber-600">Confirmed by our team</span>
+                                : quote?.fee != null ? `${currency} ${Number(quote.fee).toLocaleString()}` : "—"}
+                        </span>
                     </div>
+                    {quote?.needsReview && (
+                        <p className="text-[11px] text-amber-700 mt-1">
+                            This package&apos;s weight ({quote.greaterWeightKg} kg) is outside our standard ranges. Book it and our team
+                            will confirm the delivery fee and contact you — no payment is due until then.
+                        </p>
+                    )}
                     {quote?.basis === "formula" && (
                         <p className="text-[11px] text-slate-400 mt-1">
-                            Chargeable {quote.chargeableKg} kg · {quote.distanceKm} km from {form.pickupLat != null ? "pickup point" : "hub"}
+                            Chargeable {quote.chargeableWeightUsed ?? quote.chargeableKg} kg (greater of {quote.actualKg} kg actual, {quote.volumetricKg} kg volumetric) · {quote.distanceKm} km from {form.pickupLat != null ? "pickup point" : "hub"}
                             {quote.locationSource === "address" && " — measured to the recorded address's location"}
                         </p>
                     )}
                     {quote?.basis === "flat" && (
                         <p className="text-[11px] text-slate-400 mt-1">Flat sector rate — add a weight, then share the location (or select the address down to the cell) for distance pricing.</p>
                     )}
-                    {creditBalance > 0 && quote?.fee != null && (
+                    {creditBalance > 0 && quote?.fee != null && !quote?.needsReview && (
                         <>
                             <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
                                 <input type="checkbox" checked={applyCredit} onChange={(e) => setApplyCredit(e.target.checked)} className="accent-green-600" />

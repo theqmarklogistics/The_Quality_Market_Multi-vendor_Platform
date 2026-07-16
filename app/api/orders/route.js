@@ -9,7 +9,7 @@ import { quotePooledCartFee, getExternalDeliveryConfig } from '@/lib/externalDel
 import { chargeableWeightKg } from '@/lib/deliveryPricing';
 import { createInvoiceForOrder, shippingTierLabel } from '@/lib/invoices';
 import { generateInvoice } from '@/lib/generateInvoice';
-import { sendInvoiceEmail } from '@/lib/email';
+import { sendInvoiceEmail, sendDeliveryReviewAlertEmail } from '@/lib/email';
 import { getSocketServer } from "@/lib/socketServer";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
@@ -50,6 +50,11 @@ export async function POST(request) {
         // Optional precise location pin captured at checkout for pooled delivery.
         const recipientLat = (deliveryType === 'KIGALI_POOL' && typeof rawLat === 'number' && !Number.isNaN(rawLat)) ? rawLat : null;
         const recipientLng = (deliveryType === 'KIGALI_POOL' && typeof rawLng === 'number' && !Number.isNaN(rawLng)) ? rawLng : null;
+        // Pin used for distance pricing on ALL delivery types (persisted as
+        // recipientLat/Lng only for pooled tracking). Mirrors /shipping-quote so
+        // the fee shown at checkout equals the fee charged here.
+        const pinLat = (typeof rawLat === 'number' && !Number.isNaN(rawLat)) ? rawLat : null;
+        const pinLng = (typeof rawLng === 'number' && !Number.isNaN(rawLng)) ? rawLng : null;
 
         if (deliveryType === 'KIGALI_POOL' && !landmarkAddress) {
             return NextResponse.json({ error: "A Kigali landmark / directions field is required for Pooled Delivery." }, { status: 400 });
@@ -186,6 +191,8 @@ export async function POST(request) {
         const orderIds = [];
         // Per-order context kept for the Bank Transfer auto-invoice issued below.
         const invoiceContexts = [];
+        // Orders whose weight fell outside the ranges — admin is alerted after commit.
+        const reviewAlerts = [];
         const paymentExpiresAt = new Date(Date.now() + PAYMENT_TIMEOUT_MINUTES * 60 * 1000);
 
         // ── Phase 1: Reserve stock (optimistic locking, no transaction) ──────────
@@ -283,20 +290,28 @@ export async function POST(request) {
             for (const [storeId, storeItems] of orderByStore.entries()) {
                 const itemsSubtotal = storeItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-                // Standard delivery ships FREE. Pooled orders pay the distance ×
-                // weight pooled fee (batch of one — the final shared route can
-                // only be cheaper).
+                // Every delivery type is priced by the segmented distance-taper +
+                // weight-range formula. If the cart weight falls outside the
+                // configured ranges the fee can't be auto-computed: flag the order
+                // for manual review and alert admin (fee provisionally 0).
                 const shippingRuleId = null;
                 const shippingQuoted = true;
                 let quotedFee = 0;
-                if (deliveryType === 'KIGALI_POOL') {
-                    const pooled = await quotePooledCartFee({
+                let shippingNeedsReview = false;
+                let reviewQuote = null;
+                {
+                    const quote = await quotePooledCartFee({
                         items: storeItems,
-                        lat: recipientLat ?? address.latitude ?? null,
-                        lng: recipientLng ?? address.longitude ?? null,
+                        lat: pinLat ?? address.latitude ?? null,
+                        lng: pinLng ?? address.longitude ?? null,
                         sector: address.sector || null,
                     });
-                    quotedFee = pooled?.fee || 0;
+                    if (quote?.needsReview) {
+                        shippingNeedsReview = true;
+                        reviewQuote = quote;
+                    } else {
+                        quotedFee = quote?.fee || 0;
+                    }
                 }
                 const shippingCost = shippingCostForOrder(deliveryType, quotedFee);
                 const total = computeOrderTotal({
@@ -333,7 +348,7 @@ export async function POST(request) {
                     INSERT INTO "Order" (
                         id, "userId", "storeId", "addressId",
                         total, status,
-                        "shippingCost", "shippingQuoted", "shippingRuleId",
+                        "shippingCost", "shippingQuoted", "shippingNeedsReview", "shippingRuleId",
                         commission,
                         "paymentMethod", "paymentStatus", "paymentExpiresAt",
                         "isPaid", "isCouponUsed", coupon,
@@ -344,7 +359,7 @@ export async function POST(request) {
                     ) VALUES (
                         ${orderId}, ${userId}, ${storeId}, ${addressId},
                         ${parseFloat(total.toFixed(2))}, 'ORDER_PLACED'::"OrderStatus",
-                        ${parseFloat((shippingCost || 0).toFixed(2))}, ${shippingQuoted}, ${shippingRuleId},
+                        ${parseFloat((shippingCost || 0).toFixed(2))}, ${shippingQuoted}, ${shippingNeedsReview}, ${shippingRuleId},
                         ${commissionJson}::jsonb,
                         ${selectedPaymentMethod}::"PaymentMethod", 'PENDING'::"PaymentStatus", ${paymentExpiresAt},
                         false, ${!!couponCode}, ${couponJson}::jsonb,
@@ -365,6 +380,17 @@ export async function POST(request) {
                 }
 
                 orderIds.push(orderId);
+                if (shippingNeedsReview) {
+                    reviewAlerts.push({
+                        orderId,
+                        customerPhone: contactPhone,
+                        sector: address.sector || null,
+                        actualKg: reviewQuote?.actualKg ?? 0,
+                        volumetricKg: reviewQuote?.volumetricKg ?? 0,
+                        greaterWeightKg: reviewQuote?.greaterWeightKg ?? 0,
+                        distanceKm: reviewQuote?.distanceKm ?? null,
+                    });
+                }
                 invoiceContexts.push({
                     orderId,
                     storeItems,
@@ -390,6 +416,14 @@ export async function POST(request) {
                 `.catch(console.error);
             }
             throw orderError;
+        }
+
+        // ── Alert admin about any order whose delivery fee needs manual pricing ──
+        // (weight outside the configured ranges). Non-blocking — never fail the order.
+        if (reviewAlerts.length) {
+            Promise.all(reviewAlerts.map((a) =>
+                sendDeliveryReviewAlertEmail({ kind: 'order', ...a }).catch((e) => console.error('Review alert email failed', e))
+            )).catch(console.error);
         }
 
         // ── Phase 2.5: Auto-issue invoices for Bank Transfer orders ─────────────

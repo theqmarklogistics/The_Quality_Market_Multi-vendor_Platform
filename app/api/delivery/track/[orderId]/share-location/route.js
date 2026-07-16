@@ -103,6 +103,8 @@ export async function POST(request, { params }) {
                 originLat: order.pickupLat ?? undefined,
                 originLng: order.pickupLng ?? undefined,
             });
+            // A needs-review re-price returns fee null (weight out of range) — the
+            // finite check below skips it, leaving the existing fee + flag untouched.
             const newFee = quote.fee;
             if (Number.isFinite(newFee) && newFee > 0 && newFee !== order.total) {
                 const oldCredit = Number(order.creditApplied ?? 0);
