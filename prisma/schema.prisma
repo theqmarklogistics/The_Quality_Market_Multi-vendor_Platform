@@ -629,8 +629,11 @@ model ExternalDeliveryConfig {
     // where chargeableWeight is the DeliveryWeightRange value for max(actual, volumetric) kg.
     baseRatePerKgKm  Float  @default(8)      // RWF per km · chargeable-weight unit
     // EXPRESS deliveries use the same formula but with their own (higher) base
-    // rate — the only knob that differs from normal delivery.
+    // rate — the only pricing knob that differs from normal delivery.
     expressBaseRatePerKgKm Float @default(16) // RWF per km · chargeable-weight unit (express)
+    // Admin kill-switch: when false, Express is hidden at checkout/booking and
+    // the APIs reject new express orders (existing ones still dispatch/deliver).
+    expressEnabled         Boolean @default(true)
     minimumFloor     Float  @default(2000)   // RWF global floor for short/light trips
     volumetricFactor Float  @default(200)    // kg per 1 m³ (1 CBM = 200 kg)
     taperStepKm      Float  @default(5)      // km per taper step
@@ -664,15 +667,23 @@ model BannerConfig {
     updatedAt  DateTime @updatedAt
 }
 
-// Admin-managed product categories
+// Admin-managed product categories. Nestable up to 3 levels
+// (category → subcategory → sub-subcategory); the depth limit is enforced in
+// the admin API. Names stay globally unique because products reference their
+// category by name (Product.category string).
 model Category {
     id                String   @id @default(cuid())
     name              String   @unique
     commissionPercent Float    @default(0)
     isActive          Boolean  @default(true)
     sortOrder         Int      @default(0)
+    parentId          String?
+    parent            Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+    children          Category[] @relation("CategoryTree")
     createdAt         DateTime @default(now())
     updatedAt         DateTime @updatedAt
+
+    @@index([parentId])
 }
 
 // Newsletter subscribers

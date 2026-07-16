@@ -8,7 +8,8 @@ const CategoriesMarquee = () => {
     useEffect(() => {
         fetch('/api/categories')
             .then(r => r.json())
-            .then(d => setCategories((d.categories || []).map(c => c.name)))
+            // Top-level categories only — subcategories live in the shop filter.
+            .then(d => setCategories((d.categories || []).filter(c => !c.parentId).map(c => c.name)))
             .catch(() => {})
     }, [])
 

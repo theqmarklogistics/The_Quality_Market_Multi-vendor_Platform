@@ -21,6 +21,7 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import {
   bookExternalDelivery,
+  getDeliveryConfig,
   getExternalDeliveries,
   quoteExternalDelivery,
   trackingLink,
@@ -76,7 +77,24 @@ export default function ExternalBookScreen() {
   const [applyCredit, setApplyCredit] = useState(true);
   // Express: instant dispatch once paid, priced with the express base rate.
   const [express, setExpress] = useState(false);
+  // Admin can switch Express off (rider capacity) — hide the toggle when so.
+  const [expressEnabled, setExpressEnabled] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getDeliveryConfig()
+      .then((c) => {
+        if (!cancelled && c?.expressEnabled === false) {
+          setExpressEnabled(false);
+          setExpress(false);
+        }
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const hasPin = !!coords;
 
@@ -428,14 +446,16 @@ export default function ExternalBookScreen() {
       </View>
 
       {/* Express toggle: instant dispatch at the premium express rate */}
-      <View style={styles.quoteCard}>
-        <View style={styles.creditToggleRow}>
-          <Text style={styles.creditToggleText}>
-            Express delivery — a rider is dispatched immediately once paid (premium rate)
-          </Text>
-          <Switch value={express} onValueChange={setExpress} />
+      {expressEnabled ? (
+        <View style={styles.quoteCard}>
+          <View style={styles.creditToggleRow}>
+            <Text style={styles.creditToggleText}>
+              Express delivery — a rider is dispatched immediately once paid (premium rate)
+            </Text>
+            <Switch value={express} onValueChange={setExpress} />
+          </View>
         </View>
-      </View>
+      ) : null}
 
       {/* Quote */}
       <View style={styles.quoteCard}>

@@ -38,8 +38,38 @@ export function getBestSelling(limit = 8): Promise<{ products: Product[] }> {
   });
 }
 
+export interface CategoryRow {
+  id?: string;
+  name: string;
+  // Categories nest up to 3 levels (category → sub → sub-sub) via parentId.
+  parentId?: string | null;
+}
+
+/**
+ * Flatten the (max 3-level) category tree depth-first into picker options with
+ * indented labels: "Electronics", "— Phones", "—— Smartphones". The saved value
+ * is always the plain `name`.
+ */
+export function flattenCategoryTree(rows: CategoryRow[]): { name: string; label: string }[] {
+  const byParent = new Map<string | null, CategoryRow[]>();
+  for (const r of rows) {
+    const key = r.parentId ?? null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key)!.push(r);
+  }
+  const out: { name: string; label: string }[] = [];
+  const walk = (nodes: CategoryRow[], depth: number) => {
+    for (const n of nodes) {
+      out.push({ name: n.name, label: depth > 1 ? `${'—'.repeat(depth - 1)} ${n.name}` : n.name });
+      if (n.id) walk(byParent.get(n.id) ?? [], depth + 1);
+    }
+  };
+  walk(byParent.get(null) ?? [], 1);
+  return out;
+}
+
 // Category list from the backend (admin-configured). Falls back to the ported
 // PRODUCT_CATEGORIES constant in the UI if this is empty.
-export function getCategories(): Promise<{ categories: { id?: string; name: string }[] }> {
-  return apiGet<{ categories: { id?: string; name: string }[] }>('/api/categories');
+export function getCategories(): Promise<{ categories: CategoryRow[] }> {
+  return apiGet<{ categories: CategoryRow[] }>('/api/categories');
 }

@@ -3,7 +3,7 @@ import { getAuth } from "@clerk/nextjs/server";
 import authExternalSeller from "@/middlewares/authExternalSeller";
 import authLogistics from "@/middlewares/authLogistics";
 import authRider from "@/middlewares/authRider";
-import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
+import { quoteExternalDeliveryFee, getExternalDeliveryConfig } from "@/lib/externalDelivery";
 import { geocodeRwAddress } from "@/lib/geocode";
 
 // GET — live delivery quote. Params: sector, weightKg, lengthCm, widthCm, heightCm,
@@ -28,6 +28,13 @@ export async function GET(request) {
         };
 
         const sector = searchParams.get("sector") || "";
+        const wantsExpress = searchParams.get("express") === "1" || searchParams.get("express") === "true";
+        if (wantsExpress) {
+            const deliveryCfg = await getExternalDeliveryConfig();
+            if (deliveryCfg.expressEnabled === false) {
+                return NextResponse.json({ error: "Express delivery is currently unavailable." }, { status: 400 });
+            }
+        }
         let dropLat = num("dropLat");
         let dropLng = num("dropLng");
         let locationSource = dropLat != null && dropLng != null ? "pin" : null;
@@ -60,7 +67,7 @@ export async function GET(request) {
             originLng: num("originLng"),
             distanceKm: num("distanceKm"),
             // EXPRESS pricing (instant dispatch, express base rate).
-            express: searchParams.get("express") === "1" || searchParams.get("express") === "true",
+            express: wantsExpress,
         });
         return NextResponse.json({ ...quote, ...(locationSource && { locationSource }) });
     } catch (error) {

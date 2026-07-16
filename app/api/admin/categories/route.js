@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import authAdmin from '@/middlewares/authAdmin'
 import prisma from '@/lib/prisma'
+import { MAX_CATEGORY_DEPTH, categoryDepth } from '@/lib/categoryTree'
 
 export async function GET(request) {
     try {
@@ -36,8 +37,21 @@ export async function POST(request) {
         const existing = await prisma.category.findUnique({ where: { name } })
         if (existing) return NextResponse.json({ error: 'A category with this name already exists.' }, { status: 409 })
 
+        // Optional parent → this becomes a subcategory. Depth is capped at
+        // MAX_CATEGORY_DEPTH levels (category → sub → sub-sub).
+        let parentId = null
+        if (body.parentId) {
+            const rows = await prisma.category.findMany({ select: { id: true, name: true, parentId: true } })
+            const parent = rows.find(r => r.id === body.parentId)
+            if (!parent) return NextResponse.json({ error: 'Parent category not found.' }, { status: 400 })
+            if (categoryDepth(parent.id, rows) >= MAX_CATEGORY_DEPTH) {
+                return NextResponse.json({ error: `Maximum category depth is ${MAX_CATEGORY_DEPTH} levels — "${parent.name}" cannot have subcategories.` }, { status: 400 })
+            }
+            parentId = parent.id
+        }
+
         const category = await prisma.category.create({
-            data: { name, commissionPercent, sortOrder },
+            data: { name, commissionPercent, sortOrder, parentId },
         })
 
         // Invalidate cached public categories list so the storefront sees the new one.

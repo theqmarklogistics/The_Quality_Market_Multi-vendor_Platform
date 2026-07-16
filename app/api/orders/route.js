@@ -66,6 +66,14 @@ export async function POST(request) {
             return NextResponse.json({ error: `A Kigali landmark / directions field is required for ${deliveryType === 'EXPRESS' ? 'Express' : 'Pooled'} Delivery.` }, { status: 400 });
         }
 
+        // Express can be switched off by admin (rider capacity) — reject early.
+        if (deliveryType === 'EXPRESS') {
+            const deliveryCfg = await getExternalDeliveryConfig();
+            if (deliveryCfg.expressEnabled === false) {
+                return NextResponse.json({ error: "Express delivery is currently unavailable — please choose Kigali Pooled Delivery." }, { status: 400 });
+            }
+        }
+
         const allowedPaymentMethods = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
         if(!allowedPaymentMethods.includes(selectedPaymentMethod)){
             return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });

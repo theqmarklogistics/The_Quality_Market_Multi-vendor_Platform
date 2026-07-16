@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import { quotePooledCartFee } from "@/lib/externalDelivery";
+import { quotePooledCartFee, getExternalDeliveryConfig } from "@/lib/externalDelivery";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 
 // Quotes fire on every address/pin/delivery-type change at checkout — generous
@@ -34,6 +34,12 @@ export async function POST(request) {
         // Standard delivery is disabled for now — quotes are pooled or express
         // (unknown/legacy values coerce to pooled, matching order creation).
         const deliveryType = body?.deliveryType === "EXPRESS" ? "EXPRESS" : "KIGALI_POOL";
+        if (deliveryType === "EXPRESS") {
+            const deliveryCfg = await getExternalDeliveryConfig();
+            if (deliveryCfg.expressEnabled === false) {
+                return NextResponse.json({ error: "Express delivery is currently unavailable." }, { status: 400 });
+            }
+        }
         const pinLat = Number.isFinite(body?.lat) ? body.lat : null;
         const pinLng = Number.isFinite(body?.lng) ? body.lng : null;
 

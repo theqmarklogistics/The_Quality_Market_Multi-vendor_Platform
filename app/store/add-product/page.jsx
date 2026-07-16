@@ -5,6 +5,7 @@ import Image from "next/image"
 import { useState, useEffect } from "react"
 import { toast } from "react-hot-toast"
 import axios from "axios"
+import { flattenCategoryOptions } from "@/lib/categoryTree"
 
 const COUNTRIES = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
@@ -67,7 +68,8 @@ export default function StoreAddProduct() {
     useEffect(() => {
         fetch('/api/categories')
             .then(r => r.json())
-            .then(d => setCategoryOptions((d.categories || []).map(c => c.name)))
+            // Nested tree flattened into indented options ("— Phones", "—— Smartphones").
+            .then(d => setCategoryOptions(flattenCategoryOptions(d.categories || [])))
             .catch(() => {})
     }, [])
 
@@ -315,8 +317,8 @@ export default function StoreAddProduct() {
                     required
                 >
                     <option value="">Select a category</option>
-                    {categoryOptions.map((name) => (
-                        <option key={name} value={name}>{name}</option>
+                    {categoryOptions.map((opt) => (
+                        <option key={opt.id} value={opt.name}>{opt.label}</option>
                     ))}
                 </select>
             </label>

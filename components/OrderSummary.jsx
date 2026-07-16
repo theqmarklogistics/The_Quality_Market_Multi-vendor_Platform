@@ -40,6 +40,8 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     // always calculated and paid at checkout, for both delivery methods.
     const [shippingQuote, setShippingQuote] = useState(null);
     const [quoting, setQuoting] = useState(false);
+    // Admin can switch Express off (rider capacity) — hide the option when so.
+    const [expressEnabled, setExpressEnabled] = useState(true);
 
     const handlePinLocation = () => {
         if (!('geolocation' in navigator)) {
@@ -60,6 +62,12 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
 
     useEffect(() => {
         axios.get('/api/payment-config').then(res => setPaymentConfig(res.data)).catch(() => null)
+        axios.get('/api/delivery/config').then(res => {
+            if (res.data?.expressEnabled === false) {
+                setExpressEnabled(false);
+                setDeliveryType(prev => (prev === 'EXPRESS' ? 'KIGALI_POOL' : prev));
+            }
+        }).catch(() => null)
     }, []);
 
     // Prefill the checkout phone from the selected address (still editable).
@@ -287,6 +295,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                         </label>
 
                         {/* Express Delivery — instant dispatch, no schedule wait */}
+                        {expressEnabled && (
                         <label htmlFor="delivery_express" className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${deliveryType === 'EXPRESS' ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
                             <input
                                 type="radio"
@@ -304,6 +313,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 <span className='block text-xs text-slate-500 mt-0.5'>A rider is dispatched to you immediately — no waiting for the shared route schedule. Priced at the premium express rate.</span>
                             </div>
                         </label>
+                        )}
                     </div>
 
                     {/* Rider-pipeline extras (pooled + express): location share + landmark */}

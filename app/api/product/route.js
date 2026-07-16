@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
+import { withCache } from "@/lib/cache";
+import { categoryNamesWithDescendants } from "@/lib/categoryTree";
 
 const PAGE_SIZE = 20;
 
@@ -35,12 +37,26 @@ export async function GET(request) {
         const priceMax = parseFloat(searchParams.get('priceMax') || '0') || 0;
         const sort     = searchParams.get('sort') || 'newest';
 
+        // Selecting a category also matches its whole subtree (max 3 levels):
+        // picking "Electronics" shows products filed under "Phones" and
+        // "Smartphones" too. The category rows are tiny and shared via the same
+        // "categories" cache tag the admin routes invalidate.
+        let categoryNames = null;
+        if (category) {
+            const rows = await withCache(
+                ['categories', 'tree-rows'],
+                () => prisma.category.findMany({ select: { id: true, name: true, parentId: true } }),
+                { tags: ['categories'], ttlSeconds: 3600 }
+            );
+            categoryNames = categoryNamesWithDescendants(category, rows);
+        }
+
         const where = {
             inStock: true,
             approvalStatus: 'APPROVED',
             store: { isActive: true },
             ...(search   && { name: { contains: search, mode: 'insensitive' } }),
-            ...(category && { category }),
+            ...(categoryNames && { category: categoryNames.length > 1 ? { in: categoryNames } : category }),
             ...(priceMin && { price: { gte: priceMin } }),
             ...(priceMax && { price: { ...(priceMin ? { gte: priceMin } : {}), lte: priceMax } }),
         };

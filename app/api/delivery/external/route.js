@@ -7,7 +7,7 @@ import authLogistics from "@/middlewares/authLogistics";
 import authRider from "@/middlewares/authRider";
 import authAgent from "@/middlewares/authAgent";
 import { paymentMethod } from "@/lib/constants";
-import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
+import { quoteExternalDeliveryFee, getExternalDeliveryConfig } from "@/lib/externalDelivery";
 import { geocodeRwAddress } from "@/lib/geocode";
 import { getSocketServer } from "@/lib/socketServer";
 import { sendDeliveryReviewAlertEmail } from "@/lib/email";
@@ -220,6 +220,12 @@ export async function POST(request) {
         // EXPRESS: instant dispatch once paid — priced with the express base rate.
         const isExpress = body?.express === true;
         const deliveryType = isExpress ? "EXPRESS" : "KIGALI_POOL";
+        if (isExpress) {
+            const deliveryCfg = await getExternalDeliveryConfig();
+            if (deliveryCfg.expressEnabled === false) {
+                return NextResponse.json({ error: "Express delivery is currently unavailable — book a standard delivery instead." }, { status: 400 });
+            }
+        }
 
         const quote = await quoteExternalDeliveryFee({
             sector: recipientSector,

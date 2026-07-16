@@ -19,6 +19,7 @@ import { getAddresses } from '@/api/addresses';
 import { getProduct } from '@/api/products';
 import { verifyCoupon } from '@/api/coupons';
 import { createOrder, getShippingQuote, type ShippingQuote } from '@/api/orders';
+import { getDeliveryConfig } from '@/api/externalDelivery';
 import type { Address, Coupon, Product } from '@/api/types';
 import { Button, Loader, Money } from '@/components/ui';
 import { SignedOutGate } from '@/components/SignedOutGate';
@@ -70,6 +71,22 @@ function CheckoutScreenInner() {
   const [deliveryType, setDeliveryType] = useState<DeliveryType>(
     DeliveryType.KIGALI_POOL,
   );
+  // Admin can switch Express off (rider capacity) — hide the option when so.
+  const [expressEnabled, setExpressEnabled] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    getDeliveryConfig()
+      .then((c) => {
+        if (!cancelled && c?.expressEnabled === false) {
+          setExpressEnabled(false);
+          setDeliveryType((prev) => (prev === DeliveryType.EXPRESS ? DeliveryType.KIGALI_POOL : prev));
+        }
+      })
+      .catch(() => null);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [landmark, setLandmark] = useState('');
   const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pinning, setPinning] = useState(false);
@@ -304,13 +321,15 @@ function CheckoutScreenInner() {
           badge="Save up to 60%"
           onPress={() => setDeliveryType(DeliveryType.KIGALI_POOL)}
         />
-        <OptionRow
-          active={deliveryType === DeliveryType.EXPRESS}
-          title="Express delivery"
-          subtitle="A rider is dispatched immediately — no schedule wait. Premium rate."
-          badge="Instant"
-          onPress={() => setDeliveryType(DeliveryType.EXPRESS)}
-        />
+        {expressEnabled ? (
+          <OptionRow
+            active={deliveryType === DeliveryType.EXPRESS}
+            title="Express delivery"
+            subtitle="A rider is dispatched immediately — no schedule wait. Premium rate."
+            badge="Instant"
+            onPress={() => setDeliveryType(DeliveryType.EXPRESS)}
+          />
+        ) : null}
 
         {deliveryType === DeliveryType.KIGALI_POOL || deliveryType === DeliveryType.EXPRESS ? (
           <View style={styles.poolBox}>

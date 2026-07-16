@@ -23,13 +23,15 @@ export async function GET(request) {
                 { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
             );
         }
+        // Flat list including parentId — consumers build the (max 3-level) tree
+        // client-side with lib/categoryTree helpers.
         const categories = await withCache(
             ['categories', 'active'],
             () =>
                 prisma.category.findMany({
                     where: { isActive: true },
                     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-                    select: { id: true, name: true, commissionPercent: true },
+                    select: { id: true, name: true, commissionPercent: true, parentId: true },
                 }),
             { tags: ['categories'], ttlSeconds: 3600 }
         );

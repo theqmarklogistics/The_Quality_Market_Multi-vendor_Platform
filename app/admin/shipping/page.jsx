@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { GlobeIcon, SaveIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ExternalDeliveryPricingForm from '@/components/admin/ExternalDeliveryPricingForm'
+import ExpressDeliveryForm from '@/components/admin/ExpressDeliveryForm'
 import WeightRangesForm from '@/components/admin/WeightRangesForm'
 
 const ZONES = ['A', 'B', 'C', 'CHINA_RWANDA']
@@ -63,6 +64,10 @@ export default function ShippingPage() {
 
       <div className="mb-8">
         <ExternalDeliveryPricingForm />
+      </div>
+
+      <div className="mb-8">
+        <ExpressDeliveryForm />
       </div>
 
       <div className="mb-8">

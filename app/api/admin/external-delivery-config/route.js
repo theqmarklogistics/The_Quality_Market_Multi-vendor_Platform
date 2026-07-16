@@ -30,6 +30,7 @@ export async function POST(request) {
         if (body?.perSector && typeof body.perSector === "object" && !Array.isArray(body.perSector)) data.perSector = body.perSector;
         if (Number.isFinite(body?.baseRatePerKgKm) && body.baseRatePerKgKm > 0) data.baseRatePerKgKm = body.baseRatePerKgKm;
         if (Number.isFinite(body?.expressBaseRatePerKgKm) && body.expressBaseRatePerKgKm > 0) data.expressBaseRatePerKgKm = body.expressBaseRatePerKgKm;
+        if (typeof body?.expressEnabled === "boolean") data.expressEnabled = body.expressEnabled;
         if (Number.isFinite(body?.minimumFloor) && body.minimumFloor >= 0) data.minimumFloor = body.minimumFloor;
         if (Number.isFinite(body?.volumetricFactor) && body.volumetricFactor > 0) data.volumetricFactor = body.volumetricFactor;
         // Distance-taper knobs. Step must be positive; drop is a fraction 0–1;

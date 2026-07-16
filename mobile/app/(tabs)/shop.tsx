@@ -53,9 +53,12 @@ export default function ShopScreen() {
   }, [searchInput]);
 
   useEffect(() => {
+    // Top-level categories only for the chips — picking one also matches its
+    // whole subtree server-side.
     getCategories()
       .then((res) => {
-        if (res.categories?.length) setCategories(res.categories.map((c) => c.name));
+        const roots = (res.categories || []).filter((c) => !c.parentId).map((c) => c.name);
+        if (roots.length) setCategories(roots);
       })
       .catch(() => {
         // Fall back to the ported PRODUCT_CATEGORIES already in state.

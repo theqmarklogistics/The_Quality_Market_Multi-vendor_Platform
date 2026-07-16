@@ -28,7 +28,7 @@ import {
   type ProductFormValues,
   type ProductImageFile,
 } from '@/api/store';
-import { getCategories } from '@/api/products';
+import { flattenCategoryTree, getCategories } from '@/api/products';
 import { Button, Field, Loader } from '@/components/ui';
 import { PRODUCT_CATEGORIES } from '@/constants';
 import { colors, fonts, radius, spacing } from '@/theme';
@@ -62,7 +62,9 @@ export default function ProductFormScreen() {
   const [values, setValues] = useState({ ...EMPTY });
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [newImages, setNewImages] = useState<ProductImageFile[]>([]);
-  const [categories, setCategories] = useState<string[]>(PRODUCT_CATEGORIES);
+  const [categories, setCategories] = useState<{ name: string; label: string }[]>(
+    PRODUCT_CATEGORIES.map((n) => ({ name: n, label: n })),
+  );
   const [catPicker, setCatPicker] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -77,8 +79,9 @@ export default function ProductFormScreen() {
   useEffect(() => {
     getCategories()
       .then((d) => {
-        const names = (d.categories || []).map((c) => c.name).filter(Boolean);
-        if (names.length) setCategories(names);
+        // Nested tree flattened into indented options ("— Phones", "—— Smartphones").
+        const opts = flattenCategoryTree(d.categories || []);
+        if (opts.length) setCategories(opts);
       })
       .catch(() => {});
   }, []);
@@ -390,18 +393,18 @@ export default function ProductFormScreen() {
             </View>
             <FlatList
               data={categories}
-              keyExtractor={(c) => c}
+              keyExtractor={(c) => c.name}
               renderItem={({ item }) => {
-                const active = values.category === item;
+                const active = values.category === item.name;
                 return (
                   <TouchableOpacity
                     style={styles.catRow}
                     onPress={() => {
-                      set('category', item);
+                      set('category', item.name);
                       setCatPicker(false);
                     }}
                   >
-                    <Text style={[styles.catText, active && styles.catTextActive]}>{item}</Text>
+                    <Text style={[styles.catText, active && styles.catTextActive]}>{item.label}</Text>
                     {active ? <Ionicons name="checkmark" size={18} color={colors.success} /> : null}
                   </TouchableOpacity>
                 );

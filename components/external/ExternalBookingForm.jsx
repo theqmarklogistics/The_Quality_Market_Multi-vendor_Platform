@@ -31,6 +31,8 @@ export default function ExternalBookingForm() {
     const [quote, setQuote] = useState(null);
     // Express: instant dispatch (no schedule wait) at the premium express rate.
     const [express, setExpress] = useState(false);
+    // Admin can switch Express off (rider capacity) — hide the toggle when so.
+    const [expressEnabled, setExpressEnabled] = useState(true);
     const [creditBalance, setCreditBalance] = useState(0);
     const [applyCredit, setApplyCredit] = useState(true);
     const [locating, setLocating] = useState(false);
@@ -54,6 +56,18 @@ export default function ExternalBookingForm() {
         })();
         return () => { active = false; };
     }, [authHeaders]);
+
+    // Whether Express is currently offered (admin toggle).
+    useEffect(() => {
+        let active = true;
+        axios.get('/api/delivery/config').then(({ data }) => {
+            if (active && data?.expressEnabled === false) {
+                setExpressEnabled(false);
+                setExpress(false);
+            }
+        }).catch(() => null);
+        return () => { active = false; };
+    }, []);
 
     // Live quote whenever a pricing input changes (sector, weight, dims, pin, or
     // the recorded address — geocoded server-side when there is no pin, so the
@@ -352,6 +366,7 @@ export default function ExternalBookingForm() {
                 </div>
 
                 {/* Express: instant dispatch at the premium express rate */}
+                {expressEnabled && (
                 <label className={`flex items-start gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition ${express ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
                     <input type="checkbox" checked={express} onChange={(e) => setExpress(e.target.checked)} className="mt-1 accent-amber-500" />
                     <div>
@@ -364,6 +379,7 @@ export default function ExternalBookingForm() {
                         </span>
                     </div>
                 </label>
+                )}
 
                 <select className={input} value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)}>
                     <option value="MTN_MOMO">MTN MoMo</option>

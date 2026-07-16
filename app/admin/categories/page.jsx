@@ -1,11 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { PencilIcon, SaveIcon, TagIcon, Trash2Icon, XIcon } from 'lucide-react'
+import { CornerDownRightIcon, PencilIcon, PlusIcon, SaveIcon, TagIcon, Trash2Icon, XIcon } from 'lucide-react'
+import { MAX_CATEGORY_DEPTH, flattenCategoryOptions, isSelfOrDescendant } from '@/lib/categoryTree'
 
-const EMPTY_FORM = { name: '', sortOrder: '' }
+const EMPTY_FORM = { name: '', sortOrder: '', parentId: '' }
 
 export default function AdminCategories() {
     const { getToken } = useAuth()
@@ -33,12 +34,33 @@ export default function AdminCategories() {
 
     useEffect(() => { fetchCategories() }, [])
 
+    // Tree-ordered rows (depth 1..3) for the table + parent pickers.
+    const treeRows = useMemo(() => {
+        const byId = new Map(categories.map(c => [c.id, c]))
+        return flattenCategoryOptions(categories).map(o => ({ ...byId.get(o.id), depth: o.depth, label: o.label }))
+    }, [categories])
+
+    // Valid parents: anything above the max depth's last level, excluding (when
+    // editing) the category itself and its own subtree.
+    const parentOptions = useMemo(() =>
+        treeRows.filter(r =>
+            r.depth < MAX_CATEGORY_DEPTH &&
+            (!editId || !isSelfOrDescendant(editId, r.id, categories))
+        ), [treeRows, categories, editId])
+
     const startEdit = (cat) => {
         setEditId(cat.id)
         setForm({
             name: cat.name,
             sortOrder: cat.sortOrder,
+            parentId: cat.parentId || '',
         })
+    }
+
+    // "+ Sub" shortcut: prefill the add-form with this category as the parent.
+    const startAddChild = (cat) => {
+        setEditId(null)
+        setForm({ name: '', sortOrder: '', parentId: cat.id })
     }
 
     const cancelEdit = () => {
@@ -55,6 +77,7 @@ export default function AdminCategories() {
             const payload = {
                 name: form.name.trim(),
                 sortOrder: form.sortOrder !== '' ? Number(form.sortOrder) : 0,
+                parentId: form.parentId || null,
             }
             if (editId) {
                 await axios.put(`/api/admin/categories/${editId}`, payload, {
@@ -136,9 +159,14 @@ export default function AdminCategories() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {categories.map(cat => (
+                                    {treeRows.map(cat => (
                                         <tr key={cat.id} className={`border-b border-slate-50 hover:bg-slate-50 transition ${editId === cat.id ? 'bg-green-50' : ''}`}>
-                                            <td className="px-5 py-3 text-slate-700 font-medium">{cat.name}</td>
+                                            <td className="px-5 py-3 text-slate-700 font-medium">
+                                                <span className="inline-flex items-center gap-1.5" style={{ paddingLeft: (cat.depth - 1) * 22 }}>
+                                                    {cat.depth > 1 && <CornerDownRightIcon size={13} className="text-slate-300 shrink-0" />}
+                                                    <span className={cat.depth > 1 ? 'font-normal' : ''}>{cat.name}</span>
+                                                </span>
+                                            </td>
                                             <td className="px-3 py-3">
                                                 <button
                                                     onClick={() => toggleActive(cat)}
@@ -149,6 +177,15 @@ export default function AdminCategories() {
                                             </td>
                                             <td className="px-3 py-3 text-right">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    {cat.depth < MAX_CATEGORY_DEPTH && (
+                                                        <button
+                                                            onClick={() => startAddChild(cat)}
+                                                            className="p-1.5 rounded-lg hover:bg-green-50 text-slate-400 hover:text-green-600 transition inline-flex items-center gap-0.5 text-[11px] font-medium"
+                                                            title={`Add a subcategory under "${cat.name}"`}
+                                                        >
+                                                            <PlusIcon size={13} /> Sub
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => editId === cat.id ? cancelEdit() : startEdit(cat)}
                                                         className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
@@ -194,7 +231,23 @@ export default function AdminCategories() {
 
                         <div>
                             <label className="block text-xs text-slate-500 font-medium mb-1">
-                                Sort order <span className="font-normal text-slate-400">(lower = appears first)</span>
+                                Parent category <span className="font-normal text-slate-400">(optional — makes this a subcategory, up to {MAX_CATEGORY_DEPTH} levels)</span>
+                            </label>
+                            <select
+                                className={inputCls}
+                                value={form.parentId}
+                                onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))}
+                            >
+                                <option value="">None — top-level category</option>
+                                {parentOptions.map(opt => (
+                                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-slate-500 font-medium mb-1">
+                                Sort order <span className="font-normal text-slate-400">(lower = appears first, among siblings)</span>
                             </label>
                             <input
                                 type="number"

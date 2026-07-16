@@ -46,6 +46,7 @@ import {
     LayoutGrid,
 } from "lucide-react"
 import { useRef, useState, useEffect, useMemo } from "react"
+import { buildCategoryTree } from "@/lib/categoryTree"
 
 const categoryIcons = {
     'Baby Products': Baby,
@@ -123,9 +124,10 @@ function CategoryRow({ category, isActive, onSelect, hasSubcategories, onMouseEn
                     </p>
                     {subcategories.map((sub) => (
                         <SubcategoryRow
-                            key={sub}
-                            name={sub}
-                            isActive={currentCategory === sub}
+                            key={sub.name}
+                            name={sub.name}
+                            depth={sub.depth}
+                            isActive={currentCategory === sub.name}
                             onSelect={onSelectSub}
                         />
                     ))}
@@ -135,7 +137,7 @@ function CategoryRow({ category, isActive, onSelect, hasSubcategories, onMouseEn
     )
 }
 
-function SubcategoryRow({ name, isActive, onSelect }) {
+function SubcategoryRow({ name, depth = 2, isActive, onSelect }) {
     return (
         <button
             type="button"
@@ -146,7 +148,7 @@ function SubcategoryRow({ name, isActive, onSelect }) {
                     : 'text-slate-600 hover:bg-orange-500/10 hover:text-orange-700'
             }`}
         >
-            <span className="truncate pl-2">{name}</span>
+            <span className={`truncate ${depth >= 3 ? 'pl-6 text-[13px] text-slate-500' : 'pl-2'}`}>{name}</span>
         </button>
     )
 }
@@ -162,7 +164,18 @@ export default function CategoryFilter({ currentCategory, onSelectCategory, clas
     useEffect(() => {
         fetch('/api/categories')
             .then(r => r.json())
-            .then(d => setDbCategories((d.categories || []).map(c => ({ name: c.name, subcategories: [] }))))
+            .then(d => {
+                // Roots become the main rows; their whole subtree (levels 2 + 3)
+                // flattens into the hover flyout, third level indented.
+                const tree = buildCategoryTree(d.categories || [])
+                setDbCategories(tree.map(root => ({
+                    name: root.name,
+                    subcategories: (root.children || []).flatMap(child => [
+                        { name: child.name, depth: 2 },
+                        ...(child.children || []).map(grand => ({ name: grand.name, depth: 3 })),
+                    ]),
+                })))
+            })
             .catch(() => {})
     }, [])
 

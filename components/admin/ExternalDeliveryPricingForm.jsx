@@ -11,7 +11,7 @@ export default function ExternalDeliveryPricingForm() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    baseRatePerKgKm: '', expressBaseRatePerKgKm: '', minimumFloor: '', volumetricFactor: '', basePrice: '',
+    baseRatePerKgKm: '', minimumFloor: '', volumetricFactor: '', basePrice: '',
     taperStepKm: '', taperDropPct: '', taperFloorPct: '',
   })
 
@@ -24,7 +24,6 @@ export default function ExternalDeliveryPricingForm() {
       const c = data.config || {}
       setForm({
         baseRatePerKgKm: c.baseRatePerKgKm ?? 8,
-        expressBaseRatePerKgKm: c.expressBaseRatePerKgKm ?? 16,
         minimumFloor: c.minimumFloor ?? 2000,
         volumetricFactor: c.volumetricFactor ?? 200,
         basePrice: c.basePrice ?? 2000,
@@ -47,7 +46,6 @@ export default function ExternalDeliveryPricingForm() {
     try {
       const payload = {
         baseRatePerKgKm: Number(form.baseRatePerKgKm),
-        expressBaseRatePerKgKm: Number(form.expressBaseRatePerKgKm),
         minimumFloor: Number(form.minimumFloor),
         volumetricFactor: Number(form.volumetricFactor),
         basePrice: Number(form.basePrice),
@@ -75,7 +73,7 @@ export default function ExternalDeliveryPricingForm() {
           <SaveIcon size={14} /> {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
-      <p className="text-xs text-slate-400 mb-4">Fee = max(Floor, round(BaseRate × ChargeableWeight × EffectiveDistance)). The per-km rate starts at 100%, drops each step, and never falls below the floor — applied per distance segment and summed. Chargeable weight comes from the ranges below. <b>Express</b> deliveries (instant dispatch) use the same formula with the express rate instead of the base rate.</p>
+      <p className="text-xs text-slate-400 mb-4">Fee = max(Floor, round(BaseRate × ChargeableWeight × EffectiveDistance)). The per-km rate starts at 100%, drops each step, and never falls below the floor — applied per distance segment and summed. Chargeable weight comes from the ranges below. Express delivery is configured in its own card.</p>
 
       {loading ? (
         <div className="flex items-center justify-center h-24">
@@ -83,14 +81,10 @@ export default function ExternalDeliveryPricingForm() {
         </div>
       ) : (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
               <label className={lbl}>Base rate (Rwf/km·kg)</label>
               <input type="number" min="0" step="0.5" className={inp} value={form.baseRatePerKgKm} onChange={e => setField('baseRatePerKgKm', e.target.value)} />
-            </div>
-            <div>
-              <label className={lbl}>Express rate (Rwf/km·kg)</label>
-              <input type="number" min="0" step="0.5" className={inp} value={form.expressBaseRatePerKgKm} onChange={e => setField('expressBaseRatePerKgKm', e.target.value)} />
             </div>
             <div>
               <label className={lbl}>Minimum floor (Rwf)</label>

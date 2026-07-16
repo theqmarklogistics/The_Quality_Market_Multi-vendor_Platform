@@ -79,6 +79,15 @@ export interface DeliveryQuote {
   locationSource?: 'pin' | 'address' | string;
 }
 
+// Public, non-sensitive delivery options (which services are offered).
+export interface DeliveryConfig {
+  expressEnabled: boolean;
+}
+
+export function getDeliveryConfig(): Promise<DeliveryConfig> {
+  return apiGet<DeliveryConfig>('/api/delivery/config');
+}
+
 export function quoteExternalDelivery(params: QuoteParams): Promise<DeliveryQuote> {
   const q: Record<string, string> = {};
   for (const [k, v] of Object.entries(params)) {
