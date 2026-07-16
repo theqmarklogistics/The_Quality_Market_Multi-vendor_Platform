@@ -319,10 +319,10 @@ export default function StoreOrders() {
                             </div>
                         )}
 
-                        {/* ── Kigali Pooled Delivery Intake ── */}
-                        {selectedOrder.deliveryType === 'KIGALI_POOL' && (
+                        {/* ── Rider-delivery intake (pooled + express) ── */}
+                        {['KIGALI_POOL', 'EXPRESS'].includes(selectedOrder.deliveryType) && (
                             <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                                <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 mb-1">Pooled Delivery Intake</p>
+                                <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 mb-1">{selectedOrder.deliveryType === 'EXPRESS' ? 'Express Delivery Intake' : 'Pooled Delivery Intake'}</p>
                                 {selectedOrder.landmarkAddress && (
                                     <p className="text-xs text-slate-500 mb-3">Customer landmark: <span className="text-slate-700 font-medium">{selectedOrder.landmarkAddress}</span></p>
                                 )}

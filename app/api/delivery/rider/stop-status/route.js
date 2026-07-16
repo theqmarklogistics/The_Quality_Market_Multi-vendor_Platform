@@ -34,8 +34,8 @@ export async function POST(request) {
             },
         });
         if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-        if (order.deliveryType !== "KIGALI_POOL") {
-            return NextResponse.json({ error: "Not a pooled-delivery order" }, { status: 400 });
+        if (!["KIGALI_POOL", "EXPRESS"].includes(order.deliveryType)) {
+            return NextResponse.json({ error: "Not a rider-pipeline delivery order" }, { status: 400 });
         }
 
         // Only the rider assigned to the order's corridor (or admin) may update it.

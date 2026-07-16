@@ -68,6 +68,18 @@ function run() {
   assert.equal(nr.needsReview, true);
   assert.equal(nr.fee, null);
 
+  // ── EXPRESS: same formula, its own base rate ───────────────────────────────
+  const xCfg = { baseRatePerKgKm: 100, expressBaseRatePerKgKm: 200 };
+  const normal = computeShippingFee({ greaterWeightKg: 8, distanceKm: 12, ranges: RANGES, config: xCfg });
+  const xpress = computeShippingFee({ greaterWeightKg: 8, distanceKm: 12, ranges: RANGES, config: xCfg, express: true });
+  assert.equal(normal.fee, 11100);  // 100 × 10 × 11.1
+  assert.equal(xpress.fee, 22200);  // 200 × 10 × 11.1
+  // Express default rate falls back when unset (16 = 2× the default 8).
+  assert.equal(
+    computeShippingFee({ greaterWeightKg: 8, distanceKm: 12, ranges: RANGES, config: {}, express: true }).fee,
+    Math.max(2000, Math.round(16 * 10 * 11.1))
+  );
+
   // ── splitByRatio reconciles to the exact total ────────────────────────────
   assert.equal(splitByRatio(100, [1, 1, 1]).reduce((s, x) => s + x, 0), 100);
   assert.equal(splitByRatio(2000, [0, 0, 0]).reduce((s, x) => s + x, 0), 2000); // even fallback

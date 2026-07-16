@@ -244,13 +244,14 @@ function OrdersScreenInner() {
                 />
               ) : null}
 
-              {/* Delivery */}
-              {item.deliveryType === 'KIGALI_POOL' ? (
+              {/* Delivery (rider pipeline: pooled + express) */}
+              {item.deliveryType === 'KIGALI_POOL' || item.deliveryType === 'EXPRESS' ? (
                 <View style={styles.deliveryBox}>
                   <View style={styles.deliveryHead}>
                     <Ionicons name="bicycle-outline" size={15} color={colors.primaryDark} />
                     <Text style={styles.deliveryLabel}>
-                      Pooled delivery: {(item.deliveryStatus ?? 'PENDING_INTAKE').replace(/_/g, ' ')}
+                      {item.deliveryType === 'EXPRESS' ? 'Express' : 'Pooled'} delivery:{' '}
+                      {(item.deliveryStatus ?? 'PENDING_INTAKE').replace(/_/g, ' ')}
                     </Text>
                   </View>
                   {item.deliveryOtp ? (

@@ -31,7 +31,9 @@ export async function POST(request) {
         const body = await request.json();
         const items = Array.isArray(body?.items) ? body.items.filter(i => i?.id) : [];
         const addressId = body?.addressId || null;
-        const deliveryType = body?.deliveryType === "KIGALI_POOL" ? "KIGALI_POOL" : "STANDARD_UNPOOLED";
+        // Standard delivery is disabled for now — quotes are pooled or express
+        // (unknown/legacy values coerce to pooled, matching order creation).
+        const deliveryType = body?.deliveryType === "EXPRESS" ? "EXPRESS" : "KIGALI_POOL";
         const pinLat = Number.isFinite(body?.lat) ? body.lat : null;
         const pinLng = Number.isFinite(body?.lng) ? body.lng : null;
 
@@ -77,6 +79,7 @@ export async function POST(request) {
                 lat: pinLat ?? address.latitude ?? null,
                 lng: pinLng ?? address.longitude ?? null,
                 sector: address.sector || null,
+                express: deliveryType === "EXPRESS",
             });
             volumetricKg += quote?.volumetricKg || 0;
             chargeableKg += quote?.greaterWeightKg || 0;

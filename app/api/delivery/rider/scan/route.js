@@ -34,8 +34,8 @@ export async function POST(request) {
             where: { id: orderId },
             include: { address: { select: { name: true, sector: true, phone: true } } },
         });
-        if (!order || order.deliveryType !== "KIGALI_POOL") {
-            return NextResponse.json({ error: "No pooled-delivery package found for this code" }, { status: 404 });
+        if (!order || !["KIGALI_POOL", "EXPRESS"].includes(order.deliveryType)) {
+            return NextResponse.json({ error: "No rider-delivery package found for this code" }, { status: 404 });
         }
         if (["DELIVERED", "FAILED"].includes(order.deliveryStatus || "")) {
             return NextResponse.json({ error: `This package is already ${order.deliveryStatus.toLowerCase()}` }, { status: 409 });

@@ -1,4 +1,4 @@
-import { InfoIcon, PlusIcon, SquarePenIcon, XIcon, MapPinIcon, CheckIcon } from 'lucide-react';
+import { InfoIcon, PlusIcon, SquarePenIcon, XIcon, MapPinIcon, CheckIcon, ZapIcon } from 'lucide-react';
 import React, { useState, useEffect } from 'react'
 import AddressModal from './AddressModal';
 import { useDispatch, useSelector } from 'react-redux';
@@ -29,7 +29,8 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     const [couponCodeInput, setCouponCodeInput] = useState('');
     const [coupon, setCoupon] = useState('');
     const [paymentConfig, setPaymentConfig] = useState(null);
-    const [deliveryType, setDeliveryType] = useState('STANDARD_UNPOOLED');
+    // Standard delivery is disabled for now — pooled (default) or express only.
+    const [deliveryType, setDeliveryType] = useState('KIGALI_POOL');
     const [landmarkAddress, setLandmarkAddress] = useState('');
     const [pinnedLocation, setPinnedLocation] = useState(null); // {lat,lng} optional checkout pin
     const [pinning, setPinning] = useState(false);
@@ -134,8 +135,9 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                 return;
             }
 
-            if (deliveryType === 'KIGALI_POOL' && !landmarkAddress.trim()) {
-                toast.error('Please enter a Kigali landmark or directions for Pooled Delivery.');
+            const usesRiderPipeline = deliveryType === 'KIGALI_POOL' || deliveryType === 'EXPRESS';
+            if (usesRiderPipeline && !landmarkAddress.trim()) {
+                toast.error(`Please enter a Kigali landmark or directions for ${deliveryType === 'EXPRESS' ? 'Express' : 'Pooled'} Delivery.`);
                 return;
             }
 
@@ -153,8 +155,8 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                 couponCode: couponCodeInput,
                 contactPhone: contactPhone.trim(),
                 deliveryType,
-                ...(deliveryType === 'KIGALI_POOL' && { landmarkAddress: landmarkAddress.trim() }),
-                ...(deliveryType === 'KIGALI_POOL' && pinnedLocation && { recipientLat: pinnedLocation.lat, recipientLng: pinnedLocation.lng })
+                ...(usesRiderPipeline && { landmarkAddress: landmarkAddress.trim() }),
+                ...(usesRiderPipeline && pinnedLocation && { recipientLat: pinnedLocation.lat, recipientLng: pinnedLocation.lng })
             }
 
             if(coupon){
@@ -265,25 +267,6 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                 <section className='border-b border-slate-200 pb-5'>
                     <p className='text-xs font-semibold uppercase tracking-[0.22em] text-slate-400'>Delivery Method</p>
                     <div className='mt-3 space-y-2'>
-                        {/* Standard Delivery */}
-                        <label htmlFor="delivery_standard" className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${deliveryType === 'STANDARD_UNPOOLED' ? 'border-slate-400 bg-slate-50' : 'border-slate-200 bg-slate-50'}`}>
-                            <input
-                                type="radio"
-                                id="delivery_standard"
-                                name="delivery"
-                                onChange={() => setDeliveryType('STANDARD_UNPOOLED')}
-                                checked={deliveryType === 'STANDARD_UNPOOLED'}
-                                className='mt-1 accent-slate-700'
-                            />
-                            <div>
-                                <div className='flex items-center gap-2'>
-                                    <span className='block font-medium text-slate-800'>Standard Delivery</span>
-                                    <span className='rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700'>Free</span>
-                                </div>
-                                <span className='block text-xs text-slate-500 mt-0.5'>Free shipping — your order ships via standard vendor fulfillment.</span>
-                            </div>
-                        </label>
-
                         {/* Kigali Pooled Delivery */}
                         <label htmlFor="delivery_pool" className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${deliveryType === 'KIGALI_POOL' ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
                             <input
@@ -302,10 +285,29 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 <span className='block text-xs text-slate-500 mt-0.5'>Orders heading to the same Kigali area are grouped into shared delivery routes and dropped off together — cutting your delivery cost by up to 60%.</span>
                             </div>
                         </label>
+
+                        {/* Express Delivery — instant dispatch, no schedule wait */}
+                        <label htmlFor="delivery_express" className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${deliveryType === 'EXPRESS' ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <input
+                                type="radio"
+                                id="delivery_express"
+                                name="delivery"
+                                onChange={() => setDeliveryType('EXPRESS')}
+                                checked={deliveryType === 'EXPRESS'}
+                                className='mt-1 accent-amber-500'
+                            />
+                            <div className='flex-1'>
+                                <div className='flex items-center gap-2'>
+                                    <span className='block font-medium text-slate-800'>Express Delivery</span>
+                                    <span className='inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700'><ZapIcon size={10} /> Instant</span>
+                                </div>
+                                <span className='block text-xs text-slate-500 mt-0.5'>A rider is dispatched to you immediately — no waiting for the shared route schedule. Priced at the premium express rate.</span>
+                            </div>
+                        </label>
                     </div>
 
-                    {/* Kigali Pool extras: location share (always the first option) + landmark */}
-                    {deliveryType === 'KIGALI_POOL' && (
+                    {/* Rider-pipeline extras (pooled + express): location share + landmark */}
+                    {(deliveryType === 'KIGALI_POOL' || deliveryType === 'EXPRESS') && (
                         <div className='mt-3'>
                             {/* Option 1: share the exact delivery location */}
                             <button
@@ -394,7 +396,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                             </p>
                         ) : shippingQuote?.shipping != null && (
                             <p className='mt-1 text-[11px] text-white/60'>
-                                {`Includes ${formatAmount(shippingQuote.shipping)} shipping, paid now at checkout${deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : '.'}`}
+                                {`Includes ${formatAmount(shippingQuote.shipping)} shipping, paid now at checkout${deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : deliveryType === 'EXPRESS' ? ' — a rider is dispatched to you immediately.' : '.'}`}
                             </p>
                         )}
                     </div>

@@ -59,6 +59,8 @@ export interface QuoteParams {
   district?: string;
   cell?: string;
   village?: string;
+  // '1' to price as EXPRESS (instant dispatch, express base rate).
+  express?: string;
 }
 
 export interface DeliveryQuote {
@@ -120,12 +122,15 @@ export interface ExternalBookingPayload {
   packageHeightCm?: number;
   paymentMethod: PaymentMethod;
   applyCredit: boolean;
+  // EXPRESS: instant dispatch once paid, priced with the express base rate.
+  express?: boolean;
 }
 
 export interface BookingResult {
   success: boolean;
   orderId: string;
   fee: number;
+  express?: boolean;
   // True when the weight was outside every range: fee is 0/provisional and our
   // team will confirm the real fee out of band.
   needsReview?: boolean;

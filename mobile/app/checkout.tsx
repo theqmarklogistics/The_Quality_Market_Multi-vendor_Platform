@@ -66,8 +66,9 @@ function CheckoutScreenInner() {
   const [addressId, setAddressId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Standard delivery is disabled for now — pooled (default) or express only.
   const [deliveryType, setDeliveryType] = useState<DeliveryType>(
-    DeliveryType.STANDARD_UNPOOLED,
+    DeliveryType.KIGALI_POOL,
   );
   const [landmark, setLandmark] = useState('');
   const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -203,8 +204,13 @@ function CheckoutScreenInner() {
       Alert.alert('Address required', 'Please select or add a delivery address.');
       return;
     }
-    if (deliveryType === DeliveryType.KIGALI_POOL && !landmark.trim()) {
-      Alert.alert('Landmark required', 'Pooled delivery needs a landmark / directions.');
+    const usesRiderPipeline =
+      deliveryType === DeliveryType.KIGALI_POOL || deliveryType === DeliveryType.EXPRESS;
+    if (usesRiderPipeline && !landmark.trim()) {
+      Alert.alert(
+        'Landmark required',
+        `${deliveryType === DeliveryType.EXPRESS ? 'Express' : 'Pooled'} delivery needs a landmark / directions.`,
+      );
       return;
     }
     if (!/^\+?\d[\d\s-]{6,17}$/.test(contactPhone.trim())) {
@@ -220,10 +226,9 @@ function CheckoutScreenInner() {
         couponCode: coupon?.code,
         contactPhone: contactPhone.trim(),
         deliveryType,
-        landmarkAddress:
-          deliveryType === DeliveryType.KIGALI_POOL ? landmark.trim() : undefined,
-        recipientLat: deliveryType === DeliveryType.KIGALI_POOL ? pin?.latitude : undefined,
-        recipientLng: deliveryType === DeliveryType.KIGALI_POOL ? pin?.longitude : undefined,
+        landmarkAddress: usesRiderPipeline ? landmark.trim() : undefined,
+        recipientLat: usesRiderPipeline ? pin?.latitude : undefined,
+        recipientLng: usesRiderPipeline ? pin?.longitude : undefined,
       });
       dispatch(clearCart());
       router.replace({
@@ -293,20 +298,21 @@ function CheckoutScreenInner() {
         {/* Delivery type */}
         <SectionHeading icon="bicycle-outline" title="Delivery method" />
         <OptionRow
-          active={deliveryType === DeliveryType.STANDARD_UNPOOLED}
-          title="Standard delivery"
-          subtitle="Seller-fulfilled. Fee set per seller."
-          onPress={() => setDeliveryType(DeliveryType.STANDARD_UNPOOLED)}
-        />
-        <OptionRow
           active={deliveryType === DeliveryType.KIGALI_POOL}
           title="Kigali pooled delivery"
           subtitle="Shared rider routes — save up to 60%."
           badge="Save up to 60%"
           onPress={() => setDeliveryType(DeliveryType.KIGALI_POOL)}
         />
+        <OptionRow
+          active={deliveryType === DeliveryType.EXPRESS}
+          title="Express delivery"
+          subtitle="A rider is dispatched immediately — no schedule wait. Premium rate."
+          badge="Instant"
+          onPress={() => setDeliveryType(DeliveryType.EXPRESS)}
+        />
 
-        {deliveryType === DeliveryType.KIGALI_POOL ? (
+        {deliveryType === DeliveryType.KIGALI_POOL || deliveryType === DeliveryType.EXPRESS ? (
           <View style={styles.poolBox}>
             {/* Option 1 (always first): share the exact delivery location.
                 Otherwise the distance is calculated from the address's location. */}
@@ -350,7 +356,11 @@ function CheckoutScreenInner() {
                   : shippingQuote?.needsReview
                     ? "This package's weight is outside our standard ranges — our team will confirm your delivery fee after you order."
                     : shippingQuote && shippingQuote.shipping != null
-                      ? `Delivery fee: ${formatPrice(shippingQuote.shipping)} — paid at checkout; sharing the route can only make it cheaper.`
+                      ? `Delivery fee: ${formatPrice(shippingQuote.shipping)} — paid at checkout${
+                          deliveryType === DeliveryType.EXPRESS
+                            ? '; a rider is dispatched to you immediately.'
+                            : '; sharing the route can only make it cheaper.'
+                        }`
                       : 'Delivery fee is calculated from your address location.'}
               </Text>
             </View>
@@ -428,7 +438,11 @@ function CheckoutScreenInner() {
         ) : null}
         <View style={styles.sumRow}>
           <Text style={styles.muted}>
-            {deliveryType === DeliveryType.KIGALI_POOL ? 'Shipping (pooled)' : 'Shipping'}
+            {deliveryType === DeliveryType.KIGALI_POOL
+              ? 'Shipping (pooled)'
+              : deliveryType === DeliveryType.EXPRESS
+                ? 'Shipping (express)'
+                : 'Shipping'}
           </Text>
           <Text style={styles.sumVal}>
             {quoting

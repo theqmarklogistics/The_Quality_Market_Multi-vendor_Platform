@@ -315,10 +315,12 @@ export default function SellerOrdersScreen() {
                   </View>
                 ) : null}
 
-                {/* Pooled intake */}
-                {selected.deliveryType === 'KIGALI_POOL' ? (
+                {/* Rider-delivery intake (pooled + express) */}
+                {selected.deliveryType === 'KIGALI_POOL' || selected.deliveryType === 'EXPRESS' ? (
                   <View style={styles.actionCard}>
-                    <Text style={styles.actionCardTitle}>Pooled delivery intake</Text>
+                    <Text style={styles.actionCardTitle}>
+                      {selected.deliveryType === 'EXPRESS' ? 'Express delivery intake' : 'Pooled delivery intake'}
+                    </Text>
                     {selected.landmarkAddress ? (
                       <Text style={styles.actionCardHint}>Customer landmark: {selected.landmarkAddress}</Text>
                     ) : null}

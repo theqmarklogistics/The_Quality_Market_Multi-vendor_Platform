@@ -39,8 +39,8 @@ export async function POST(request) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
         }
 
-        if (order.deliveryType !== 'KIGALI_POOL') {
-            return NextResponse.json({ error: "This order does not use Kigali Pooled Delivery" }, { status: 400 });
+        if (!['KIGALI_POOL', 'EXPRESS'].includes(order.deliveryType)) {
+            return NextResponse.json({ error: "This order does not use rider delivery" }, { status: 400 });
         }
 
         // Only the rider assigned to this order's corridor (or an admin) may confirm delivery.

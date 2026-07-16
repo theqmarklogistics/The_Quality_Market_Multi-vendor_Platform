@@ -10,6 +10,7 @@ import { chargeableWeightKg } from '@/lib/deliveryPricing';
 import { createInvoiceForOrder, shippingTierLabel } from '@/lib/invoices';
 import { generateInvoice } from '@/lib/generateInvoice';
 import { sendInvoiceEmail, sendDeliveryReviewAlertEmail } from '@/lib/email';
+import { dispatchExpressOrder } from '@/lib/expressDispatch';
 import { getSocketServer } from "@/lib/socketServer";
 import { createRateLimiter, getClientIp } from "@/lib/rateLimit";
 import { maybeSweepExpiredOrders } from "@/lib/expireOrders";
@@ -45,19 +46,24 @@ export async function POST(request) {
             return NextResponse.json({ error: "Missing order details" }, { status: 400 });
         }
 
-        const deliveryType = rawDeliveryType === 'KIGALI_POOL' ? 'KIGALI_POOL' : 'STANDARD_UNPOOLED';
+        // Standard delivery is disabled for now — every new order is pooled or
+        // express (unknown/legacy values coerce to pooled).
+        const deliveryType = rawDeliveryType === 'EXPRESS' ? 'EXPRESS' : 'KIGALI_POOL';
+        // Pooled AND express orders ride the rider pipeline (OTP, tracking, escrow);
+        // express additionally dispatches immediately instead of waiting for batching.
+        const usesRiderPipeline = deliveryType === 'KIGALI_POOL' || deliveryType === 'EXPRESS';
         const landmarkAddress = typeof rawLandmark === 'string' ? rawLandmark.trim() : null;
-        // Optional precise location pin captured at checkout for pooled delivery.
-        const recipientLat = (deliveryType === 'KIGALI_POOL' && typeof rawLat === 'number' && !Number.isNaN(rawLat)) ? rawLat : null;
-        const recipientLng = (deliveryType === 'KIGALI_POOL' && typeof rawLng === 'number' && !Number.isNaN(rawLng)) ? rawLng : null;
+        // Optional precise location pin captured at checkout for rider-pipeline orders.
+        const recipientLat = (usesRiderPipeline && typeof rawLat === 'number' && !Number.isNaN(rawLat)) ? rawLat : null;
+        const recipientLng = (usesRiderPipeline && typeof rawLng === 'number' && !Number.isNaN(rawLng)) ? rawLng : null;
         // Pin used for distance pricing on ALL delivery types (persisted as
-        // recipientLat/Lng only for pooled tracking). Mirrors /shipping-quote so
-        // the fee shown at checkout equals the fee charged here.
+        // recipientLat/Lng only for rider-pipeline tracking). Mirrors /shipping-quote
+        // so the fee shown at checkout equals the fee charged here.
         const pinLat = (typeof rawLat === 'number' && !Number.isNaN(rawLat)) ? rawLat : null;
         const pinLng = (typeof rawLng === 'number' && !Number.isNaN(rawLng)) ? rawLng : null;
 
-        if (deliveryType === 'KIGALI_POOL' && !landmarkAddress) {
-            return NextResponse.json({ error: "A Kigali landmark / directions field is required for Pooled Delivery." }, { status: 400 });
+        if (usesRiderPipeline && !landmarkAddress) {
+            return NextResponse.json({ error: `A Kigali landmark / directions field is required for ${deliveryType === 'EXPRESS' ? 'Express' : 'Pooled'} Delivery.` }, { status: 400 });
         }
 
         const allowedPaymentMethods = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
@@ -305,6 +311,7 @@ export async function POST(request) {
                         lat: pinLat ?? address.latitude ?? null,
                         lng: pinLng ?? address.longitude ?? null,
                         sector: address.sector || null,
+                        express: deliveryType === 'EXPRESS',
                     });
                     if (quote?.needsReview) {
                         shippingNeedsReview = true;
@@ -338,11 +345,10 @@ export async function POST(request) {
                 const commissionJson = JSON.stringify(commissionBreakdown.length ? commissionBreakdown : {});
                 const couponJson = JSON.stringify(couponCode && coupon ? { code: coupon.code, discount: coupon.discount } : {});
 
-                const isPooled = deliveryType === 'KIGALI_POOL';
                 // Cryptographically-random 4-digit code (1000–9999) to resist guessing.
-                const deliveryOtp = isPooled ? String(randomInt(1000, 10000)) : null;
-                const poolDeliveryStatus = isPooled ? 'PENDING_INTAKE' : null;
-                const escrowStatus = isPooled ? 'HELD' : 'NOT_HELD';
+                const deliveryOtp = usesRiderPipeline ? String(randomInt(1000, 10000)) : null;
+                const poolDeliveryStatus = usesRiderPipeline ? 'PENDING_INTAKE' : null;
+                const escrowStatus = usesRiderPipeline ? 'HELD' : 'NOT_HELD';
 
                 await prisma.$executeRaw`
                     INSERT INTO "Order" (
@@ -424,6 +430,13 @@ export async function POST(request) {
             Promise.all(reviewAlerts.map((a) =>
                 sendDeliveryReviewAlertEmail({ kind: 'order', ...a }).catch((e) => console.error('Review alert email failed', e))
             )).catch(console.error);
+        }
+
+        // ── EXPRESS: dispatch immediately — a single-stop run appears on the
+        // dispatch board right now instead of waiting for the batching schedule.
+        // Fire-and-forget: dispatch never fails the order (helper never throws).
+        if (deliveryType === 'EXPRESS') {
+            Promise.all(orderIds.map((id) => dispatchExpressOrder(id))).catch(console.error);
         }
 
         // ── Phase 2.5: Auto-issue invoices for Bank Transfer orders ─────────────

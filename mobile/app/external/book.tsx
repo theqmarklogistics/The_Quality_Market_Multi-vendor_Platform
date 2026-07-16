@@ -74,6 +74,8 @@ export default function ExternalBookScreen() {
   const [quote, setQuote] = useState<DeliveryQuote | null>(null);
   const [creditBalance, setCreditBalance] = useState(0);
   const [applyCredit, setApplyCredit] = useState(true);
+  // Express: instant dispatch once paid, priced with the express base rate.
+  const [express, setExpress] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const hasPin = !!coords;
@@ -119,6 +121,7 @@ export default function ExternalBookScreen() {
           // so the live quote matches the fee charged at booking.
           originLat: pickupCoords?.latitude,
           originLng: pickupCoords?.longitude,
+          express: express ? '1' : undefined,
         });
         if (active) setQuote(q);
       } catch {
@@ -129,7 +132,7 @@ export default function ExternalBookScreen() {
       active = false;
       clearTimeout(t);
     };
-  }, [sector, location.district, location.cell, location.village, weightKg, lengthCm, widthCm, heightCm, coords, pickupCoords]);
+  }, [sector, location.district, location.cell, location.village, weightKg, lengthCm, widthCm, heightCm, coords, pickupCoords, express]);
 
   const pinLocation = async () => {
     setPinning(true);
@@ -232,6 +235,7 @@ export default function ExternalBookScreen() {
         packageHeightCm: num(heightCm),
         paymentMethod,
         applyCredit,
+        express,
       });
       const msg = res.needsReview
         ? "This package's weight is outside our standard ranges — our team will confirm the delivery fee and contact you. No payment is due yet."
@@ -421,6 +425,16 @@ export default function ExternalBookScreen() {
             </TouchableOpacity>
           );
         })}
+      </View>
+
+      {/* Express toggle: instant dispatch at the premium express rate */}
+      <View style={styles.quoteCard}>
+        <View style={styles.creditToggleRow}>
+          <Text style={styles.creditToggleText}>
+            Express delivery — a rider is dispatched immediately once paid (premium rate)
+          </Text>
+          <Switch value={express} onValueChange={setExpress} />
+        </View>
       </View>
 
       {/* Quote */}

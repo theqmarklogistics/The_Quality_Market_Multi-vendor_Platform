@@ -11,6 +11,7 @@ import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
 import { geocodeRwAddress } from "@/lib/geocode";
 import { getSocketServer } from "@/lib/socketServer";
 import { sendDeliveryReviewAlertEmail } from "@/lib/email";
+import { dispatchExpressOrder } from "@/lib/expressDispatch";
 
 const ALLOWED_PAYMENT = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
 const ALLOWED_INTAKE = ["HUB_DROP_OFF", "DRIVER_SWEEP"];
@@ -216,6 +217,10 @@ export async function POST(request) {
         // Drop point: the recipient pin, else the geocoded address location.
         // Either way the fee is re-priced from the coordinates the client shares
         // through their tracking link (see share-location route).
+        // EXPRESS: instant dispatch once paid — priced with the express base rate.
+        const isExpress = body?.express === true;
+        const deliveryType = isExpress ? "EXPRESS" : "KIGALI_POOL";
+
         const quote = await quoteExternalDeliveryFee({
             sector: recipientSector,
             weightKg: packageWeightKg,
@@ -226,6 +231,7 @@ export async function POST(request) {
             dropLng: recipientLng ?? addressLng,
             originLat: pickupLat ?? undefined,
             originLng: pickupLng ?? undefined,
+            express: isExpress,
         });
         // When the weight falls outside every configured range the fee can't be
         // auto-computed: create the booking with a provisional 0 fee, flag it for
@@ -289,7 +295,7 @@ export async function POST(request) {
                 ${selectedPaymentMethod}::"PaymentMethod", ${paymentStatusVal}::"PaymentStatus", ${expiresVal},
                 ${fullyCovered}, false, '{}'::jsonb,
                 false, ${proofStatusVal}::"PaymentProofStatus",
-                'KIGALI_POOL'::"DeliveryType", ${intakeMethod}::"IntakeMethod", ${recipientLandmark}, ${deliveryOtp},
+                ${deliveryType}::"DeliveryType", ${intakeMethod}::"IntakeMethod", ${recipientLandmark}, ${deliveryOtp},
                 'PENDING_INTAKE'::"PoolDeliveryStatus", 'NOT_HELD'::"EscrowStatus",
                 true, ${senderName}, ${senderPhone}, ${senderEmail},
                 ${pickupContactName}, ${pickupPhone}, ${pickupLandmark},
@@ -317,9 +323,16 @@ export async function POST(request) {
             const io = getSocketServer();
             io.to("admin-room").emit("admin-notification", {
                 key: "newOrders",
-                message: "New external delivery booked",
+                message: isExpress ? "New EXPRESS delivery booked" : "New external delivery booked",
             });
         } catch (_) { /* socket optional */ }
+
+        // Credit-covered express bookings are paid up-front → dispatch right now.
+        // Unpaid ones dispatch the moment payment is confirmed (proof approval /
+        // cash marking / share-location reprice).
+        if (isExpress && fullyCovered) {
+            dispatchExpressOrder(orderId).catch(console.error);
+        }
 
         if (needsReview) {
             sendDeliveryReviewAlertEmail({
@@ -335,7 +348,7 @@ export async function POST(request) {
             }).catch((e) => console.error('Review alert email failed', e));
         }
 
-        return NextResponse.json({ success: true, orderId, fee, needsReview, creditApplied, amountDue, fullyCovered, trackingToken, deliveryOtp });
+        return NextResponse.json({ success: true, orderId, fee, express: isExpress, needsReview, creditApplied, amountDue, fullyCovered, trackingToken, deliveryOtp });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: error.message || error.code }, { status: 400 });

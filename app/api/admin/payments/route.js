@@ -4,6 +4,7 @@ import authAdmin from "@/middlewares/authAdmin";
 import prisma from "@/lib/prisma";
 import { inngest } from "@/inngest/client";
 import { logAdminAction } from "@/lib/auditLog";
+import { dispatchExpressOrder } from "@/lib/expressDispatch";
 
 const ALLOWED_REVIEW_STATUSES = ["APPROVED", "REJECTED"];
 
@@ -96,7 +97,7 @@ export async function POST(request) {
         // proof — never approve an order that has no proof on file.
         const order = await prisma.order.findUnique({
             where: { id: orderId },
-            select: { paymentProofUrl: true, paymentProofStatus: true }
+            select: { paymentProofUrl: true, paymentProofStatus: true, deliveryType: true }
         });
         if (!order) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -120,6 +121,13 @@ export async function POST(request) {
                 paymentReceivedAt: status === "APPROVED" ? new Date() : null
             }
         });
+
+        // EXPRESS orders dispatch the moment their payment is confirmed —
+        // a single-stop run appears on the dispatch board immediately
+        // (idempotent: skipped if the order was already dispatched).
+        if (status === "APPROVED" && order.deliveryType === "EXPRESS") {
+            dispatchExpressOrder(orderId).catch(console.error);
+        }
 
         try {
             await inngest.send({

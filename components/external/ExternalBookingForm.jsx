@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { ArrowLeftIcon, PackagePlusIcon, Loader2Icon, MapPinIcon, CrosshairIcon, CheckCircleIcon, CopyIcon, CheckIcon, LinkIcon, AlertTriangleIcon } from "lucide-react";
+import { ArrowLeftIcon, PackagePlusIcon, Loader2Icon, MapPinIcon, CrosshairIcon, CheckCircleIcon, CopyIcon, CheckIcon, LinkIcon, AlertTriangleIcon, ZapIcon } from "lucide-react";
 import LocationPicker from "@/components/delivery/LocationPicker";
 import RwLocationSelect from "@/components/delivery/RwLocationSelect";
 
@@ -29,6 +29,8 @@ export default function ExternalBookingForm() {
         pickupLat: null, pickupLng: null,
     });
     const [quote, setQuote] = useState(null);
+    // Express: instant dispatch (no schedule wait) at the premium express rate.
+    const [express, setExpress] = useState(false);
     const [creditBalance, setCreditBalance] = useState(0);
     const [applyCredit, setApplyCredit] = useState(true);
     const [locating, setLocating] = useState(false);
@@ -82,12 +84,13 @@ export default function ExternalBookingForm() {
                 // so the live quote matches the fee charged at booking.
                 if (form.pickupLat != null) params.set("originLat", String(form.pickupLat));
                 if (form.pickupLng != null) params.set("originLng", String(form.pickupLng));
+                if (express) params.set("express", "1");
                 const { data } = await axios.get(`/api/delivery/external/quote?${params.toString()}`, { headers: await authHeaders() });
                 if (active) setQuote(data);
             } catch (_) { if (active) setQuote(null); }
         })();
         return () => { active = false; };
-    }, [form.recipientSector, form.recipientDistrict, form.recipientCell, form.recipientVillage, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, form.pickupLat, form.pickupLng, authHeaders]);
+    }, [form.recipientSector, form.recipientDistrict, form.recipientCell, form.recipientVillage, form.packageWeightKg, form.packageLengthCm, form.packageWidthCm, form.packageHeightCm, form.recipientLat, form.recipientLng, form.pickupLat, form.pickupLng, express, authHeaders]);
 
     const onPick = (lat, lng) => setForm((f) => ({ ...f, recipientLat: lat, recipientLng: lng }));
 
@@ -146,6 +149,7 @@ export default function ExternalBookingForm() {
                 packageWidthCm: num(form.packageWidthCm),
                 packageHeightCm: num(form.packageHeightCm),
                 applyCredit,
+                express,
             }, { headers: await authHeaders() });
             setBooked(data);
         } catch (err) {
@@ -346,6 +350,20 @@ export default function ExternalBookingForm() {
                         </p>
                     </div>
                 </div>
+
+                {/* Express: instant dispatch at the premium express rate */}
+                <label className={`flex items-start gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition ${express ? "border-amber-400 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                    <input type="checkbox" checked={express} onChange={(e) => setExpress(e.target.checked)} className="mt-1 accent-amber-500" />
+                    <div>
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                            <ZapIcon size={14} className="text-amber-500" /> Express delivery
+                        </span>
+                        <span className="block text-[11px] text-slate-500 mt-0.5">
+                            A rider is dispatched immediately once the fee is paid — no waiting for the route
+                            schedule. Priced at the premium express rate.
+                        </span>
+                    </div>
+                </label>
 
                 <select className={input} value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)}>
                     <option value="MTN_MOMO">MTN MoMo</option>

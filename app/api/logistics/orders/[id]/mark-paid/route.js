@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import authLogistics from "@/middlewares/authLogistics";
+import { dispatchExpressOrder } from "@/lib/expressDispatch";
 
 // POST — logistics/admin records that an EXTERNAL delivery has been paid for
 // (cash/transfer collected at booking). Self-serve partners instead upload a
@@ -17,7 +18,7 @@ export async function POST(request, { params }) {
         const { id } = await params;
         const order = await prisma.order.findUnique({
             where: { id },
-            select: { isExternalDelivery: true, isPaid: true },
+            select: { isExternalDelivery: true, isPaid: true, deliveryType: true },
         });
         if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
         if (!order.isExternalDelivery) {
@@ -35,6 +36,11 @@ export async function POST(request, { params }) {
                 paymentReceivedAt: new Date(),
             },
         });
+
+        // EXPRESS bookings dispatch the moment they're paid (idempotent).
+        if (order.deliveryType === "EXPRESS") {
+            dispatchExpressOrder(id).catch(console.error);
+        }
 
         return NextResponse.json({ success: true, orderId: id, isPaid: true });
     } catch (error) {

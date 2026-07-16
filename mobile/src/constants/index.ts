@@ -82,6 +82,8 @@ export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus
 export const DeliveryType = {
   STANDARD_UNPOOLED: 'STANDARD_UNPOOLED',
   KIGALI_POOL: 'KIGALI_POOL',
+  // Instant dispatch — skips the pooled batching schedule, express base rate.
+  EXPRESS: 'EXPRESS',
 } as const;
 export type DeliveryType = (typeof DeliveryType)[keyof typeof DeliveryType];
 

@@ -19,8 +19,8 @@ export async function POST(request, { params }) {
             select: { deliveryType: true, deliveryStatus: true, corridorId: true },
         });
         if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-        if (order.deliveryType !== "KIGALI_POOL") {
-            return NextResponse.json({ error: "Not a pooled-delivery order" }, { status: 400 });
+        if (!["KIGALI_POOL", "EXPRESS"].includes(order.deliveryType)) {
+            return NextResponse.json({ error: "Not a rider-pipeline delivery order" }, { status: 400 });
         }
         if (order.deliveryStatus !== "PENDING_INTAKE") {
             return NextResponse.json({ error: `Cannot mark intake from status ${order.deliveryStatus}` }, { status: 409 });

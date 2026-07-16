@@ -132,8 +132,8 @@ export async function GET(request, { params }) {
             return NextResponse.json({ error: "Order not found" }, { status: 404 });
         }
 
-        if (order.deliveryType !== "KIGALI_POOL") {
-            return NextResponse.json({ error: "Label only available for Kigali Pooled Delivery orders" }, { status: 400 });
+        if (!["KIGALI_POOL", "EXPRESS"].includes(order.deliveryType)) {
+            return NextResponse.json({ error: "Label only available for rider-delivered (pooled/express) orders" }, { status: 400 });
         }
 
         const pdfBuffer = await renderToBuffer(<PackageLabel order={order} />);

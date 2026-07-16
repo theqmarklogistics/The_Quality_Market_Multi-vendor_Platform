@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { emitDelivery } from "@/lib/deliveryRealtime";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
 import { geocodeRwAddress } from "@/lib/geocode";
+import { dispatchExpressOrder } from "@/lib/expressDispatch";
 
 // POST { lat, lng } — the customer opts in to share their live location so the rider
 // can find them. Persists on the order (not the saved address) and pushes the pin to
@@ -50,8 +51,8 @@ export async function POST(request, { params }) {
             if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
             if (order.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
-        if (order.deliveryType !== "KIGALI_POOL") {
-            return NextResponse.json({ error: "Not a pooled-delivery order" }, { status: 400 });
+        if (!["KIGALI_POOL", "EXPRESS"].includes(order.deliveryType)) {
+            return NextResponse.json({ error: "Not a rider-pipeline delivery order" }, { status: 400 });
         }
 
         if (useAddress) {
@@ -102,6 +103,7 @@ export async function POST(request, { params }) {
                 dropLng: lng,
                 originLat: order.pickupLat ?? undefined,
                 originLng: order.pickupLng ?? undefined,
+                express: order.deliveryType === "EXPRESS",
             });
             // A needs-review re-price returns fee null (weight out of range) — the
             // finite check below skips it, leaving the existing fee + flag untouched.
@@ -137,6 +139,12 @@ export async function POST(request, { params }) {
                     .create({ data: { name: "delivery.fee_repriced", userId: order.userId, payload: { orderId, oldFee: order.total, newFee, basis: quote.basis, distanceKm: quote.distanceKm } } })
                     .catch((e) => console.error("Event write error:", e.message));
                 updatedFee = newFee;
+
+                // Credit fully covered the re-priced fee → the express booking just
+                // became paid: dispatch it immediately (idempotent helper).
+                if (fullyCovered && order.deliveryType === "EXPRESS") {
+                    dispatchExpressOrder(orderId).catch(console.error);
+                }
             }
         }
 

@@ -59,6 +59,8 @@ export async function GET(request) {
             originLat: num("originLat"),
             originLng: num("originLng"),
             distanceKm: num("distanceKm"),
+            // EXPRESS pricing (instant dispatch, express base rate).
+            express: searchParams.get("express") === "1" || searchParams.get("express") === "true",
         });
         return NextResponse.json({ ...quote, ...(locationSource && { locationSource }) });
     } catch (error) {

@@ -125,8 +125,8 @@ export async function GET(request, { params }) {
             if (order.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        if (order.deliveryType !== 'KIGALI_POOL') {
-            return NextResponse.json({ error: "This order does not use Kigali Pooled Delivery" }, { status: 400 });
+        if (!['KIGALI_POOL', 'EXPRESS'].includes(order.deliveryType)) {
+            return NextResponse.json({ error: "This order does not use rider delivery" }, { status: 400 });
         }
 
         const corridor = order.corridor;

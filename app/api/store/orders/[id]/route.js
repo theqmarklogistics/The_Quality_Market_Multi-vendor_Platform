@@ -35,8 +35,8 @@ export async function PATCH(request, { params }) {
             if (!validMethods.includes(body.intakeMethod)) {
                 return NextResponse.json({ error: "Invalid intake method" }, { status: 400 });
             }
-            if (order.deliveryType !== 'KIGALI_POOL') {
-                return NextResponse.json({ error: "Intake method only applies to Kigali Pooled Delivery orders" }, { status: 400 });
+            if (!['KIGALI_POOL', 'EXPRESS'].includes(order.deliveryType)) {
+                return NextResponse.json({ error: "Intake method only applies to rider-delivered (pooled/express) orders" }, { status: 400 });
             }
 
             let newTotal = order.total;
@@ -69,9 +69,10 @@ export async function PATCH(request, { params }) {
             if (isNaN(fee) || fee < 0) {
                 return NextResponse.json({ error: "Invalid shipping fee" }, { status: 400 });
             }
-            // Standard delivery ships free — a seller can no longer add a fee.
+            // Delivery fees are platform-calculated (segmented taper + weight-range
+            // formula) for every delivery type — sellers cannot add their own fee.
             if (order.deliveryType !== 'KIGALI_POOL' && fee > 0) {
-                return NextResponse.json({ error: "Standard delivery is free — a shipping fee cannot be added to this order." }, { status: 400 });
+                return NextResponse.json({ error: "Delivery fees are calculated by the platform — a manual shipping fee cannot be added to this order." }, { status: 400 });
             }
             const oldFee = order.shippingCost ?? 0;
             const newTotal = parseFloat((order.total - oldFee + fee).toFixed(2));
