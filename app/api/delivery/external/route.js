@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import authExternalSeller from "@/middlewares/authExternalSeller";
 import authLogistics from "@/middlewares/authLogistics";
 import authRider from "@/middlewares/authRider";
+import authAgent from "@/middlewares/authAgent";
 import { paymentMethod } from "@/lib/constants";
 import { quoteExternalDeliveryFee } from "@/lib/externalDelivery";
 import { geocodeRwAddress } from "@/lib/geocode";
@@ -19,9 +20,9 @@ export async function GET(request) {
     try {
         const { userId } = getAuth(request);
         if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        // Partners see their bookings; riders see walk-up deliveries they recorded.
-        if (!(await authExternalSeller(userId)) && !(await authRider(userId))) {
-            return NextResponse.json({ error: "Forbidden — delivery partners or riders only" }, { status: 403 });
+        // Partners see their bookings; riders/agents see walk-ups they recorded.
+        if (!(await authExternalSeller(userId)) && !(await authRider(userId)) && !(await authAgent(userId))) {
+            return NextResponse.json({ error: "Forbidden — delivery partners, riders or agents only" }, { status: 403 });
         }
 
         const [orders, partner] = await Promise.all([
@@ -86,10 +87,11 @@ export async function POST(request) {
             if (!partner) return NextResponse.json({ error: "Partner not found" }, { status: 400 });
             ownerId = partner.id;
         } else {
-            // Delivery partners book their own deliveries; riders may record a new
-            // walk-up delivery at the hub (owned by the rider, cash marked by logistics).
-            if (!(await authExternalSeller(userId)) && !(await authRider(userId))) {
-                return NextResponse.json({ error: "Forbidden — delivery partners or riders only" }, { status: 403 });
+            // Delivery partners book their own deliveries; riders and agents may
+            // record a new walk-up delivery at the hub / their post (owned by the
+            // recorder, cash marked by logistics).
+            if (!(await authExternalSeller(userId)) && !(await authRider(userId)) && !(await authAgent(userId))) {
+                return NextResponse.json({ error: "Forbidden — delivery partners, riders or agents only" }, { status: 403 });
             }
             ownerId = userId;
         }

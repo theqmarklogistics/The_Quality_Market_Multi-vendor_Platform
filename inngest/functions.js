@@ -34,7 +34,7 @@ export const syncUserCreation = inngest.createFunction(
 
         const { data } = event;
         const roleFromMetadata = data?.public_metadata?.role;
-        const allowedRoles = ['LOGISTICS_MANAGER', 'FINANCIAL_OPERATIONAL', 'WAREHOUSE_KEEPER', 'RIDER'];
+        const allowedRoles = ['LOGISTICS_MANAGER', 'FINANCIAL_OPERATIONAL', 'WAREHOUSE_KEEPER', 'RIDER', 'EXTERNAL_SELLER', 'AGENT'];
         const role = allowedRoles.includes(roleFromMetadata) ? roleFromMetadata : undefined;
         await prisma.user.create({
             data: {
@@ -50,6 +50,12 @@ export const syncUserCreation = inngest.createFunction(
         // Kept as a separate statement (no nested write) — a simple, portable pattern.
         if (role === 'RIDER') {
             await prisma.riderProfile.create({ data: { userId: data.id } });
+        }
+
+        // Agents / logistics managers get a StaffProfile up-front so the admin can
+        // record their public phone + location for the delivery-network page.
+        if (role === 'AGENT' || role === 'LOGISTICS_MANAGER') {
+            await prisma.staffProfile.create({ data: { userId: data.id } });
         }
 }
 )

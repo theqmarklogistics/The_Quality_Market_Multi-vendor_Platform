@@ -19,6 +19,9 @@ model User {
     // Account credit earned from pooled-delivery savings (external partners),
     // redeemable against future delivery bookings.
     deliveryCreditBalance Float @default(0)
+    // Admin deactivation flag — sign-in is blocked via a Clerk ban; this flag
+    // drives the admin UI and lets staff-facing queries exclude the account.
+    isActive Boolean @default(true)
 
     // Relations
     ratings     Rating[]
@@ -29,6 +32,7 @@ model User {
     sentMessages       Message[]                 @relation("MessageSender")
     returns     Return[]
     riderProfile       RiderProfile?
+    staffProfile       StaffProfile?
     assignedCorridors  DeliveryCorridor[]        @relation("CorridorRider")
     corridorSchedules  CorridorSchedule[]        @relation("ScheduleRider")
     pushTokens         PushToken[]
@@ -480,6 +484,7 @@ enum UserRole {
     WAREHOUSE_KEEPER
     RIDER
     EXTERNAL_SELLER
+    AGENT
 }
 
 enum ShippingRuleType {
@@ -694,6 +699,26 @@ model DeliveryCorridor {
     assignedRider User?          @relation("CorridorRider", fields: [assignedRiderId], references: [id])
 
     @@index([runDate, status])
+}
+
+// Public-facing staff contact card (AGENT / LOGISTICS_MANAGER). Admin-managed;
+// published on the public delivery-network page so senders can reach the
+// nearest agent (or the logistics manager) directly by phone.
+model StaffProfile {
+    id        String   @id @default(cuid())
+    userId    String   @unique
+    phone     String?
+    // Where this staff member is stationed
+    sector    String?
+    landmark  String?
+    latitude  Float?
+    longitude Float?
+    // Whether this card is shown on the public delivery-network page
+    isPublic  Boolean  @default(true)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // Rider/driver profile used by the dispatch board to assign deliveries

@@ -27,6 +27,10 @@ export default function StoreEditProduct() {
         wholesalePrice: "",
         wholesaleMinQty: "",
         category: "",
+        weightKg: "",
+        lengthCm: "",
+        widthCm: "",
+        heightCm: "",
     })
     const [categoryOptions, setCategoryOptions] = useState([])
 
@@ -56,6 +60,10 @@ export default function StoreEditProduct() {
                     wholesalePrice: data.wholesalePrice ?? "",
                     wholesaleMinQty: data.wholesaleMinQty ?? "",
                     category: data.category,
+                    weightKg: data.weightKg ?? "",
+                    lengthCm: data.lengthCm ?? "",
+                    widthCm: data.widthCm ?? "",
+                    heightCm: data.heightCm ?? "",
                 })
                 const existing = Array.isArray(data.images) ? data.images : []
                 const slots = { 1: null, 2: null, 3: null, 4: null }
@@ -114,6 +122,11 @@ export default function StoreEditProduct() {
             newFiles.forEach((f) => formData.append("images", f))
             if (productInfo.wholesalePrice) formData.append("wholesalePrice", productInfo.wholesalePrice)
             if (productInfo.wholesaleMinQty) formData.append("wholesaleMinQty", productInfo.wholesaleMinQty)
+            // Shipping weight & volume dimensions (blank clears the value)
+            formData.append("weightKg", productInfo.weightKg)
+            formData.append("lengthCm", productInfo.lengthCm)
+            formData.append("widthCm", productInfo.widthCm)
+            formData.append("heightCm", productInfo.heightCm)
 
             const token = await getToken()
             await axios.patch(`/api/store/product/${productId}`, formData, {
@@ -292,6 +305,46 @@ export default function StoreEditProduct() {
                             className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded"
                         />
                     </label>
+                </div>
+            </div>
+
+            {/* Shipping weight & volume dimensions */}
+            <div className="mt-8 border-t border-slate-100 pt-6">
+                <p className="text-slate-700 font-medium mb-1">Shipping Weight &amp; Volume Dimensions</p>
+                <p className="text-xs text-slate-400 mb-4">Used to compute the volumetric weight and the delivery fee. Leave blank if unknown.</p>
+                <div className="flex flex-wrap gap-5">
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="weightKg">Weight (kg)</label>
+                        <input
+                            id="weightKg" type="number" name="weightKg" step="0.01" min="0"
+                            onChange={onChangeHandler} value={productInfo.weightKg} placeholder="0.00"
+                            className="w-32 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="lengthCm">Length (cm)</label>
+                        <input
+                            id="lengthCm" type="number" name="lengthCm" step="0.1" min="0"
+                            onChange={onChangeHandler} value={productInfo.lengthCm} placeholder="0"
+                            className="w-32 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="widthCm">Width (cm)</label>
+                        <input
+                            id="widthCm" type="number" name="widthCm" step="0.1" min="0"
+                            onChange={onChangeHandler} value={productInfo.widthCm} placeholder="0"
+                            className="w-32 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label htmlFor="heightCm">Height (cm)</label>
+                        <input
+                            id="heightCm" type="number" name="heightCm" step="0.1" min="0"
+                            onChange={onChangeHandler} value={productInfo.heightCm} placeholder="0"
+                            className="w-32 p-2 px-4 outline-none border border-slate-200 rounded"
+                        />
+                    </div>
                 </div>
             </div>
 

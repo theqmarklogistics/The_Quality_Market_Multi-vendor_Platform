@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 export default async function sitemap() {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://thequalitymarket.com'
 
-    const staticRoutes = ['', '/shop', '/about', '/contact', '/terms', '/policy'].map(path => ({
+    const staticRoutes = ['', '/shop', '/about', '/contact', '/terms', '/policy', '/create-store', '/delivery-schedule', '/delivery-network'].map(path => ({
         url: `${baseUrl}${path}`,
         lastModified: new Date(),
         changeFrequency: 'weekly',

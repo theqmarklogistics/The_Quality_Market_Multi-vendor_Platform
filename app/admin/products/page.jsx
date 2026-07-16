@@ -468,6 +468,7 @@ export default function AdminProducts() {
                                             <th className="text-left px-3 py-3">Store</th>
                                             <th className="text-left px-3 py-3">Category</th>
                                             <th className="text-left px-3 py-3">Status</th>
+                                            <th className="text-left px-3 py-3">Weight / Dimensions</th>
                                             <th className="text-right px-3 py-3">Price (Rwf)</th>
                                             <th className="text-right px-3 py-3">Orders</th>
                                             <th className="text-right px-3 py-3">Reviews</th>
@@ -495,6 +496,20 @@ export default function AdminProducts() {
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[p.approvalStatus] || 'bg-slate-100 text-slate-500'}`}>
                                                         {p.approvalStatus}
                                                     </span>
+                                                </td>
+                                                <td className="px-3 py-3 whitespace-nowrap">
+                                                    {p.weightKg || p.lengthCm || p.widthCm || p.heightCm ? (
+                                                        <>
+                                                            <span className="text-slate-700">{p.weightKg ? `${p.weightKg} kg` : '—'}</span>
+                                                            <span className="block text-xs text-slate-400">
+                                                                {p.lengthCm || p.widthCm || p.heightCm
+                                                                    ? `${p.lengthCm ?? '?'} × ${p.widthCm ?? '?'} × ${p.heightCm ?? '?'} cm`
+                                                                    : 'no dimensions'}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-xs text-amber-600">Not set</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-3 py-3 text-right text-slate-700">{p.price?.toLocaleString()}</td>
                                                 <td className="px-3 py-3 text-right font-medium text-slate-700">{p._count?.orderItems ?? 0}</td>

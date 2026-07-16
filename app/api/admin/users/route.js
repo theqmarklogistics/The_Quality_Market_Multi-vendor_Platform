@@ -10,7 +10,12 @@ const ALLOWED_ROLES = [
     'WAREHOUSE_KEEPER',
     'RIDER',
     'EXTERNAL_SELLER',
+    'AGENT',
 ]
+
+// Roles whose contact card (phone + location) is published on the public
+// delivery-network page — they get a StaffProfile the admin can fill in.
+const STAFF_PROFILE_ROLES = ['AGENT', 'LOGISTICS_MANAGER']
 
 export async function GET(request) {
     try {
@@ -20,7 +25,12 @@ export async function GET(request) {
 
         const users = await prisma.user.findMany({
             orderBy: { name: 'asc' },
-            select: { id: true, name: true, email: true, image: true, role: true },
+            select: {
+                id: true, name: true, email: true, image: true, role: true, isActive: true,
+                staffProfile: { select: { phone: true, sector: true, landmark: true, isPublic: true } },
+                _count: { select: { buyerOrders: true, returns: true } },
+                store: { select: { id: true } },
+            },
         });
 
         return NextResponse.json({ users });
@@ -62,6 +72,15 @@ export async function POST(request) {
                 const profile = await prisma.riderProfile.findUnique({ where: { userId: existing.id } });
                 if (!profile) {
                     await prisma.riderProfile.create({ data: { userId: existing.id } });
+                }
+            }
+
+            // Agents / logistics managers get a StaffProfile so the admin can
+            // record their public phone + location for the delivery-network page.
+            if (STAFF_PROFILE_ROLES.includes(normalizedRole)) {
+                const profile = await prisma.staffProfile.findUnique({ where: { userId: existing.id } });
+                if (!profile) {
+                    await prisma.staffProfile.create({ data: { userId: existing.id } });
                 }
             }
 

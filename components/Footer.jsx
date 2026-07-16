@@ -30,6 +30,7 @@ const Footer = () => {
                 { text: "Create Your Store", path: '/create-store', icon: null },
                 { text: "Deliver With Us", path: '/external', icon: null },
                 { text: "Rider Departure Schedule", path: '/delivery-schedule', icon: null },
+                { text: "Hubs & Agents Near You", path: '/delivery-network', icon: null },
                 { text: "Download the Android App", path: 'https://github.com/theqmarklogistics/The_Quality_Market_Multi-vendor_Platform/releases/latest/download/the-quality-market.apk', icon: null },
                 { text: "Privacy Policy", path: '/policy', icon: null },
                 { text: "Terms & Conditions", path: '/terms', icon: null },

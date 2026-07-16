@@ -160,6 +160,7 @@ export default function StoreManageProducts() {
                                 <th className="px-4 py-3 hidden md:table-cell">MRP</th>
                                 <th className="px-4 py-3">Price</th>
                                 <th className="px-4 py-3 hidden lg:table-cell">Warehouse Qty</th>
+                                <th className="px-4 py-3 hidden lg:table-cell">Weight / Dimensions</th>
                                 <th className="px-4 py-3">Approval</th>
                                 <th className="px-4 py-3">Actions</th>
                             </tr>
@@ -183,6 +184,20 @@ export default function StoreManageProducts() {
                                     <td className="px-4 py-3 hidden md:table-cell">{currency} {product.mrp?.toLocaleString()}</td>
                                     <td className="px-4 py-3">{currency} {product.price?.toLocaleString()}</td>
                                     <td className="px-4 py-3 hidden lg:table-cell">{product.warehouseQuantity}</td>
+                                    <td className="px-4 py-3 hidden lg:table-cell text-slate-600 whitespace-nowrap">
+                                        {product.weightKg || product.lengthCm || product.widthCm || product.heightCm ? (
+                                            <>
+                                                {product.weightKg ? `${product.weightKg} kg` : '—'}
+                                                <span className="block text-xs text-slate-400">
+                                                    {product.lengthCm || product.widthCm || product.heightCm
+                                                        ? `${product.lengthCm ?? '?'} × ${product.widthCm ?? '?'} × ${product.heightCm ?? '?'} cm`
+                                                        : 'no dimensions'}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="text-xs text-amber-600">Not set</span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs px-2 py-1 rounded-full ${product.approvalStatus === 'APPROVED' ? 'bg-green-100 text-green-700' : product.approvalStatus === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
                                             {(product.approvalStatus || 'PENDING').toLowerCase()}

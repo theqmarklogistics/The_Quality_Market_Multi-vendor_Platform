@@ -7,6 +7,39 @@ import Loading from "@/components/Loading"
 import { useAuth, useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import axios from "axios"
+import { StoreIcon, ShieldCheckIcon, TruckIcon, TrendingUpIcon, BanknoteIcon, SparklesIcon } from "lucide-react"
+
+// Why-sell-with-us cards shown above the application form.
+const SELLER_PERKS = [
+    {
+        icon: StoreIcon,
+        title: 'Your store, city-wide reach',
+        body: 'List once and your products reach shoppers across Kigali and beyond — on web and on our mobile app.',
+    },
+    {
+        icon: TruckIcon,
+        title: 'Delivery is our problem',
+        body: 'Go Full Managed and we store, pick, pack and deliver for you — or stay Local and ship on your own terms.',
+    },
+    {
+        icon: BanknoteIcon,
+        title: 'Secure payments & payouts',
+        body: 'Customers pay by MoMo, bank transfer or card. Your earnings are tracked per order and paid out on schedule.',
+    },
+    {
+        icon: TrendingUpIcon,
+        title: 'Tools that grow with you',
+        body: 'A full seller dashboard: live orders, stock control, wholesale pricing, analytics and direct chat with buyers.',
+    },
+]
+
+// The path from application to first sale.
+const SELLER_STEPS = [
+    { title: 'Submit your details', body: 'Store name, contact and your TIN — five minutes, all online.' },
+    { title: 'We verify you', body: 'Our team reviews your application, usually within one business day.' },
+    { title: 'Add your products', body: 'Upload photos, set prices and stock from your dashboard.' },
+    { title: 'Start selling', body: 'Orders, payments and delivery updates flow in automatically.' },
+]
 
 const SELLER_CONTRACT = `SELLER AGREEMENT — THE QUALITY MARKET
 
@@ -169,6 +202,53 @@ export default function CreateStore() {
         <>
             {!alreadySubmitted ? (
                 <div className="mx-6 min-h-[70vh] my-16">
+                    {/* ── Why sell with us ─────────────────────────────────── */}
+                    <div className="max-w-7xl mx-auto mb-14">
+                        <div className="relative overflow-hidden rounded-3xl border border-green-100/70 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.18),_transparent_45%),linear-gradient(135deg,_#f8fafc_0%,_#ecfdf5_100%)] p-8 sm:p-10">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-600/10 text-green-700 text-xs font-semibold px-3 py-1">
+                                <SparklesIcon size={14} /> Become a seller
+                            </span>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mt-4">Open your store on The Quality Market</h1>
+                            <p className="text-sm sm:text-base text-slate-600 leading-7 mt-3 max-w-xl">
+                                Sell to shoppers across Rwanda with payments, logistics and buyer chat already built in.
+                                Apply below — verification usually takes one business day.
+                            </p>
+                            <p className="mt-5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                                <ShieldCheckIcon size={14} className="text-green-600" /> Free to apply · No listing fees · Commission only when you sell
+                            </p>
+                        </div>
+
+                        {/* Benefit cards */}
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                            {SELLER_PERKS.map((perk) => (
+                                <div key={perk.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-green-200 transition">
+                                    <div className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                                        <perk.icon size={18} />
+                                    </div>
+                                    <p className="font-medium text-slate-700 mt-3">{perk.title}</p>
+                                    <p className="text-sm text-slate-500 mt-1 leading-6">{perk.body}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* How it works */}
+                        <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
+                            <p className="font-semibold text-slate-800 mb-5">How it works</p>
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {SELLER_STEPS.map((step, i) => (
+                                    <div key={step.title} className="relative">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-green-400 text-sm font-bold">{i + 1}</span>
+                                            {i < SELLER_STEPS.length - 1 && <span className="hidden lg:block h-px flex-1 bg-slate-200" aria-hidden="true" />}
+                                        </div>
+                                        <p className="font-medium text-slate-700 mt-3 text-sm">{step.title}</p>
+                                        <p className="text-xs text-slate-500 mt-1 leading-5">{step.body}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
                     <form onSubmit={e => toast.promise(onSubmitHandler(e), { loading: "Submitting data..." })} className="max-w-7xl mx-auto flex flex-col items-start gap-3 text-slate-500">
                         {/* Title */}
                         <div>

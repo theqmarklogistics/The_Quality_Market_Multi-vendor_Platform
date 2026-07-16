@@ -14,6 +14,7 @@ export default clerkMiddleware({
     '/api/newsletter/unsubscribe',
     '/api/delivery/external/quote',
     '/api/delivery/schedule',
+    '/api/delivery/network',
   ],
 });
 

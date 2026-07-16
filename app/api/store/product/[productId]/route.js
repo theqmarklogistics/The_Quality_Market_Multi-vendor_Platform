@@ -61,6 +61,16 @@ export async function PATCH(request, { params }) {
     const wholesalePrice = wholesalePriceRaw ? Number(wholesalePriceRaw) : null;
     const wholesaleMinQty = wholesaleMinQtyRaw ? Number(wholesaleMinQtyRaw) : null;
 
+    // Shipping weight & volume dimensions. Only fields present in the form are
+    // touched (older clients omit them); a blank value clears the dimension.
+    const dims = {};
+    for (const field of ["weightKg", "lengthCm", "widthCm", "heightCm"]) {
+      const raw = formData.get(field);
+      if (raw === null) continue; // field not submitted — leave as-is
+      const parsed = Number(raw);
+      dims[field] = raw !== "" && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    }
+
     const parsedWarehouseQuantity = Number(warehouseQuantity);
 
     if (!name || !description || mrp == null || price == null || !category || warehouseQuantity == null) {
@@ -123,6 +133,7 @@ export async function PATCH(request, { params }) {
         approvedAt: null,
         wholesalePrice,
         wholesaleMinQty,
+        ...dims,
       },
     });
 

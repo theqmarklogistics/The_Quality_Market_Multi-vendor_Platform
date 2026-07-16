@@ -207,6 +207,7 @@ const Navbar = () => {
     if (canShowAccessActions && isAdmin) dashboards.push({ href: '/admin', label: 'Admin Dashboard', color: 'bg-slate-50 text-slate-800 hover:bg-slate-100' })
     if (canShowAccessActions && isSeller) dashboards.push({ href: '/store', label: 'Store Dashboard', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' })
     if (staffRole === 'RIDER') dashboards.push({ href: '/rider', label: 'Rider Console', color: 'bg-green-50 text-green-700 hover:bg-green-100' })
+    if (staffRole === 'AGENT') dashboards.push({ href: '/agent', label: 'Agent Console', color: 'bg-green-50 text-green-700 hover:bg-green-100' })
     if (staffRole === 'LOGISTICS_MANAGER' || isAdmin) dashboards.push({ href: '/logistics', label: 'Dispatch', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' })
     if (staffRole === 'EXTERNAL_SELLER') dashboards.push({ href: '/external', label: 'My Deliveries', color: 'bg-green-50 text-green-700 hover:bg-green-100' })
 
@@ -346,6 +347,9 @@ const Navbar = () => {
                                     {staffRole === 'RIDER' && (
                                         <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Rider Console" onClick={() => router.push('/rider')} />
                                     )}
+                                    {staffRole === 'AGENT' && (
+                                        <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Agent Console" onClick={() => router.push('/agent')} />
+                                    )}
                                     {(staffRole === 'LOGISTICS_MANAGER' || isAdmin) && (
                                         <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Dispatch Board" onClick={() => router.push('/logistics')} />
                                     )}
@@ -413,6 +417,9 @@ const Navbar = () => {
                                     )}
                                     {staffRole === 'RIDER' && (
                                         <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Rider Console" onClick={() => router.push('/rider')} />
+                                    )}
+                                    {staffRole === 'AGENT' && (
+                                        <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Agent Console" onClick={() => router.push('/agent')} />
                                     )}
                                     {(staffRole === 'LOGISTICS_MANAGER' || isAdmin) && (
                                         <UserButton.Action labelIcon={<TruckIcon size={16} />} label="Dispatch Board" onClick={() => router.push('/logistics')} />

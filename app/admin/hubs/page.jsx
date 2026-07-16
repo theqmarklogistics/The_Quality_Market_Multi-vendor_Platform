@@ -6,8 +6,61 @@ import { useAuth } from "@clerk/nextjs"
 import { useCallback, useEffect, useState } from "react"
 import axios from "axios"
 import toast from "react-hot-toast"
-import { WarehouseIcon, PlusIcon, Trash2Icon, RouteIcon, CalendarClockIcon, PowerIcon, MapPinIcon, ArrowUpIcon, ArrowDownIcon, XIcon, BanknoteIcon } from "lucide-react"
+import { WarehouseIcon, PlusIcon, Trash2Icon, RouteIcon, CalendarClockIcon, PowerIcon, MapPinIcon, ArrowUpIcon, ArrowDownIcon, XIcon, BanknoteIcon, CrosshairIcon, LocateFixedIcon } from "lucide-react"
 import { KIGALI_SECTORS } from "@/lib/constants"
+import LocationPicker from "@/components/delivery/LocationPicker"
+
+// Coordinate capture that never blocks on the map: tap the map to drop a pin,
+// type/paste coordinates from Google Maps, or use the device's own location
+// (handy when the admin is standing at the hub).
+function CoordinateFields({ latitude, longitude, onChange }) {
+    const parse = (v) => {
+        if (v === '' || v == null) return null
+        const n = Number(v)
+        return Number.isFinite(n) ? n : null
+    }
+
+    const useMyLocation = () => {
+        if (!navigator.geolocation) return toast.error('Location is not available in this browser')
+        navigator.geolocation.getCurrentPosition(
+            (pos) => onChange(pos.coords.latitude, pos.coords.longitude),
+            () => toast.error('Could not read your location — allow location access or type the coordinates'),
+            { enableHighAccuracy: true, timeout: 10000 }
+        )
+    }
+
+    return (
+        <div className="space-y-2">
+            <LocationPicker
+                value={latitude != null ? { lat: latitude, lng: longitude } : null}
+                onPick={(lat, lng) => onChange(lat, lng)}
+                height={220}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+                <input
+                    type="number" step="any" value={latitude ?? ''}
+                    onChange={e => onChange(parse(e.target.value), longitude)}
+                    placeholder="Latitude (e.g. -1.94995)"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white w-44"
+                />
+                <input
+                    type="number" step="any" value={longitude ?? ''}
+                    onChange={e => onChange(latitude, parse(e.target.value))}
+                    placeholder="Longitude (e.g. 30.05885)"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-green-500 bg-white w-44"
+                />
+                <button type="button" onClick={useMyLocation} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-green-200 text-green-700 text-xs font-medium hover:bg-green-50">
+                    <LocateFixedIcon size={13} /> Use my current location
+                </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+                {latitude != null && longitude != null
+                    ? <>Pinned at <span className="font-medium text-slate-600">{latitude.toFixed(5)}, {longitude.toFixed(5)}</span></>
+                    : 'Tap the map, type the coordinates, or use your current location — required so delivery distances can be calculated from this hub.'}
+            </p>
+        </div>
+    )
+}
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -66,8 +119,10 @@ export default function AdminHubs() {
     const [riders, setRiders] = useState([])
     const [loading, setLoading] = useState(true)
 
-    // New hub form
-    const [hubForm, setHubForm] = useState({ name: '', sector: '', landmark: '' })
+    // New hub form (latitude/longitude picked on the map — used for distance-based pricing)
+    const [hubForm, setHubForm] = useState({ name: '', sector: '', landmark: '', latitude: null, longitude: null })
+    // Coordinate editor (keyed open per hub) for existing hubs
+    const [editingHubLocation, setEditingHubLocation] = useState(null) // { id, latitude, longitude } | null
     // New corridor form (keyed open per hub)
     const [corridorHub, setCorridorHub] = useState(null)
     const [corridorForm, setCorridorForm] = useState({ name: '', areas: '', description: '', landmarks: [], fixedRate: '', perKmRate: '' })
@@ -102,10 +157,29 @@ export default function AdminHubs() {
     const createHub = async (e) => {
         e.preventDefault()
         if (!hubForm.name.trim()) return toast.error('Hub name is required')
+        if (hubForm.latitude == null || hubForm.longitude == null) return toast.error('Set the hub coordinates — tap the map, type them, or use your current location')
         try {
             await axios.post('/api/admin/hubs', hubForm, { headers: await authHeaders() })
             toast.success('Hub created')
-            setHubForm({ name: '', sector: '', landmark: '' })
+            setHubForm({ name: '', sector: '', landmark: '', latitude: null, longitude: null })
+            load()
+        } catch (error) {
+            toast.error(error?.response?.data?.error || error.message)
+        }
+    }
+
+    const saveHubLocation = async () => {
+        if (!editingHubLocation) return
+        if (editingHubLocation.latitude == null || editingHubLocation.longitude == null) {
+            return toast.error('Tap the map to drop the hub pin first')
+        }
+        try {
+            await axios.patch(`/api/admin/hubs/${editingHubLocation.id}`, {
+                latitude: editingHubLocation.latitude,
+                longitude: editingHubLocation.longitude,
+            }, { headers: await authHeaders() })
+            toast.success('Hub coordinates saved')
+            setEditingHubLocation(null)
             load()
         } catch (error) {
             toast.error(error?.response?.data?.error || error.message)
@@ -139,7 +213,7 @@ export default function AdminHubs() {
         try {
             await axios.post('/api/admin/corridor-routes', { ...corridorForm, hubId }, { headers: await authHeaders() })
             toast.success('Corridor recorded')
-            setCorridorForm({ name: '', areas: '', description: '', landmarks: [] })
+            setCorridorForm({ name: '', areas: '', description: '', landmarks: [], fixedRate: '', perKmRate: '' })
             setCorridorHub(null)
             load()
         } catch (error) {
@@ -231,7 +305,15 @@ export default function AdminHubs() {
     return (
         <div className="text-slate-500 mb-28 max-w-4xl">
             <h1 className="text-2xl mb-1">Hubs &amp; <span className="text-slate-800 font-medium">Corridors</span></h1>
-            <p className="text-sm text-slate-400 mb-6">Register hubs, the corridors served from each hub, and the rider departure schedule shown to the public.</p>
+            <p className="text-sm text-slate-400 mb-3">Register hubs, the corridors served from each hub, and the rider departure schedule shown to the public.</p>
+            {/* Flow hint — corridors and schedules live INSIDE each hub card below */}
+            <div className="flex flex-wrap items-center gap-2 mb-6 text-xs">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 text-slate-600 px-3 py-1.5 font-medium"><WarehouseIcon size={12} className="text-green-600" /> 1 · Add a hub</span>
+                <span className="text-slate-300">→</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 text-slate-600 px-3 py-1.5 font-medium"><RouteIcon size={12} className="text-green-600" /> 2 · Record its corridors (inside the hub card)</span>
+                <span className="text-slate-300">→</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 text-slate-600 px-3 py-1.5 font-medium"><CalendarClockIcon size={12} className="text-green-600" /> 3 · Add departure schedules (published publicly)</span>
+            </div>
 
             {/* New hub */}
             <form onSubmit={createHub} className="bg-white border rounded-xl shadow-sm p-4 mb-6">
@@ -243,6 +325,16 @@ export default function AdminHubs() {
                         {KIGALI_SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <input value={hubForm.landmark} onChange={e => setHubForm(f => ({ ...f, landmark: e.target.value }))} placeholder="Landmark / address" className="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-green-500" />
+                </div>
+                <div className="mt-3">
+                    <p className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                        <CrosshairIcon size={12} className="text-green-600" /> Hub coordinates — used to calculate delivery distances
+                    </p>
+                    <CoordinateFields
+                        latitude={hubForm.latitude}
+                        longitude={hubForm.longitude}
+                        onChange={(latitude, longitude) => setHubForm(f => ({ ...f, latitude, longitude }))}
+                    />
                 </div>
                 <button className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 text-sm font-medium transition">
                     <PlusIcon size={15} /> Add Hub
@@ -265,8 +357,18 @@ export default function AdminHubs() {
                                 {!hub.isActive && <span className="text-[10px] font-semibold uppercase bg-slate-100 text-slate-500 rounded-full px-2 py-0.5">Inactive</span>}
                             </p>
                             <p className="text-xs text-slate-400 mt-0.5">{[hub.sector, hub.landmark].filter(Boolean).join(' · ') || 'No location details'}</p>
+                            {hub.latitude != null && hub.longitude != null ? (
+                                <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                                    <CrosshairIcon size={11} className="text-green-600" /> {hub.latitude.toFixed(5)}, {hub.longitude.toFixed(5)}
+                                </p>
+                            ) : (
+                                <p className="text-[11px] text-amber-600 mt-0.5">No coordinates — tap the crosshair to pin this hub so distances can be calculated.</p>
+                            )}
                         </div>
                         <div className="flex gap-2">
+                            <button onClick={() => setEditingHubLocation(editingHubLocation?.id === hub.id ? null : { id: hub.id, latitude: hub.latitude, longitude: hub.longitude })} title="Set hub coordinates" className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:border-green-400 hover:text-green-600">
+                                <CrosshairIcon size={14} />
+                            </button>
                             <button onClick={() => toggleHub(hub)} title={hub.isActive ? 'Deactivate' : 'Activate'} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:border-amber-400 hover:text-amber-600">
                                 <PowerIcon size={14} />
                             </button>
@@ -275,6 +377,24 @@ export default function AdminHubs() {
                             </button>
                         </div>
                     </div>
+
+                    {/* Hub coordinate editor */}
+                    {editingHubLocation?.id === hub.id && (
+                        <div className="mt-3 rounded-lg border border-green-100 bg-green-50/50 p-3">
+                            <p className="text-xs font-medium text-slate-600 mb-2 flex items-center gap-1">
+                                <CrosshairIcon size={12} className="text-green-600" /> Hub coordinates — feed the delivery-distance calculation
+                            </p>
+                            <CoordinateFields
+                                latitude={editingHubLocation.latitude}
+                                longitude={editingHubLocation.longitude}
+                                onChange={(latitude, longitude) => setEditingHubLocation(l => ({ ...l, latitude, longitude }))}
+                            />
+                            <div className="mt-2 flex items-center gap-2">
+                                <button onClick={saveHubLocation} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700">Save coordinates</button>
+                                <button onClick={() => setEditingHubLocation(null)} className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600">Cancel</button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Corridors of this hub */}
                     <div className="mt-3 space-y-3">
@@ -404,8 +524,8 @@ export default function AdminHubs() {
                                 </div>
                             </form>
                         ) : (
-                            <button onClick={() => { setCorridorHub(hub.id); setCorridorForm({ name: '', areas: '', description: '', landmarks: [], fixedRate: '', perKmRate: '' }) }} className="inline-flex items-center gap-1.5 text-sm text-green-700 hover:underline">
-                                <PlusIcon size={14} /> Record a corridor from this hub
+                            <button onClick={() => { setCorridorHub(hub.id); setCorridorForm({ name: '', areas: '', description: '', landmarks: [], fixedRate: '', perKmRate: '' }) }} className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-green-300 bg-green-50/40 px-4 py-3 text-sm font-medium text-green-700 hover:bg-green-50 hover:border-green-400 transition">
+                                <RouteIcon size={16} /> Record a corridor from this hub
                             </button>
                         )}
                     </div>
