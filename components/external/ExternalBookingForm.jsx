@@ -384,6 +384,7 @@ export default function ExternalBookingForm() {
                 <select className={input} value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)}>
                     <option value="MTN_MOMO">MTN MoMo</option>
                     <option value="BANK_TRANSFER">Bank transfer</option>
+                    <option value="EKASH">eKash</option>
                 </select>
 
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">

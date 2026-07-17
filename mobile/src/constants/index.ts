@@ -21,19 +21,21 @@ export const API_URL = (
 
 export const SOCKET_ENABLED = process.env.EXPO_PUBLIC_SOCKET_ENABLED === 'true';
 
-// Payment methods (match prisma PaymentMethod). Only BANK_TRANSFER + MTN_MOMO are
-// surfaced in checkout today, matching the web's allowedPaymentMethods.
+// Payment methods (match prisma PaymentMethod). MTN_MOMO, BANK_TRANSFER + EKASH
+// are surfaced in checkout today, matching the web's allowedPaymentMethods.
 export const PaymentMethod = {
   BANK_TRANSFER: 'BANK_TRANSFER',
   STRIPE: 'STRIPE',
   MTN_MOMO: 'MTN_MOMO',
   AIRTEL_MONEY: 'AIRTEL_MONEY',
+  EKASH: 'EKASH',
 } as const;
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
 
 export const CHECKOUT_PAYMENT_METHODS: PaymentMethod[] = [
   PaymentMethod.MTN_MOMO,
   PaymentMethod.BANK_TRANSFER,
+  PaymentMethod.EKASH,
 ];
 
 // User roles (match prisma UserRole).

@@ -375,17 +375,26 @@ export default function StoreAddProduct() {
                         />
                     </div>
                 </div>
-                {volumetricKg > 0 && (
+                {(Number(productInfo.lengthCm) > 0 || Number(productInfo.widthCm) > 0 || Number(productInfo.heightCm) > 0) && (
                     <div className="mb-5 max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-                        <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Volumetric weight</span>
-                            <span className="font-medium text-slate-800">{volumetricKg.toFixed(2)} kg</span>
-                        </div>
-                        <div className="mt-1 flex items-center justify-between">
-                            <span className="text-slate-500">Billed (chargeable) weight</span>
-                            <span className="font-medium text-slate-800">{chargeableKg.toFixed(2)} kg</span>
-                        </div>
-                        <p className="mt-2 text-xs text-slate-400">Delivery is charged on the greater of actual and volumetric weight (1 m³ = 200 kg).</p>
+                        {volumetricKg > 0 ? (
+                            <>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-500">Volumetric weight</span>
+                                    <span className="font-medium text-slate-800">{volumetricKg.toFixed(2)} kg</span>
+                                </div>
+                                <div className="mt-1 flex items-center justify-between">
+                                    <span className="text-slate-500">Billed (chargeable) weight</span>
+                                    <span className="font-medium text-slate-800">{chargeableKg.toFixed(2)} kg</span>
+                                </div>
+                                <p className="mt-2 text-xs text-slate-400">Delivery is charged on the greater of actual and volumetric weight (1 m³ = 200 kg).</p>
+                            </>
+                        ) : (
+                            <div className="flex items-center justify-between text-slate-400">
+                                <span>Volumetric weight</span>
+                                <span className="text-xs">Enter length, width &amp; height to calculate</span>
+                            </div>
+                        )}
                     </div>
                 )}
                 <div>

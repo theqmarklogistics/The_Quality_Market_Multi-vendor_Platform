@@ -15,9 +15,12 @@ export async function GET() {
             momoAccountName: config?.momoAccountName || null,
             momoConfigured: !!(config?.momoPayCode && config?.momoAccountName),
             bankConfigured: !!(config?.bankName && config?.bankAccountNumber),
+            ekashNumber: config?.ekashNumber || null,
+            ekashAccountName: config?.ekashAccountName || null,
+            ekashConfigured: !!config?.ekashNumber,
         });
     } catch (error) {
         console.error(error);
-        return cachedJson({ momoPayCode: null, momoAccountName: null, momoConfigured: false, bankConfigured: false });
+        return cachedJson({ momoPayCode: null, momoAccountName: null, momoConfigured: false, bankConfigured: false, ekashNumber: null, ekashAccountName: null, ekashConfigured: false });
     }
 }

@@ -145,6 +145,7 @@ enum PaymentMethod {
     MTN_MOMO
     AIRTEL_MONEY
     BANK_TRANSFER
+    EKASH
 }
 
 enum PaymentStatus {
@@ -611,6 +612,8 @@ model PaymentConfig {
     bankAccountNumber String?
     bankAccountName   String?
     bankBranch        String?
+    ekashNumber       String?
+    ekashAccountName  String?
     updatedAt         DateTime @updatedAt
 }
 

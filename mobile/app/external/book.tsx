@@ -68,9 +68,9 @@ export default function ExternalBookScreen() {
   const [widthCm, setWidthCm] = useState('');
   const [heightCm, setHeightCm] = useState('');
 
-  const [paymentMethod, setPaymentMethod] = useState<typeof PaymentMethod.MTN_MOMO | typeof PaymentMethod.BANK_TRANSFER>(
-    PaymentMethod.MTN_MOMO,
-  );
+  const [paymentMethod, setPaymentMethod] = useState<
+    typeof PaymentMethod.MTN_MOMO | typeof PaymentMethod.BANK_TRANSFER | typeof PaymentMethod.EKASH
+  >(PaymentMethod.MTN_MOMO);
 
   const [quote, setQuote] = useState<DeliveryQuote | null>(null);
   const [creditBalance, setCreditBalance] = useState(0);
@@ -431,6 +431,7 @@ export default function ExternalBookScreen() {
         {([
           { value: PaymentMethod.MTN_MOMO, label: 'MTN MoMo' },
           { value: PaymentMethod.BANK_TRANSFER, label: 'Bank transfer' },
+          { value: PaymentMethod.EKASH, label: 'eKash' },
         ]).map((o) => {
           const active = paymentMethod === o.value;
           return (

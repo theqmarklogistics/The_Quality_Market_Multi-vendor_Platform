@@ -16,6 +16,8 @@ const PaymentConfigPage = () => {
         bankAccountNumber: '',
         bankAccountName: '',
         bankBranch: '',
+        ekashNumber: '',
+        ekashAccountName: '',
     })
 
     useEffect(() => {
@@ -25,13 +27,16 @@ const PaymentConfigPage = () => {
                 const { data } = await axios.get('/api/admin/payment-config', {
                     headers: { Authorization: `Bearer ${token}` }
                 })
+                const config = data.config || data || {}
                 setForm({
-                    momoPayCode: data.momoPayCode || '',
-                    momoAccountName: data.momoAccountName || '',
-                    bankName: data.bankName || '',
-                    bankAccountNumber: data.bankAccountNumber || '',
-                    bankAccountName: data.bankAccountName || '',
-                    bankBranch: data.bankBranch || '',
+                    momoPayCode: config.momoPayCode || '',
+                    momoAccountName: config.momoAccountName || '',
+                    bankName: config.bankName || '',
+                    bankAccountNumber: config.bankAccountNumber || '',
+                    bankAccountName: config.bankAccountName || '',
+                    bankBranch: config.bankBranch || '',
+                    ekashNumber: config.ekashNumber || '',
+                    ekashAccountName: config.ekashAccountName || '',
                 })
             } catch {
                 toast.error('Failed to load payment config')
@@ -72,7 +77,7 @@ const PaymentConfigPage = () => {
     return (
         <div className="p-6 max-w-2xl">
             <h1 className="text-2xl font-semibold text-slate-800 mb-1">Payment Configuration</h1>
-            <p className="text-sm text-slate-500 mb-8">Configure MTN MoMo and Bank Transfer payment details.</p>
+            <p className="text-sm text-slate-500 mb-8">Configure MTN MoMo, Bank Transfer, and eKash payment details.</p>
 
             <div className="space-y-8">
                 {/* MTN MoMo Section */}
@@ -157,6 +162,40 @@ const PaymentConfigPage = () => {
                                 placeholder="e.g. Kigali Main Branch"
                                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-400"
                             />
+                        </div>
+                    </div>
+                </div>
+
+                {/* eKash Section */}
+                <div className="rounded-xl border border-slate-200 bg-white p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <span className="text-emerald-700 text-base font-bold">e</span>
+                        </div>
+                        <h2 className="text-base font-semibold text-slate-700">eKash</h2>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1.5">eKash Number</label>
+                            <input
+                                name="ekashNumber"
+                                value={form.ekashNumber}
+                                onChange={handleChange}
+                                placeholder="e.g. 0788 123 456"
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-400"
+                            />
+                            <p className="text-xs text-slate-400 mt-1">The eKash number customers send payment to. Displayed to the customer on the order confirmation page when they select eKash.</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 mb-1.5">Account Name <span className="text-slate-400">(optional)</span></label>
+                            <input
+                                name="ekashAccountName"
+                                value={form.ekashAccountName}
+                                onChange={handleChange}
+                                placeholder="e.g. The Quality Market"
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-400"
+                            />
+                            <p className="text-xs text-slate-400 mt-1">Name the customer will see when sending the eKash payment.</p>
                         </div>
                     </div>
                 </div>

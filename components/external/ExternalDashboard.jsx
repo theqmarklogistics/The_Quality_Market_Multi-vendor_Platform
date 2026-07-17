@@ -105,6 +105,12 @@ export default function ExternalDashboard() {
                 </div>
             )}
 
+            {momo?.ekashConfigured && (
+                <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    Pay the delivery fee via eKash to <b>{momo.ekashNumber}</b>{momo.ekashAccountName ? ` (${momo.ekashAccountName})` : ''}, then upload your proof on the delivery below. We route it once payment is confirmed.
+                </div>
+            )}
+
             {loading ? (
                 <p className="text-slate-400 text-center py-10">Loading…</p>
             ) : deliveries.length === 0 ? (

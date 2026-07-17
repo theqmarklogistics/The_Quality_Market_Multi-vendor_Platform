@@ -37,11 +37,13 @@ import { colors, fonts, radius, shadows, spacing } from '@/theme';
 const paymentLabels: Record<string, string> = {
   [PaymentMethod.MTN_MOMO]: 'MTN Mobile Money',
   [PaymentMethod.BANK_TRANSFER]: 'Bank transfer',
+  [PaymentMethod.EKASH]: 'eKash',
 };
 
 const paymentIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   [PaymentMethod.MTN_MOMO]: 'phone-portrait-outline',
   [PaymentMethod.BANK_TRANSFER]: 'business-outline',
+  [PaymentMethod.EKASH]: 'cash-outline',
 };
 
 export default function CheckoutScreen() {

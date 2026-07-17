@@ -306,6 +306,7 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                         <select value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)} className={`w-full ${inp}`}>
                             <option value="MTN_MOMO">MTN MoMo</option>
                             <option value="BANK_TRANSFER">Bank transfer</option>
+                            <option value="EKASH">eKash</option>
                         </select>
 
                         <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">

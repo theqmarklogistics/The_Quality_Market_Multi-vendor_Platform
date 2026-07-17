@@ -74,7 +74,7 @@ export async function POST(request) {
             }
         }
 
-        const allowedPaymentMethods = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
+        const allowedPaymentMethods = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO, paymentMethod.EKASH];
         if(!allowedPaymentMethods.includes(selectedPaymentMethod)){
             return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
         }
@@ -497,6 +497,10 @@ export async function POST(request) {
                             momo: {
                                 momoAccountName: paymentConfig?.momoAccountName || null,
                                 momoPayCode: paymentConfig?.momoPayCode || null,
+                            },
+                            ekash: {
+                                ekashNumber: paymentConfig?.ekashNumber || null,
+                                ekashAccountName: paymentConfig?.ekashAccountName || null,
                             },
                         },
                     });

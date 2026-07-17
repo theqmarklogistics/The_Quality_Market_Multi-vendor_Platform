@@ -10,10 +10,10 @@ import { paymentMethod } from "@/lib/constants";
 import { quoteExternalDeliveryFee, getExternalDeliveryConfig } from "@/lib/externalDelivery";
 import { geocodeRwAddress } from "@/lib/geocode";
 import { getSocketServer } from "@/lib/socketServer";
-import { sendDeliveryReviewAlertEmail } from "@/lib/email";
+import { sendDeliveryReviewAlertEmail, sendDeliveryTrackingEmail } from "@/lib/email";
 import { dispatchExpressOrder } from "@/lib/expressDispatch";
 
-const ALLOWED_PAYMENT = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO];
+const ALLOWED_PAYMENT = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO, paymentMethod.EKASH];
 const ALLOWED_INTAKE = ["HUB_DROP_OFF", "DRIVER_SWEEP"];
 
 // GET — the caller's own external deliveries (partner dashboard).
@@ -332,6 +332,18 @@ export async function POST(request) {
                 message: isExpress ? "New EXPRESS delivery booked" : "New external delivery booked",
             });
         } catch (_) { /* socket optional */ }
+
+        // Email the recipient their live tracking link right away. The link carries
+        // the public tracking token, so they can open it without a login and share
+        // their exact drop-off location (which prices/routes the delivery).
+        sendDeliveryTrackingEmail({
+            to: recipientEmail,
+            orderId,
+            trackingToken,
+            recipientName,
+            senderName,
+            packageDescription,
+        }).catch((e) => console.error("Tracking email failed", e.message));
 
         // Credit-covered express bookings are paid up-front → dispatch right now.
         // Unpaid ones dispatch the moment payment is confirmed (proof approval /

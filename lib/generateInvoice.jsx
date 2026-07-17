@@ -65,6 +65,8 @@ function fmt(amount) {
 
 function InvoiceDocument({ order, paymentConfig, logoSrc, invoice }) {
     const isMomo = order.paymentMethod === 'MTN_MOMO';
+    const isEkash = order.paymentMethod === 'EKASH';
+    const paymentMethodLabel = isMomo ? 'MTN MoMo' : isEkash ? 'eKash' : 'Bank Transfer';
     const subtotal = order.orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const coupon = order.coupon && typeof order.coupon === 'object' ? order.coupon : null;
     const couponDiscount = coupon?.discount ? (coupon.discount / 100) * subtotal : 0;
@@ -113,7 +115,7 @@ function InvoiceDocument({ order, paymentConfig, logoSrc, invoice }) {
                     <View style={{ flex: 1 }}>
                         <Text style={styles.sectionTitle}>Payment Method</Text>
                         <View style={styles.badge}>
-                            <Text>{isMomo ? 'MTN MoMo' : 'Bank Transfer'}</Text>
+                            <Text>{paymentMethodLabel}</Text>
                         </View>
                         <Text style={[styles.label, { marginTop: 6 }]}>Order date: {new Date(order.createdAt).toLocaleDateString()}</Text>
                         <Text style={[styles.label, { marginTop: 2 }]}>Order ID: {order.id.slice(0, 16).toUpperCase()}</Text>
@@ -173,6 +175,16 @@ function InvoiceDocument({ order, paymentConfig, logoSrc, invoice }) {
                         <Text style={styles.paymentTitle}>MTN MoMo Payment Instructions</Text>
                         <View style={styles.row}><Text style={styles.label}>Account Name:</Text><Text style={styles.value}>{paymentConfig?.momoAccountName || '—'}</Text></View>
                         <View style={styles.row}><Text style={styles.label}>Pay Code:</Text><Text style={styles.value}>{paymentConfig?.momoPayCode || '—'}</Text></View>
+                        <View style={styles.row}><Text style={styles.label}>Amount to Pay:</Text><Text style={styles.value}>{fmt(order.total)}</Text></View>
+                        <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{paymentRef}</Text> as the payment note.</Text>
+                    </View>
+                ) : isEkash ? (
+                    <View style={styles.paymentBox}>
+                        <Text style={styles.paymentTitle}>eKash Payment Instructions</Text>
+                        <View style={styles.row}><Text style={styles.label}>eKash Number:</Text><Text style={styles.value}>{paymentConfig?.ekashNumber || '—'}</Text></View>
+                        {paymentConfig?.ekashAccountName && (
+                            <View style={styles.row}><Text style={styles.label}>Account Name:</Text><Text style={styles.value}>{paymentConfig.ekashAccountName}</Text></View>
+                        )}
                         <View style={styles.row}><Text style={styles.label}>Amount to Pay:</Text><Text style={styles.value}>{fmt(order.total)}</Text></View>
                         <Text style={[styles.label, { marginTop: 8, fontSize: 9 }]}>Use reference number <Text style={styles.value}>{paymentRef}</Text> as the payment note.</Text>
                     </View>

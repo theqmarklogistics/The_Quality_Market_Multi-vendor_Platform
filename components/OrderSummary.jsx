@@ -258,6 +258,24 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 <span className='block text-xs text-slate-500 mt-0.5'>Bank details are sent via invoice email after you place the order.</span>
                             </div>
                         </label>
+
+                        {/* eKash */}
+                        <label htmlFor={paymentMethod.EKASH} className={`flex gap-3 items-start rounded-2xl border px-4 py-3 cursor-pointer transition ${selectedPaymentMethod === paymentMethod.EKASH ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                            <input
+                                type="radio"
+                                id={paymentMethod.EKASH}
+                                name='payment'
+                                onChange={() => setSelectedPaymentMethod(paymentMethod.EKASH)}
+                                checked={selectedPaymentMethod === paymentMethod.EKASH}
+                                className='mt-1 accent-emerald-600'
+                            />
+                            <div>
+                                <span className='block font-medium text-slate-800'>eKash</span>
+                                <span className='block text-xs text-slate-500 mt-0.5'>
+                                    {paymentConfig?.ekashConfigured ? 'eKash number will be shown after placing order.' : 'Pay using eKash.'}
+                                </span>
+                            </div>
+                        </label>
                     </div>
                 </section>
 

@@ -63,6 +63,10 @@ export async function POST(request, { params }) {
                         momoAccountName: paymentConfig?.momoAccountName || null,
                         momoPayCode: paymentConfig?.momoPayCode || null,
                     },
+                    ekash: {
+                        ekashNumber: paymentConfig?.ekashNumber || null,
+                        ekashAccountName: paymentConfig?.ekashAccountName || null,
+                    },
                 },
             });
         }

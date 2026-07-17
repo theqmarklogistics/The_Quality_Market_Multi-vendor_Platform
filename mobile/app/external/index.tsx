@@ -166,6 +166,15 @@ export default function ExternalDashboardScreen() {
           </View>
         ) : null}
 
+        {momo?.ekashConfigured ? (
+          <View style={styles.momoBanner}>
+            <Text style={styles.momoText}>
+              Pay the delivery fee via eKash to <Text style={styles.momoBold}>{momo.ekashNumber}</Text>
+              {momo.ekashAccountName ? ` (${momo.ekashAccountName})` : ''}, then upload your proof on the delivery below.
+            </Text>
+          </View>
+        ) : null}
+
         {deliveries.length === 0 ? (
           <EmptyState
             icon="cube-outline"

@@ -26,27 +26,23 @@ export async function PUT(request) {
         if (!isAdmin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await request.json();
-        const { momoPayCode, momoAccountName, bankName, bankAccountNumber, bankAccountName, bankBranch } = body;
+        const { momoPayCode, momoAccountName, bankName, bankAccountNumber, bankAccountName, bankBranch, ekashNumber, ekashAccountName } = body;
+
+        const fields = {
+            momoPayCode: momoPayCode?.trim() || null,
+            momoAccountName: momoAccountName?.trim() || null,
+            bankName: bankName?.trim() || null,
+            bankAccountNumber: bankAccountNumber?.trim() || null,
+            bankAccountName: bankAccountName?.trim() || null,
+            bankBranch: bankBranch?.trim() || null,
+            ekashNumber: ekashNumber?.trim() || null,
+            ekashAccountName: ekashAccountName?.trim() || null,
+        };
 
         const config = await prisma.paymentConfig.upsert({
             where: { id: 'default' },
-            update: {
-                momoPayCode: momoPayCode?.trim() || null,
-                momoAccountName: momoAccountName?.trim() || null,
-                bankName: bankName?.trim() || null,
-                bankAccountNumber: bankAccountNumber?.trim() || null,
-                bankAccountName: bankAccountName?.trim() || null,
-                bankBranch: bankBranch?.trim() || null,
-            },
-            create: {
-                id: 'default',
-                momoPayCode: momoPayCode?.trim() || null,
-                momoAccountName: momoAccountName?.trim() || null,
-                bankName: bankName?.trim() || null,
-                bankAccountNumber: bankAccountNumber?.trim() || null,
-                bankAccountName: bankAccountName?.trim() || null,
-                bankBranch: bankBranch?.trim() || null,
-            },
+            update: fields,
+            create: { id: 'default', ...fields },
         });
 
         const admin = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });

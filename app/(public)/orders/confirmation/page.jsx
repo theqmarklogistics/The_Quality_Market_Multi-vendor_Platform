@@ -83,6 +83,7 @@ function ConfirmationContent() {
     const paymentMethodUsed = orders[0]?.paymentMethod
     const isMomo = paymentMethodUsed === 'MTN_MOMO'
     const isBankTransfer = paymentMethodUsed === 'BANK_TRANSFER'
+    const isEkash = paymentMethodUsed === 'EKASH'
 
     return (
         <div className="min-h-[80vh] mx-6 py-16">
@@ -186,6 +187,53 @@ function ConfirmationContent() {
                                                     onClick={() => requestInvoice(order.id)}
                                                     disabled={requesting.has(order.id)}
                                                     className="inline-flex items-center gap-1.5 text-xs font-medium text-yellow-800 border border-yellow-300 bg-white hover:bg-yellow-50 px-3 py-1.5 rounded-lg transition disabled:opacity-60"
+                                                >
+                                                    <FileTextIcon size={12} />
+                                                    {requesting.has(order.id) ? 'Requesting...' : 'Request Invoice'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Payment instructions — eKash */}
+                {isEkash && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 mb-6">
+                        <p className="font-semibold text-emerald-800 mb-3">Pay with eKash</p>
+                        {paymentConfig?.ekashConfigured ? (
+                            <div className="space-y-1.5 text-sm text-emerald-900">
+                                <p>Send your payment via eKash to the number below:</p>
+                                <div className="mt-2 rounded-xl bg-emerald-100 border border-emerald-200 px-4 py-3 font-mono text-base font-semibold tracking-wide text-emerald-800">
+                                    {paymentConfig.ekashNumber}
+                                </div>
+                                {paymentConfig.ekashAccountName && (
+                                    <p className="text-xs text-emerald-700 mt-1">Account Name: <span className="font-medium">{paymentConfig.ekashAccountName}</span></p>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-emerald-700">Payment details will be provided by admin. Please check your email or contact support.</p>
+                        )}
+                        <div className="mt-4 pt-4 border-t border-emerald-200">
+                            <p className="text-xs text-emerald-700 mb-3">Invoice is optional for eKash. Request one for your records:</p>
+                            <div className="space-y-2">
+                                {orders.map(order => {
+                                    const requested = requestedIds.has(order.id) || order.invoiceRequested
+                                    return (
+                                        <div key={order.id} className="flex items-center justify-between gap-3">
+                                            <span className="text-xs text-emerald-800 font-mono">#{order.id.slice(0, 8)}</span>
+                                            {requested ? (
+                                                <span className="inline-flex items-center gap-1.5 text-green-700 text-xs font-medium">
+                                                    <CheckIcon size={13} /> Invoice Requested
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => requestInvoice(order.id)}
+                                                    disabled={requesting.has(order.id)}
+                                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 border border-emerald-300 bg-white hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition disabled:opacity-60"
                                                 >
                                                     <FileTextIcon size={12} />
                                                     {requesting.has(order.id) ? 'Requesting...' : 'Request Invoice'}

@@ -1,6 +1,7 @@
 // Post-checkout: confirms the order(s) and shows payment instructions. For MTN MoMo
-// we surface the pay code from /api/payment-config; for bank transfer we point the
-// user to request an invoice. Payment proof is uploaded later from the Orders tab.
+// and eKash we surface the pay code / number from /api/payment-config; for bank
+// transfer we point the user to request an invoice. Payment proof is uploaded later
+// from the Orders tab.
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,6 +18,7 @@ export default function ConfirmationScreen() {
   const { ids, payment } = useLocalSearchParams<{ ids: string; payment: string }>();
   const orderIds = (ids ?? '').split(',').filter(Boolean);
   const isMomo = payment === PaymentMethod.MTN_MOMO;
+  const isEkash = payment === PaymentMethod.EKASH;
 
   const [config, setConfig] = useState<PaymentConfig | null>(null);
 
@@ -60,6 +62,27 @@ export default function ConfirmationScreen() {
           ) : (
             <Text style={styles.line}>
               MoMo details will be shared shortly. You can also upload your payment proof
+              from the Orders tab once paid.
+            </Text>
+          )
+        ) : isEkash ? (
+          config?.ekashConfigured ? (
+            <>
+              <Text style={styles.line}>Send your payment via eKash to:</Text>
+              <View style={styles.payCodeBox}>
+                <Text style={styles.payCode}>{config.ekashNumber}</Text>
+                {config.ekashAccountName ? (
+                  <Text style={styles.payName}>{config.ekashAccountName}</Text>
+                ) : null}
+              </View>
+              <Text style={styles.hint}>
+                After paying, upload your payment screenshot from the Orders tab so we can
+                verify it faster.
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.line}>
+              eKash details will be shared shortly. You can also upload your payment proof
               from the Orders tab once paid.
             </Text>
           )

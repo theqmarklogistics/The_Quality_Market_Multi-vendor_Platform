@@ -142,6 +142,9 @@ export interface PaymentConfig {
   momoAccountName: string | null;
   momoConfigured: boolean;
   bankConfigured: boolean;
+  ekashNumber: string | null;
+  ekashAccountName: string | null;
+  ekashConfigured: boolean;
 }
 
 // Payload for POST /api/orders.
