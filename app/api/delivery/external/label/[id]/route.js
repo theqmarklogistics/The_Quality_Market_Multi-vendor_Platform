@@ -68,7 +68,7 @@ function ExternalLabel({ order, senderName }) {
                     <Text style={styles.sectionTitle}>Sender</Text>
                     <View style={styles.row}><Text style={styles.label}>Name</Text><Text style={styles.value}>{order.senderName || order.pickupContactName || senderName || "—"}</Text></View>
                     {order.senderPhone && <View style={styles.row}><Text style={styles.label}>Phone</Text><Text style={styles.value}>{order.senderPhone}</Text></View>}
-                    <View style={styles.row}><Text style={styles.label}>Partner</Text><Text style={styles.value}>{senderName || "—"}</Text></View>
+                    <View style={styles.row}><Text style={styles.label}>Company/institution</Text><Text style={styles.value}>{senderName || "—"}</Text></View>
                     {order.pickupContactName && <View style={styles.row}><Text style={styles.label}>Pickup contact</Text><Text style={styles.value}>{order.pickupContactName}</Text></View>}
                     {order.pickupPhone && <View style={styles.row}><Text style={styles.label}>Pickup phone</Text><Text style={styles.value}>{order.pickupPhone}</Text></View>}
                     {order.pickupLandmark && <View style={styles.row}><Text style={styles.label}>Pickup</Text><Text style={[styles.value, { maxWidth: 220, textAlign: "right" }]}>{order.pickupLandmark}</Text></View>}

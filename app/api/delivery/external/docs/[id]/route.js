@@ -211,7 +211,7 @@ function SenderReceipt({ order, partnerName }) {
                         <Row label="Name" value={order.senderName || order.pickupContactName || partnerName} />
                         <Row label="Phone" value={order.senderPhone || order.pickupPhone} />
                         {order.senderEmail && <Row label="Email" value={order.senderEmail} />}
-                        <Row label="Partner" value={partnerName} />
+                        <Row label="Company/institution" value={partnerName} />
                         {order.pickupContactName && <Row label="Pickup contact" value={order.pickupContactName} />}
                         {order.pickupPhone && <Row label="Pickup phone" value={order.pickupPhone} />}
                         {order.pickupLandmark && <Row label="Pickup point" value={order.pickupLandmark} />}
@@ -283,7 +283,7 @@ function DeliveryConfirmation({ order, partnerName }) {
                         <Text style={styles.sectionTitle}>Sender</Text>
                         <Row label="Name" value={order.senderName || order.pickupContactName || partnerName} />
                         {order.senderPhone && <Row label="Phone" value={order.senderPhone} />}
-                        <Row label="Partner" value={partnerName} />
+                        <Row label="Company/institution" value={partnerName} />
                         {order.deliveredAt && <Row label="Delivered" value={fmtDate(order.deliveredAt)} />}
                     </View>
                 </View>
@@ -311,12 +311,16 @@ function DeliveryConfirmation({ order, partnerName }) {
                 <View style={styles.sigBlock}>
                     <View style={styles.sigBox}>
                         <View style={styles.sigLine} />
-                        <Text style={styles.sigLabel}>Rider name &amp; signature</Text>
+                        <Text style={styles.sigLabel}>Receiver National ID no. (required)</Text>
                     </View>
+                    <View style={styles.sigBox} />
+                </View>
+                <View style={styles.sigBlock}>
                     <View style={styles.sigBox}>
                         <View style={styles.sigLine} />
-                        <Text style={styles.sigLabel}>National ID no. (optional)</Text>
+                        <Text style={styles.sigLabel}>Rider name &amp; signature</Text>
                     </View>
+                    <View style={styles.sigBox} />
                 </View>
 
                 <Text style={styles.footer}>The Quality Market — Kigali Pooled Delivery · Signed copy is returned to the hub with the rider.</Text>

@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import { toast } from "react-hot-toast"
 import axios from "axios"
 import { flattenCategoryOptions } from "@/lib/categoryTree"
+import { volumetricWeightKg } from "@/lib/deliveryPricing"
 
 const COUNTRIES = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda',
@@ -204,6 +205,11 @@ export default function StoreAddProduct() {
     }
 
 
+    // Volumetric weight (1 m³ = 200 kg ⇒ L·W·H cm ÷ 5000) and the chargeable
+    // weight (greater of actual vs volumetric) shown live as dimensions are typed.
+    const volumetricKg = volumetricWeightKg(Number(productInfo.lengthCm), Number(productInfo.widthCm), Number(productInfo.heightCm))
+    const chargeableKg = Math.max(Number(productInfo.weightKg) || 0, volumetricKg)
+
     return (
         <form onSubmit={onSubmitHandler} className="text-slate-500 mb-28">
             <h1 className="text-2xl">Add New <span className="text-slate-800 font-medium">Products</span></h1>
@@ -369,6 +375,19 @@ export default function StoreAddProduct() {
                         />
                     </div>
                 </div>
+                {volumetricKg > 0 && (
+                    <div className="mb-5 max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                        <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Volumetric weight</span>
+                            <span className="font-medium text-slate-800">{volumetricKg.toFixed(2)} kg</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                            <span className="text-slate-500">Billed (chargeable) weight</span>
+                            <span className="font-medium text-slate-800">{chargeableKg.toFixed(2)} kg</span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">Delivery is charged on the greater of actual and volumetric weight (1 m³ = 200 kg).</p>
+                    </div>
+                )}
                 <div>
                     <p className="text-sm text-slate-600 mb-2">Product Origin</p>
                     <div className="flex gap-5 flex-wrap">

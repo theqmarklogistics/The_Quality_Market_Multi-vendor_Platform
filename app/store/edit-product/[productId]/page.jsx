@@ -10,6 +10,7 @@ import { toast } from "react-hot-toast"
 import axios from "axios"
 import { ArrowLeft } from "lucide-react"
 import { flattenCategoryOptions } from "@/lib/categoryTree"
+import { volumetricWeightKg } from "@/lib/deliveryPricing"
 
 export default function StoreEditProduct() {
     const params = useParams()
@@ -150,6 +151,11 @@ export default function StoreEditProduct() {
             </div>
         )
     }
+
+    // Volumetric weight (1 m³ = 200 kg ⇒ L·W·H cm ÷ 5000) and the chargeable
+    // weight (greater of actual vs volumetric) shown live as dimensions change.
+    const volumetricKg = volumetricWeightKg(Number(productInfo.lengthCm), Number(productInfo.widthCm), Number(productInfo.heightCm))
+    const chargeableKg = Math.max(Number(productInfo.weightKg) || 0, volumetricKg)
 
     return (
         <form
@@ -314,7 +320,7 @@ export default function StoreEditProduct() {
             <div className="mt-8 border-t border-slate-100 pt-6">
                 <p className="text-slate-700 font-medium mb-1">Shipping Weight &amp; Volume Dimensions</p>
                 <p className="text-xs text-slate-400 mb-4">Used to compute the volumetric weight and the delivery fee. Leave blank if unknown.</p>
-                <div className="flex flex-wrap gap-5">
+                <div className="flex flex-wrap gap-5 mb-5">
                     <div className="flex flex-col gap-1">
                         <label htmlFor="weightKg">Weight (kg)</label>
                         <input
@@ -348,6 +354,19 @@ export default function StoreEditProduct() {
                         />
                     </div>
                 </div>
+                {volumetricKg > 0 && (
+                    <div className="max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                        <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Volumetric weight</span>
+                            <span className="font-medium text-slate-800">{volumetricKg.toFixed(2)} kg</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                            <span className="text-slate-500">Billed (chargeable) weight</span>
+                            <span className="font-medium text-slate-800">{chargeableKg.toFixed(2)} kg</span>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-400">Delivery is charged on the greater of actual and volumetric weight (1 m³ = 200 kg).</p>
+                    </div>
+                )}
             </div>
 
             <label htmlFor="category" className="flex flex-col gap-2 my-6">
