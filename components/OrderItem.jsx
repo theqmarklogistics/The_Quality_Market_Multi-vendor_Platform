@@ -124,7 +124,7 @@ const OrderItem = ({ order, onProofUploaded }) => {
             const { data } = await axios.post(`/api/orders/${order.id}/request-invoice`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            if (order.paymentMethod === 'MTN_MOMO') {
+            if (order.paymentMethod === 'MTN_MOMO' || order.paymentMethod === 'EKASH') {
                 setInvoiceSentNow(true)
             } else {
                 setInvoiceRequested(true)

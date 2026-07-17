@@ -215,7 +215,19 @@ function SenderReceipt({ order, partnerName }) {
                         {order.pickupContactName && <Row label="Pickup contact" value={order.pickupContactName} />}
                         {order.pickupPhone && <Row label="Pickup phone" value={order.pickupPhone} />}
                         {order.pickupLandmark && <Row label="Pickup point" value={order.pickupLandmark} />}
-                        <Row label="Intake" value={order.intakeMethod === "DRIVER_SWEEP" ? "Driver sweep" : "Hub drop-off"} />
+                        <Row
+                            label="Intake"
+                            value={
+                                order.intakeMethod === "DRIVER_SWEEP"
+                                    ? "Driver sweep"
+                                    : order.dropHub?.name
+                                        ? `Hub drop-off — ${order.dropHub.name}`
+                                        : "Hub drop-off"
+                            }
+                        />
+                        {order.intakeMethod !== "DRIVER_SWEEP" && order.dropHub?.landmark && (
+                            <Row label="Hub location" value={order.dropHub.landmark} />
+                        )}
                     </View>
                     <View style={styles.col}>
                         <Text style={styles.sectionTitle}>Recipient</Text>
@@ -348,7 +360,7 @@ export async function GET(request, { params }) {
         const { id: orderId } = await params;
         const order = await prisma.order.findUnique({
             where: { id: orderId },
-            include: { address: true, user: { select: { name: true, email: true } } },
+            include: { address: true, user: { select: { name: true, email: true } }, dropHub: { select: { name: true, landmark: true } } },
         });
 
         if (!order || !order.isExternalDelivery) {

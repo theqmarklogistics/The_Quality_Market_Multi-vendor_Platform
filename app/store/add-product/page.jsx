@@ -60,6 +60,8 @@ export default function StoreAddProduct() {
         importOrigin: "",
     })
     const [importCountry, setImportCountry] = useState('')
+    // Specific address where a to-be-imported product is currently located.
+    const [importAddress, setImportAddress] = useState('')
     const [loading, setLoading] = useState(false)
     const [aiUsed, setAiUsed] = useState(false)
     const [errors, setErrors] = useState({})
@@ -174,6 +176,8 @@ export default function StoreAddProduct() {
             if (productInfo.heightCm) formData.append('heightCm', productInfo.heightCm);
             // importOrigin: use selected country if "IMPORTED", otherwise empty (Local)
             formData.append('importOrigin', productInfo.importOrigin === 'IMPORTED' ? importCountry : '');
+            // importAddress: where the to-be-imported product is currently located.
+            formData.append('importAddress', productInfo.importOrigin === 'IMPORTED' ? importAddress : '');
             if (productInfo.wholesalePrice) formData.append('wholesalePrice', productInfo.wholesalePrice);
             if (productInfo.wholesaleMinQty) formData.append('wholesaleMinQty', productInfo.wholesaleMinQty);
             // Append all the images to the form data
@@ -191,6 +195,7 @@ export default function StoreAddProduct() {
 
             setProductInfo({ name: "", description: "", mrp: 0, price: 0, warehouseQuantity: 0, mainCategory: "", category: "", wholesalePrice: "", wholesaleMinQty: "", weightKg: "", lengthCm: "", widthCm: "", heightCm: "", importOrigin: "" })
             setImportCountry('')
+            setImportAddress('')
             setImages({ 1: null, 2: null, 3: null, 4: null })
             setErrors({})
             setTouched({})
@@ -414,11 +419,11 @@ export default function StoreAddProduct() {
                                 checked={productInfo.importOrigin === 'IMPORTED'}
                                 onChange={onChangeHandler}
                             />
-                            Imported
+                            To be imported
                         </label>
                     </div>
                     {productInfo.importOrigin === 'IMPORTED' && (
-                        <div className="mt-3">
+                        <div className="mt-3 space-y-3">
                             <select
                                 value={importCountry}
                                 onChange={e => setImportCountry(e.target.value)}
@@ -428,6 +433,16 @@ export default function StoreAddProduct() {
                                 <option value="">Select country of origin</option>
                                 {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
+                            <div>
+                                <input
+                                    type="text"
+                                    value={importAddress}
+                                    onChange={e => setImportAddress(e.target.value)}
+                                    placeholder="Specific address where the product is located"
+                                    className="w-full max-w-md p-2 px-4 outline-none border border-slate-200 rounded text-sm text-slate-700"
+                                />
+                                <p className="mt-1 text-xs text-slate-400">Where the product is currently located (e.g. supplier warehouse, city) — used to arrange importing.</p>
+                            </div>
                         </div>
                     )}
                 </div>

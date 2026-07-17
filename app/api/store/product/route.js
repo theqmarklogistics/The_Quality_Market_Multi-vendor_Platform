@@ -34,6 +34,8 @@ export async function POST(request) {
     const widthCm = formData.get("widthCm") ? Number(formData.get("widthCm")) : null;
     const heightCm = formData.get("heightCm") ? Number(formData.get("heightCm")) : null;
     const importOrigin = formData.get("importOrigin") || null;
+    // Specific address of a to-be-imported product — only kept when it's imported.
+    const importAddress = importOrigin ? (formData.get("importAddress")?.toString().trim() || null) : null;
     const wholesalePriceRaw = formData.get("wholesalePrice");
     const wholesaleMinQtyRaw = formData.get("wholesaleMinQty");
     const wholesalePrice = wholesalePriceRaw ? Number(wholesalePriceRaw) : null;
@@ -96,6 +98,7 @@ export async function POST(request) {
             widthCm,
             heightCm,
             importOrigin,
+            importAddress,
             wholesalePrice,
             wholesaleMinQty,
         }

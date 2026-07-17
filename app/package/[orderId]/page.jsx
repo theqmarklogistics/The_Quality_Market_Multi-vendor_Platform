@@ -27,6 +27,7 @@ export default async function PackagePage({ params }) {
             address: true,
             store: { select: { name: true } },
             user: { select: { name: true } },
+            dropHub: { select: { name: true, landmark: true } },
         },
     });
 
@@ -111,6 +112,9 @@ export default async function PackagePage({ params }) {
                             {order.intakeMethod && (
                                 <p className="text-xs text-slate-500">
                                     Intake: {order.intakeMethod === "HUB_DROP_OFF" ? "Hub drop-off" : "Driver sweep"}
+                                    {order.intakeMethod === "HUB_DROP_OFF" && order.dropHub?.name && (
+                                        <span className="text-slate-700"> · {order.dropHub.name}</span>
+                                    )}
                                 </p>
                             )}
                         </section>

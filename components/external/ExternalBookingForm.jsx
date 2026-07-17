@@ -22,13 +22,15 @@ export default function ExternalBookingForm() {
         recipientName: "", recipientPhone: "", recipientEmail: "",
         recipientDistrict: "", recipientSector: "", recipientCell: "", recipientVillage: "",
         recipientLandmark: "",
-        intakeMethod: "HUB_DROP_OFF", pickupContactName: "", pickupPhone: "", pickupLandmark: "",
+        intakeMethod: "HUB_DROP_OFF", dropHubId: "", pickupContactName: "", pickupPhone: "", pickupLandmark: "",
         packageDescription: "", declaredValue: "", paymentMethod: "MTN_MOMO",
         packageWeightKg: "", packageLengthCm: "", packageWidthCm: "", packageHeightCm: "",
         recipientLat: null, recipientLng: null,
         pickupLat: null, pickupLng: null,
     });
     const [quote, setQuote] = useState(null);
+    // Active drop-off hubs the sender can choose from (HUB_DROP_OFF intake).
+    const [hubs, setHubs] = useState([]);
     // Express: instant dispatch (no schedule wait) at the premium express rate.
     const [express, setExpress] = useState(false);
     // Admin can switch Express off (rider capacity) — hide the toggle when so.
@@ -56,6 +58,15 @@ export default function ExternalBookingForm() {
         })();
         return () => { active = false; };
     }, [authHeaders]);
+
+    // Active hubs the sender can drop the package at (public network endpoint).
+    useEffect(() => {
+        let active = true;
+        axios.get('/api/delivery/network')
+            .then(({ data }) => { if (active) setHubs(data?.hubs || []); })
+            .catch(() => null);
+        return () => { active = false; };
+    }, []);
 
     // Whether Express is currently offered (admin toggle).
     useEffect(() => {
@@ -151,6 +162,9 @@ export default function ExternalBookingForm() {
         if (!form.declaredValue || Number(form.declaredValue) <= 0) return toast.error("Enter the declared value of the package");
         if (form.intakeMethod === "DRIVER_SWEEP" && (!form.pickupContactName || !form.pickupPhone || !form.pickupLandmark)) {
             return toast.error("Pickup contact, phone and location are required for a sweep");
+        }
+        if (form.intakeMethod === "HUB_DROP_OFF" && hubs.length > 0 && !form.dropHubId) {
+            return toast.error("Select the hub you'll drop the package at");
         }
         setSubmitting(true);
         try {
@@ -301,6 +315,30 @@ export default function ExternalBookingForm() {
                             <input type="radio" name="intake" className="mr-2 accent-amber-600" checked={form.intakeMethod === "DRIVER_SWEEP"} onChange={() => set("intakeMethod", "DRIVER_SWEEP")} /> Sweep pickup
                         </label>
                     </div>
+                    {form.intakeMethod === "HUB_DROP_OFF" && (
+                        hubs.length > 0 ? (
+                            <div className="space-y-1">
+                                <select className={input} value={form.dropHubId} onChange={(e) => set("dropHubId", e.target.value)}>
+                                    <option value="">Select the hub you&apos;ll drop at…</option>
+                                    {hubs.map((h) => (
+                                        <option key={h.id} value={h.id}>
+                                            {h.name}{h.sector ? ` — ${h.sector}` : ""}
+                                        </option>
+                                    ))}
+                                </select>
+                                {(() => {
+                                    const hub = hubs.find((h) => h.id === form.dropHubId);
+                                    return hub?.landmark ? (
+                                        <p className="text-[11px] text-slate-400 flex items-start gap-1">
+                                            <MapPinIcon size={12} className="mt-0.5 shrink-0" /> {hub.landmark}
+                                        </p>
+                                    ) : null;
+                                })()}
+                            </div>
+                        ) : (
+                            <p className="text-[11px] text-slate-400">Bring the package to any of our hubs — see the delivery network for locations.</p>
+                        )
+                    )}
                     {form.intakeMethod === "DRIVER_SWEEP" && (
                         <div className="space-y-2">
                             <div className="grid grid-cols-2 gap-2">

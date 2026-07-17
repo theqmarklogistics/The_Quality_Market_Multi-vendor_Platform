@@ -143,6 +143,8 @@ export interface ProductFormValues {
   widthCm?: string;
   heightCm?: string;
   importOrigin?: string;
+  // Specific address where a to-be-imported product is currently located.
+  importAddress?: string;
 }
 
 function appendCommon(form: FormData, v: ProductFormValues): void {
@@ -177,6 +179,7 @@ export async function createSellerProduct(
   if (values.widthCm) form.append('widthCm', values.widthCm);
   if (values.heightCm) form.append('heightCm', values.heightCm);
   if (values.importOrigin) form.append('importOrigin', values.importOrigin);
+  if (values.importAddress) form.append('importAddress', values.importAddress);
   images.forEach((img) => appendImage(form, img));
   const res = await api.post<{ message: string }>('/api/store/product', form, {
     headers: { 'Content-Type': 'multipart/form-data' },

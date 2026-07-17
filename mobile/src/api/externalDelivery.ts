@@ -25,6 +25,7 @@ export interface ExternalDelivery {
   isPaid: boolean;
   deliveryStatus: string | null;
   intakeMethod: string | null;
+  dropHubName: string | null;
   deliveryOtp: string | null;
   trackingToken: string | null;
   packageDescription: string | null;
@@ -88,6 +89,21 @@ export function getDeliveryConfig(): Promise<DeliveryConfig> {
   return apiGet<DeliveryConfig>('/api/delivery/config');
 }
 
+// ── Delivery network (public) ────────────────────────────────────────────────
+// Active drop-off hubs the sender can choose from when dropping at a hub.
+export interface DeliveryHub {
+  id: string;
+  name: string;
+  sector: string | null;
+  landmark: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export function getDeliveryHubs(): Promise<DeliveryHub[]> {
+  return apiGet<{ hubs: DeliveryHub[] }>('/api/delivery/network').then((d) => d.hubs || []);
+}
+
 export function quoteExternalDelivery(params: QuoteParams): Promise<DeliveryQuote> {
   const q: Record<string, string> = {};
   for (const [k, v] of Object.entries(params)) {
@@ -116,6 +132,8 @@ export interface ExternalBookingPayload {
   recipientLat?: number;
   recipientLng?: number;
   intakeMethod: 'HUB_DROP_OFF' | 'DRIVER_SWEEP';
+  // Hub the sender will drop at (HUB_DROP_OFF only; ignored for a driver sweep).
+  dropHubId?: string;
   pickupContactName?: string;
   pickupPhone?: string;
   pickupLandmark?: string;

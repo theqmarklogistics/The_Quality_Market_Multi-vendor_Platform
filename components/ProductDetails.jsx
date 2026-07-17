@@ -112,7 +112,7 @@ const ProductDetails = ({ product }) => {
                     <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
                         <p className="flex items-center gap-2 text-sm font-medium text-blue-800">
                             <EarthIcon size={16} />
-                            Imported{product.importOrigin !== 'IMPORTED' ? ` from ${product.importOrigin}` : ''}
+                            To be imported{product.importOrigin !== 'IMPORTED' ? ` from ${product.importOrigin}` : ''}
                         </p>
                         <p className="mt-1 text-xs text-blue-700">
                             Shipping for imported items is quoted on request. Request a quote and our team will confirm the shipping fee for you.

@@ -51,6 +51,7 @@ const EMPTY: ProductFormValues & { importedCountry: string } = {
   heightCm: '',
   importOrigin: '',
   importedCountry: '',
+  importAddress: '',
 };
 
 export default function ProductFormScreen() {
@@ -208,6 +209,7 @@ export default function ProductFormScreen() {
       widthCm: values.widthCm,
       heightCm: values.heightCm,
       importOrigin: values.importOrigin === 'IMPORTED' ? values.importedCountry : '',
+      importAddress: values.importOrigin === 'IMPORTED' ? values.importAddress : '',
     };
     try {
       const res = isEdit
@@ -343,7 +345,7 @@ export default function ProductFormScreen() {
           <View style={styles.originRow}>
             {[
               { label: 'Local (Rwanda)', value: '' },
-              { label: 'Imported', value: 'IMPORTED' },
+              { label: 'To be imported', value: 'IMPORTED' },
             ].map((o) => {
               const active = values.importOrigin === o.value;
               return (
@@ -358,12 +360,20 @@ export default function ProductFormScreen() {
             })}
           </View>
           {values.importOrigin === 'IMPORTED' ? (
-            <Field
-              label="Country of origin"
-              value={values.importedCountry}
-              onChangeText={(t) => set('importedCountry', t)}
-              placeholder="e.g. China"
-            />
+            <>
+              <Field
+                label="Country of origin"
+                value={values.importedCountry}
+                onChangeText={(t) => set('importedCountry', t)}
+                placeholder="e.g. China"
+              />
+              <Field
+                label="Product location"
+                value={values.importAddress}
+                onChangeText={(t) => set('importAddress', t)}
+                placeholder="Specific address where the product is located"
+              />
+            </>
           ) : null}
         </>
       ) : null}

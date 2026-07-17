@@ -22,9 +22,11 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   bookExternalDelivery,
   getDeliveryConfig,
+  getDeliveryHubs,
   getExternalDeliveries,
   quoteExternalDelivery,
   trackingLink,
+  type DeliveryHub,
   type DeliveryQuote,
 } from '@/api/externalDelivery';
 import { Button, Field } from '@/components/ui';
@@ -57,6 +59,8 @@ export default function ExternalBookScreen() {
   const [pickupPinning, setPickupPinning] = useState(false);
 
   const [intakeMethod, setIntakeMethod] = useState<'HUB_DROP_OFF' | 'DRIVER_SWEEP'>('HUB_DROP_OFF');
+  const [hubs, setHubs] = useState<DeliveryHub[]>([]);
+  const [dropHubId, setDropHubId] = useState('');
   const [pickupContactName, setPickupContactName] = useState('');
   const [pickupPhone, setPickupPhone] = useState('');
   const [pickupLandmark, setPickupLandmark] = useState('');
@@ -103,6 +107,17 @@ export default function ExternalBookScreen() {
     let active = true;
     getExternalDeliveries()
       .then((d) => active && setCreditBalance(d.creditBalance || 0))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Load the active drop-off hubs the sender can choose from.
+  useEffect(() => {
+    let active = true;
+    getDeliveryHubs()
+      .then((h) => active && setHubs(h))
       .catch(() => {});
     return () => {
       active = false;
@@ -223,6 +238,10 @@ export default function ExternalBookScreen() {
       Alert.alert('Pickup details', 'Pickup contact, phone and location are required for a driver sweep.');
       return;
     }
+    if (intakeMethod === 'HUB_DROP_OFF' && hubs.length > 0 && !dropHubId) {
+      Alert.alert('Drop-off hub', "Select the hub you'll drop the package at.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await bookExternalDelivery({
@@ -240,6 +259,7 @@ export default function ExternalBookScreen() {
         recipientLat: coords?.latitude,
         recipientLng: coords?.longitude,
         intakeMethod,
+        dropHubId: intakeMethod === 'HUB_DROP_OFF' ? dropHubId || undefined : undefined,
         pickupContactName: pickupContactName.trim() || undefined,
         pickupPhone: pickupPhone.trim() || undefined,
         pickupLandmark: pickupLandmark.trim() || undefined,
@@ -289,7 +309,7 @@ export default function ExternalBookScreen() {
   }, [
     senderName, senderPhone, senderEmail,
     recipientName, recipientPhone, recipientEmail, location, landmark, hasPin, coords,
-    intakeMethod, pickupContactName, pickupPhone, pickupLandmark, pickupCoords,
+    intakeMethod, hubs, dropHubId, pickupContactName, pickupPhone, pickupLandmark, pickupCoords,
     packageDescription, declaredValue, weightKg, lengthCm, widthCm, heightCm,
     paymentMethod, applyCredit, router,
   ]);
@@ -373,6 +393,34 @@ export default function ExternalBookScreen() {
           );
         })}
       </View>
+      {intakeMethod === 'HUB_DROP_OFF' && hubs.length > 0 ? (
+        <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
+          <Text style={styles.hint}>Which hub will you drop the package at?</Text>
+          {hubs.map((h) => {
+            const active = dropHubId === h.id;
+            return (
+              <TouchableOpacity
+                key={h.id}
+                style={[styles.hubRow, active && styles.hubRowActive]}
+                onPress={() => setDropHubId(h.id)}
+              >
+                <Ionicons
+                  name={active ? 'radio-button-on' : 'radio-button-off'}
+                  size={18}
+                  color={active ? colors.success : colors.muted}
+                />
+                <View style={styles.flex}>
+                  <Text style={styles.hubName}>
+                    {h.name}
+                    {h.sector ? ` — ${h.sector}` : ''}
+                  </Text>
+                  {h.landmark ? <Text style={styles.hubLandmark}>{h.landmark}</Text> : null}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
       {intakeMethod === 'DRIVER_SWEEP' ? (
         <View style={{ marginTop: spacing.sm }}>
           <Field label="Pickup contact" value={pickupContactName} onChangeText={setPickupContactName} placeholder="Contact name" />
@@ -551,6 +599,19 @@ const styles = StyleSheet.create({
   toggleWarn: { borderColor: colors.warning, backgroundColor: '#fffbeb' },
   toggleText: { fontSize: 14, color: colors.muted, fontFamily: fonts.semibold },
   toggleTextActive: { color: colors.text },
+
+  hubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  hubRowActive: { borderColor: colors.success, backgroundColor: '#f0fdf4' },
+  hubName: { fontSize: 14, color: colors.text, fontFamily: fonts.semibold },
+  hubLandmark: { fontSize: 12, color: colors.subtle, marginTop: 2 },
 
   row: { flexDirection: 'row', gap: spacing.md },
   flex: { flex: 1 },

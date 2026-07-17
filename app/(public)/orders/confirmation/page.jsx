@@ -60,11 +60,11 @@ function ConfirmationContent() {
         setRequesting(prev => new Set(prev).add(orderId))
         try {
             const token = await getToken()
-            await axios.post(`/api/orders/${orderId}/request-invoice`, {}, {
+            const { data } = await axios.post(`/api/orders/${orderId}/request-invoice`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             setRequestedIds(prev => new Set(prev).add(orderId))
-            toast.success('Invoice requested — admin will send it to your email shortly.')
+            toast.success(data?.message || 'Invoice requested — admin will send it to your email shortly.')
         } catch (err) {
             toast.error(err?.response?.data?.error || 'Failed to request invoice')
         } finally {

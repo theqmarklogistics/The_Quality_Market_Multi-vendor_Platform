@@ -31,9 +31,12 @@ export async function POST(request, { params }) {
         if (order.invoiceStatus === 'SENT') return NextResponse.json({ error: 'Invoice has already been sent to your email' }, { status: 400 });
 
         const isMomo = order.paymentMethod === 'MTN_MOMO';
+        const isEkash = order.paymentMethod === 'EKASH';
 
-        if (isMomo) {
-            // MTN MoMo: generate and send immediately — no admin approval needed
+        if (isMomo || isEkash) {
+            // MTN MoMo / eKash: self-service payment details, so generate and send
+            // the invoice immediately — no admin approval needed. The PDF renders
+            // the matching (MoMo or eKash) payment instructions from paymentConfig.
             if (!order.user?.email) return NextResponse.json({ error: 'No email on file for this account' }, { status: 400 });
 
             const pdfBuffer = await generateInvoice({ order, paymentConfig });

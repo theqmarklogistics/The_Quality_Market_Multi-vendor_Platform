@@ -30,7 +30,10 @@ export async function GET(request) {
             prisma.order.findMany({
                 where: { userId, isExternalDelivery: true },
                 orderBy: { createdAt: "desc" },
-                include: { address: { select: { name: true, phone: true, sector: true } } },
+                include: {
+                    address: { select: { name: true, phone: true, sector: true } },
+                    dropHub: { select: { name: true } },
+                },
             }),
             prisma.user.findUnique({ where: { id: userId }, select: { deliveryCreditBalance: true } }),
         ]);
@@ -49,6 +52,7 @@ export async function GET(request) {
                 isPaid: o.isPaid,
                 deliveryStatus: o.deliveryStatus,
                 intakeMethod: o.intakeMethod,
+                dropHubName: o.dropHub?.name ?? null,
                 deliveryOtp: o.deliveryOtp,
                 trackingToken: o.trackingToken,
                 // Client's shared/pinned location drives the delivery price — the
@@ -114,6 +118,9 @@ export async function POST(request) {
         const recipientLng = typeof body?.recipientLng === "number" && !Number.isNaN(body.recipientLng) ? body.recipientLng : null;
 
         const intakeMethod = ALLOWED_INTAKE.includes(body?.intakeMethod) ? body.intakeMethod : "HUB_DROP_OFF";
+        // Hub the sender will drop the package at. Only meaningful for HUB_DROP_OFF;
+        // ignored (nulled) for a driver sweep. Validated against active hubs below.
+        const requestedDropHubId = (body?.dropHubId || "").trim() || null;
         const pickupContactName = (body?.pickupContactName || "").trim() || null;
         const pickupPhone = (body?.pickupPhone || "").trim() || null;
         const pickupLandmark = (body?.pickupLandmark || "").trim() || null;
@@ -170,6 +177,21 @@ export async function POST(request) {
                 { error: "Pickup contact, phone and location are required for a driver sweep" },
                 { status: 400 }
             );
+        }
+
+        // Resolve the chosen drop-off hub. Only for HUB_DROP_OFF, and only when the
+        // sender picked one — a hub must exist and be active. Sweep bookings never
+        // carry a hub (the rider collects from the pickup point).
+        let dropHubId = null;
+        if (intakeMethod === "HUB_DROP_OFF" && requestedDropHubId) {
+            const hub = await prisma.deliveryHub.findFirst({
+                where: { id: requestedDropHubId, isActive: true },
+                select: { id: true },
+            });
+            if (!hub) {
+                return NextResponse.json({ error: "Selected drop-off hub is not available" }, { status: 400 });
+            }
+            dropHubId = hub.id;
         }
 
         // Second option after a shared/pinned location: geocode the recorded
@@ -284,7 +306,7 @@ export async function POST(request) {
                 "paymentMethod", "paymentStatus", "paymentExpiresAt",
                 "isPaid", "isCouponUsed", coupon,
                 "invoiceRequested", "paymentProofStatus",
-                "deliveryType", "intakeMethod", "landmarkAddress", "deliveryOtp",
+                "deliveryType", "intakeMethod", "dropHubId", "landmarkAddress", "deliveryOtp",
                 "deliveryStatus", "escrowStatus",
                 "isExternalDelivery", "senderName", "senderPhone", "senderEmail",
                 "pickupContactName", "pickupPhone", "pickupLandmark",
@@ -301,7 +323,7 @@ export async function POST(request) {
                 ${selectedPaymentMethod}::"PaymentMethod", ${paymentStatusVal}::"PaymentStatus", ${expiresVal},
                 ${fullyCovered}, false, '{}'::jsonb,
                 false, ${proofStatusVal}::"PaymentProofStatus",
-                ${deliveryType}::"DeliveryType", ${intakeMethod}::"IntakeMethod", ${recipientLandmark}, ${deliveryOtp},
+                ${deliveryType}::"DeliveryType", ${intakeMethod}::"IntakeMethod", ${dropHubId}, ${recipientLandmark}, ${deliveryOtp},
                 'PENDING_INTAKE'::"PoolDeliveryStatus", 'NOT_HELD'::"EscrowStatus",
                 true, ${senderName}, ${senderPhone}, ${senderEmail},
                 ${pickupContactName}, ${pickupPhone}, ${pickupLandmark},

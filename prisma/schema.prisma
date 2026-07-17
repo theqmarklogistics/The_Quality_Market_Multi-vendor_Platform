@@ -79,6 +79,9 @@ model Product {
     widthCm     Float?
     heightCm    Float?
     importOrigin String?  // "CHINA" | null (local/Rwanda)
+    // Specific address where a to-be-imported product is currently located
+    // (seller-entered; only meaningful when importOrigin is set).
+    importAddress String?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -231,6 +234,9 @@ model Order {
     escrowStatus      EscrowStatus       @default(NOT_HELD)
     deliveryFeeShare  Float?
     corridorId        String?
+    // Hub the sender chose to drop the package at (intakeMethod HUB_DROP_OFF).
+    // Null for driver-sweep intake (the rider collects from the pickup point).
+    dropHubId         String?
     // Contact phone confirmed at checkout (may differ from the saved address phone)
     contactPhone      String?
     // Realtime tracking: customer pinned/live location (kept on the order, not the saved Address)
@@ -289,6 +295,7 @@ model Order {
     conversations Conversation[]
     returnRequest Return?
     corridor      DeliveryCorridor? @relation(fields: [corridorId], references: [id])
+    dropHub       DeliveryHub?      @relation(fields: [dropHubId], references: [id])
     invoice       Invoice?
 
     @@index([paymentProofStatus, createdAt])
@@ -767,6 +774,8 @@ model DeliveryHub {
     updatedAt DateTime @updatedAt
 
     corridorRoutes CorridorRoute[]
+    // Deliveries whose sender chose to drop the package at this hub.
+    droppedOrders  Order[]
 }
 
 // Admin-registered corridor (a named route/area served from a hub). These are the

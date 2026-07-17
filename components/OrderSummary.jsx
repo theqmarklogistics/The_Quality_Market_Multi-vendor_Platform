@@ -467,7 +467,7 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                     {shippingQuote?.importQuote && (
                         <div className='rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800'>
                             <p className='flex items-center gap-2 font-medium'>
-                                <EarthIcon size={15} className='shrink-0 text-blue-500' /> Imported items — shipping quoted on request
+                                <EarthIcon size={15} className='shrink-0 text-blue-500' /> To-be-imported items — shipping quoted on request
                             </p>
                             <p className='mt-1 text-blue-700'>Request a shipping quote and our team will confirm the fee. You can still place your order now.</p>
                             {quoteRequested ? (

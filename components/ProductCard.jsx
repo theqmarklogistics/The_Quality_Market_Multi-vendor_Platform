@@ -22,7 +22,7 @@ const ProductCard = ({ product }) => {
                 <div className='relative h-44 sm:h-64 flex items-center justify-center bg-[linear-gradient(180deg,_rgba(248,250,252,1)_0%,_rgba(241,245,249,1)_100%)]'>
                     {product.importOrigin && (
                         <span className='absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full bg-blue-600/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm'>
-                            <EarthIcon size={11} /> Imported
+                            <EarthIcon size={11} /> To be imported
                         </span>
                     )}
                     {imageSrc ? (

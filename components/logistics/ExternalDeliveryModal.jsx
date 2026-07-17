@@ -16,6 +16,7 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
     const authHeaders = useCallback(async () => ({ Authorization: `Bearer ${await getToken()}` }), [getToken]);
 
     const [partners, setPartners] = useState([]);
+    const [hubs, setHubs] = useState([]);
     const [partnerId, setPartnerId] = useState("");
     const [newPartnerName, setNewPartnerName] = useState("");
     const [creatingPartner, setCreatingPartner] = useState(false);
@@ -34,7 +35,7 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
             recipientName: "", recipientPhone: "", recipientEmail: "",
             recipientDistrict: "", recipientSector: "", recipientCell: "", recipientVillage: "",
             recipientLandmark: "",
-            intakeMethod: "HUB_DROP_OFF", pickupContactName: "", pickupPhone: "", pickupLandmark: "",
+            intakeMethod: "HUB_DROP_OFF", dropHubId: "", pickupContactName: "", pickupPhone: "", pickupLandmark: "",
             packageDescription: "", declaredValue: "", paymentMethod: "MTN_MOMO",
             packageWeightKg: "", packageLengthCm: "", packageWidthCm: "", packageHeightCm: "",
             recipientLat: null, recipientLng: null,
@@ -54,6 +55,7 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
         if (!open) return;
         setForm(blankForm()); setPartnerId(""); setNewPartnerName(""); setMarkPaid(true); setResult(null); setCopied(false); setQuote(null);
         loadPartners();
+        axios.get(`/api/delivery/network`).then(({ data }) => setHubs(data?.hubs || [])).catch(() => null);
     }, [open, loadPartners]);
 
     // Live quote whenever a pricing input changes (sector, weight, dims, or pin).
@@ -130,6 +132,9 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
         if (!form.declaredValue || Number(form.declaredValue) <= 0) return toast.error("Enter the declared value of the package");
         if (form.intakeMethod === "DRIVER_SWEEP" && (!form.pickupContactName || !form.pickupPhone || !form.pickupLandmark)) {
             return toast.error("Pickup contact, phone and location are required for a sweep");
+        }
+        if (form.intakeMethod === "HUB_DROP_OFF" && hubs.length > 0 && !form.dropHubId) {
+            return toast.error("Select the hub the package will be dropped at");
         }
         setSubmitting(true);
         try {
@@ -276,6 +281,14 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                                     Sweep pickup
                                 </label>
                             </div>
+                            {form.intakeMethod === "HUB_DROP_OFF" && hubs.length > 0 && (
+                                <select value={form.dropHubId} onChange={(e) => set("dropHubId", e.target.value)} className={`w-full ${inp}`}>
+                                    <option value="">Select the drop-off hub…</option>
+                                    {hubs.map((h) => (
+                                        <option key={h.id} value={h.id}>{h.name}{h.sector ? ` — ${h.sector}` : ""}</option>
+                                    ))}
+                                </select>
+                            )}
                             {form.intakeMethod === "DRIVER_SWEEP" && (
                                 <div className="space-y-2">
                                     <div className="grid grid-cols-2 gap-2">
