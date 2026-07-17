@@ -321,7 +321,10 @@ export async function POST(request) {
                         sector: address.sector || null,
                         express: deliveryType === 'EXPRESS',
                     });
-                    if (quote?.needsReview) {
+                    // Imported (non-local) items aren't auto-priced — the customer
+                    // requests a shipping quote and admin sets the fee manually.
+                    const hasImported = storeItems.some((it) => it.importOrigin);
+                    if (hasImported || quote?.needsReview) {
                         shippingNeedsReview = true;
                         reviewQuote = quote;
                     } else {

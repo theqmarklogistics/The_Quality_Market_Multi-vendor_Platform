@@ -1,5 +1,5 @@
 'use client'
-import { StarIcon } from 'lucide-react'
+import { StarIcon, EarthIcon } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
@@ -20,6 +20,11 @@ const ProductCard = ({ product }) => {
         <Link href={`/product/${product.id}`} className='group block max-xl:mx-auto w-full max-w-60 sm:max-w-none'>
             <div className='rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] overflow-hidden transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_20px_40px_rgba(15,23,42,0.10)]'>
                 <div className='relative h-44 sm:h-64 flex items-center justify-center bg-[linear-gradient(180deg,_rgba(248,250,252,1)_0%,_rgba(241,245,249,1)_100%)]'>
+                    {product.importOrigin && (
+                        <span className='absolute top-3 left-3 z-10 inline-flex items-center gap-1 rounded-full bg-blue-600/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm'>
+                            <EarthIcon size={11} /> Imported
+                        </span>
+                    )}
                     {imageSrc ? (
                         <Image width={500} height={500} className='max-h-32 sm:max-h-40 w-auto object-contain group-hover:scale-105 transition duration-300' src={imageSrc} alt={product.name} />
                     ) : (

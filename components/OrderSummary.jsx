@@ -1,4 +1,4 @@
-import { InfoIcon, PlusIcon, SquarePenIcon, XIcon, MapPinIcon, CheckIcon, ZapIcon } from 'lucide-react';
+import { InfoIcon, PlusIcon, SquarePenIcon, XIcon, MapPinIcon, CheckIcon, ZapIcon, EarthIcon } from 'lucide-react';
 import React, { useState, useEffect } from 'react'
 import AddressModal from './AddressModal';
 import { useDispatch, useSelector } from 'react-redux';
@@ -42,6 +42,9 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
     const [quoting, setQuoting] = useState(false);
     // Admin can switch Express off (rider capacity) — hide the option when so.
     const [expressEnabled, setExpressEnabled] = useState(true);
+    // Imported (non-local) items aren't auto-priced — customer requests a quote.
+    const [quoteRequesting, setQuoteRequesting] = useState(false);
+    const [quoteRequested, setQuoteRequested] = useState(false);
 
     const handlePinLocation = () => {
         if (!('geolocation' in navigator)) {
@@ -104,6 +107,32 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
         quote();
         return () => { cancelled = true; };
     }, [deliveryType, selectedAddress, pinnedLocation, items, user, getToken]);
+
+    const requestShippingQuote = async () => {
+        if (!user) {
+            toast.error('Please login to request a shipping quote.');
+            return;
+        }
+        if (!selectedAddress) {
+            toast.error('Please select an address first.');
+            return;
+        }
+        setQuoteRequesting(true);
+        try {
+            const token = await getToken();
+            await axios.post('/api/orders/shipping-quote-request', {
+                items: (items || []).map(i => ({ id: i.id || i.productId, quantity: i.quantity })),
+                addressId: selectedAddress.id,
+                source: 'checkout',
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            setQuoteRequested(true);
+            toast.success('Request sent — our team will contact you with a shipping quote.');
+        } catch (err) {
+            toast.error(err?.response?.data?.error || err.message);
+        } finally {
+            setQuoteRequesting(false);
+        }
+    }
 
     const formatAmount = (amount) => `${currency}${Number(amount || 0).toLocaleString()}`
 
@@ -364,11 +393,13 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 <p>{formatAmount(totalPrice)}</p>
                                 {quoting
                                     ? <p className='text-green-700 text-xs'>Calculating…</p>
-                                    : shippingQuote?.needsReview
-                                        ? <p className='text-amber-600 text-xs'>Confirmed by our team</p>
-                                        : shippingQuote?.shipping != null
-                                            ? <p className='text-green-700'>{formatAmount(shippingQuote.shipping)}</p>
-                                            : <p className='text-slate-400 text-xs'>Select an address</p>}
+                                    : shippingQuote?.importQuote
+                                        ? <p className='text-blue-600 text-xs'>Quoted on request</p>
+                                        : shippingQuote?.needsReview
+                                            ? <p className='text-amber-600 text-xs'>Confirmed by our team</p>
+                                            : shippingQuote?.shipping != null
+                                                ? <p className='text-green-700'>{formatAmount(shippingQuote.shipping)}</p>
+                                                : <p className='text-slate-400 text-xs'>Select an address</p>}
 
                                 {coupon && <p>{`-${formatAmount((coupon.discount / 100) * totalPrice)}`}</p>}
                             </div>
@@ -400,7 +431,11 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 )}
                             </p>
                         </div>
-                        {shippingQuote?.needsReview ? (
+                        {shippingQuote?.importQuote ? (
+                            <p className='mt-1 text-[11px] text-blue-200'>
+                                Your cart has imported items — shipping is quoted on request. You can place the order now; our team will confirm the shipping fee.
+                            </p>
+                        ) : shippingQuote?.needsReview ? (
                             <p className='mt-1 text-[11px] text-amber-300'>
                                 This package&apos;s weight is outside our standard ranges — our team will confirm your delivery fee after you place the order.
                             </p>
@@ -409,6 +444,34 @@ const OrderSummary = ({ totalPrice, items, hasStockIssues = false }) => {
                                 {`Includes ${formatAmount(shippingQuote.shipping)} shipping, paid now at checkout${deliveryType === 'KIGALI_POOL' ? ' — the final pooled fee can only be lower when your route is shared.' : deliveryType === 'EXPRESS' ? ' — a rider is dispatched to you immediately.' : '.'}`}
                             </p>
                         )}
+                    </div>
+
+                    {shippingQuote?.importQuote && (
+                        <div className='rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800'>
+                            <p className='flex items-center gap-2 font-medium'>
+                                <EarthIcon size={15} className='shrink-0 text-blue-500' /> Imported items — shipping quoted on request
+                            </p>
+                            <p className='mt-1 text-blue-700'>Request a shipping quote and our team will confirm the fee. You can still place your order now.</p>
+                            {quoteRequested ? (
+                                <p className='mt-2 inline-flex items-center gap-1.5 font-medium text-green-700'>
+                                    <CheckIcon size={14} /> Request sent — we&apos;ll be in touch
+                                </p>
+                            ) : (
+                                <button
+                                    type='button'
+                                    onClick={requestShippingQuote}
+                                    disabled={quoteRequesting}
+                                    className='mt-2 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-700 active:scale-95 disabled:opacity-60'
+                                >
+                                    {quoteRequesting ? 'Sending…' : 'Request shipping quotation'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    <div className='flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800'>
+                        <InfoIcon size={16} className='mt-0.5 shrink-0 text-amber-500' />
+                        <p>After placing your order, you&apos;ll need to upload your <strong>proof of payment</strong> from <strong>My Orders</strong> so our team can verify and approve it.</p>
                     </div>
 
                     <button

@@ -58,9 +58,13 @@ export async function POST(request) {
 
         // Group by store — each store becomes its own order (and shipping charge).
         const byStore = new Map();
+        // Imported (non-local) products aren't auto-priced by the domestic formula:
+        // the customer requests a shipping quote and our team follows up.
+        let hasImported = false;
         for (const item of items) {
             const p = productMap.get(item.id);
             if (!p) continue;
+            if (p.importOrigin) hasImported = true;
             const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
             if (!byStore.has(p.storeId)) byStore.set(p.storeId, []);
             byStore.get(p.storeId).push({
@@ -70,6 +74,18 @@ export async function POST(request) {
                 widthCm: p.widthCm,
                 heightCm: p.heightCm,
                 importOrigin: p.importOrigin,
+            });
+        }
+
+        // Any imported item ⇒ the whole cart's shipping is quoted on request.
+        if (hasImported) {
+            return NextResponse.json({
+                shipping: null,
+                needsReview: true,
+                importQuote: true,
+                stores: byStore.size,
+                deliveryType,
+                basis: "import_quote",
             });
         }
 

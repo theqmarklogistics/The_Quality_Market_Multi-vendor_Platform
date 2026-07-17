@@ -1,12 +1,15 @@
 'use client'
 
 import { addToCart } from "@/lib/features/cart/cartSlice";
-import { StarIcon, TagIcon, EarthIcon, CreditCardIcon, UserIcon } from "lucide-react";
+import { StarIcon, TagIcon, EarthIcon, CreditCardIcon, UserIcon, WeightIcon, CheckIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
 import Counter from "./Counter";
 import { useDispatch, useSelector } from "react-redux";
+import { useAuth } from "@clerk/nextjs";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 const ProductDetails = ({ product }) => {
 
@@ -15,6 +18,10 @@ const ProductDetails = ({ product }) => {
 
     const cart = useSelector(state => state.cart.cartItems);
     const dispatch = useDispatch();
+    const { getToken, isSignedIn } = useAuth();
+
+    const [quoteRequesting, setQuoteRequesting] = useState(false);
+    const [quoteRequested, setQuoteRequested] = useState(false);
 
     const router = useRouter()
 
@@ -27,6 +34,28 @@ const ProductDetails = ({ product }) => {
 
     const addToCartHandler = () => {
         dispatch(addToCart({ productId }))
+    }
+
+    const requestShippingQuote = async () => {
+        if (!isSignedIn) {
+            toast.error('Please login to request a shipping quote.');
+            return;
+        }
+        setQuoteRequesting(true);
+        try {
+            const token = await getToken();
+            await axios.post(
+                '/api/orders/shipping-quote-request',
+                { items: [{ id: productId, quantity: cart[productId] || 1 }], source: 'product' },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setQuoteRequested(true);
+            toast.success('Request sent — our team will contact you with a shipping quote.');
+        } catch (err) {
+            toast.error(err?.response?.data?.error || err.message);
+        } finally {
+            setQuoteRequesting(false);
+        }
     }
 
     return (
@@ -78,6 +107,31 @@ const ProductDetails = ({ product }) => {
                     <span className={`size-2 rounded-full ${isAvailable ? 'bg-green-500' : 'bg-red-500'}`}></span>
                     {isAvailable ? 'In stock and ready to ship' : 'Currently unavailable'}
                 </div>
+
+                {product.importOrigin && (
+                    <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                        <p className="flex items-center gap-2 text-sm font-medium text-blue-800">
+                            <EarthIcon size={16} />
+                            Imported{product.importOrigin !== 'IMPORTED' ? ` from ${product.importOrigin}` : ''}
+                        </p>
+                        <p className="mt-1 text-xs text-blue-700">
+                            Shipping for imported items is quoted on request. Request a quote and our team will confirm the shipping fee for you.
+                        </p>
+                        {quoteRequested ? (
+                            <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-green-700">
+                                <CheckIcon size={15} /> Request sent — we&apos;ll be in touch
+                            </p>
+                        ) : (
+                            <button
+                                onClick={requestShippingQuote}
+                                disabled={quoteRequesting}
+                                className="mt-3 inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 active:scale-95 disabled:opacity-60"
+                            >
+                                {quoteRequesting ? 'Sending…' : 'Request shipping quotation'}
+                            </button>
+                        )}
+                    </div>
+                )}
                 <div className="flex items-end gap-5 mt-10 flex-wrap">
                     {
                         isAvailable && cart[productId] && (
@@ -93,6 +147,7 @@ const ProductDetails = ({ product }) => {
                 </div>
                 <hr className="border-gray-300 my-5" />
                 <div className="flex flex-col gap-4 text-slate-500">
+                    <p className="flex gap-3"> <WeightIcon className="text-slate-400" /> Weight: <span className="text-slate-700 font-medium">{product.weightKg != null ? `${product.weightKg} kg` : 'Not specified'}</span> </p>
                     <p className="flex gap-3"> <EarthIcon className="text-slate-400" /> Shipping fee confirmed by seller after order </p>
                     <p className="flex gap-3"> <CreditCardIcon className="text-slate-400" /> Secure bank transfer or mobile money checkout </p>
                     <p className="flex gap-3"> <UserIcon className="text-slate-400" /> Reviewed by the store before approval </p>

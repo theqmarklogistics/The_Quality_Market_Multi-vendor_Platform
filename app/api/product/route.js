@@ -70,6 +70,7 @@ export async function GET(request) {
             id: true, name: true, description: true,
             mrp: true, price: true, wholesalePrice: true, wholesaleMinQty: true, images: true,
             category: true, inStock: true, createdAt: true,
+            weightKg: true, lengthCm: true, widthCm: true, heightCm: true, importOrigin: true,
             rating: {
                 select: {
                     createdAt: true, rating: true, review: true,
