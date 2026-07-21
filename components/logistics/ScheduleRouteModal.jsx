@@ -14,25 +14,32 @@ export default function ScheduleRouteModal({ open, onClose, onCreated, riders = 
     const [name, setName] = useState("");
     const [runDate, setRunDate] = useState(defaultDate || new Date().toISOString().slice(0, 10));
     const [riderId, setRiderId] = useState("");
-    const [baseRouteCost, setBaseRouteCost] = useState(10000);
+    const [corridorRoutes, setCorridorRoutes] = useState([]);
+    const [corridorRouteId, setCorridorRouteId] = useState("");
     const [poolable, setPoolable] = useState([]);
     const [selected, setSelected] = useState(() => new Set());
     const [loadingOrders, setLoadingOrders] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // Reset and load the available order pool whenever the modal opens.
+    // Reset and load the available order pool + recorded corridors whenever the
+    // modal opens.
     useEffect(() => {
         if (!open) return;
         setName("");
         setRunDate(defaultDate || new Date().toISOString().slice(0, 10));
         setRiderId("");
-        setBaseRouteCost(10000);
+        setCorridorRouteId("");
         setSelected(new Set());
         (async () => {
             setLoadingOrders(true);
             try {
-                const { data } = await axios.get(`/api/logistics/orders/poolable`, { headers: await authHeaders() });
-                setPoolable(data.orders || []);
+                const headers = await authHeaders();
+                const [pool, corridors] = await Promise.all([
+                    axios.get(`/api/logistics/orders/poolable`, { headers }),
+                    axios.get(`/api/logistics/corridor-routes`, { headers }),
+                ]);
+                setPoolable(pool.data.orders || []);
+                setCorridorRoutes(corridors.data.corridors || []);
             } catch (err) {
                 toast.error(err?.response?.data?.error || err.message);
             } finally {
@@ -40,6 +47,19 @@ export default function ScheduleRouteModal({ open, onClose, onCreated, riders = 
             }
         })();
     }, [open, defaultDate, authHeaders]);
+
+    // The recorded corridor currently selected (if any).
+    const selectedCorridor = useMemo(
+        () => corridorRoutes.find((c) => c.id === corridorRouteId) || null,
+        [corridorRoutes, corridorRouteId]
+    );
+
+    // Picking a recorded corridor prefills the route name (kept editable).
+    const onPickCorridor = (id) => {
+        setCorridorRouteId(id);
+        const corridor = corridorRoutes.find((c) => c.id === id);
+        if (corridor) setName(corridor.name);
+    };
 
     const toggle = (orderId) => {
         setSelected((prev) => {
@@ -75,7 +95,6 @@ export default function ScheduleRouteModal({ open, onClose, onCreated, riders = 
                     name: name.trim(),
                     runDate,
                     riderId: riderId || null,
-                    baseRouteCost: Number(baseRouteCost) || undefined,
                     orderIds: [...selected],
                 },
                 { headers: await authHeaders() }
@@ -108,6 +127,33 @@ export default function ScheduleRouteModal({ open, onClose, onCreated, riders = 
 
                 <div className="space-y-4 p-5">
                     <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-500">Recorded corridor (optional)</label>
+                        <select
+                            value={corridorRouteId}
+                            onChange={(e) => onPickCorridor(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-green-400 focus:outline-none"
+                        >
+                            <option value="">Custom route (no recorded corridor)</option>
+                            {corridorRoutes.map((c) => (
+                                <option key={c.id} value={c.id}>{c.name}{c.hubName ? ` — ${c.hubName}` : ""}</option>
+                            ))}
+                        </select>
+                        {selectedCorridor && (
+                            <div className="mt-1.5 rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+                                {selectedCorridor.hubName && (
+                                    <p><span className="font-semibold text-slate-600">Hub:</span> {selectedCorridor.hubName}</p>
+                                )}
+                                {selectedCorridor.areas?.length > 0 && (
+                                    <p><span className="font-semibold text-slate-600">Areas:</span> {selectedCorridor.areas.join(", ")}</p>
+                                )}
+                                {selectedCorridor.landmarks?.length > 0 && (
+                                    <p><span className="font-semibold text-slate-600">Route:</span> {selectedCorridor.landmarks.join(" → ")}</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div>
                         <label className="mb-1 block text-xs font-semibold text-slate-500">Route name</label>
                         <input
                             value={name}
@@ -117,26 +163,14 @@ export default function ScheduleRouteModal({ open, onClose, onCreated, riders = 
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="mb-1 block text-xs font-semibold text-slate-500">Run date</label>
-                            <input
-                                type="date"
-                                value={runDate}
-                                onChange={(e) => setRunDate(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-green-400 focus:outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-1 block text-xs font-semibold text-slate-500">Route cost (RWF)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                value={baseRouteCost}
-                                onChange={(e) => setBaseRouteCost(e.target.value)}
-                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-green-400 focus:outline-none"
-                            />
-                        </div>
+                    <div>
+                        <label className="mb-1 block text-xs font-semibold text-slate-500">Run date</label>
+                        <input
+                            type="date"
+                            value={runDate}
+                            onChange={(e) => setRunDate(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-green-400 focus:outline-none"
+                        />
                     </div>
 
                     <div>
@@ -201,7 +235,7 @@ export default function ScheduleRouteModal({ open, onClose, onCreated, riders = 
                             )}
                         </div>
                         <p className="mt-1 text-[11px] text-slate-400">
-                            Stops are auto-ordered from the hub and the route cost split by distance. You can also leave this empty and batch orders in later.
+                            Stops are auto-ordered from the hub and priced by the distance × weight formula. You can also leave this empty and batch orders in later.
                         </p>
                     </div>
                 </div>
