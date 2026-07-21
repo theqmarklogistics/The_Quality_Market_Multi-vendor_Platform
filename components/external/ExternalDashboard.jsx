@@ -1,10 +1,11 @@
 'use client'
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { PackagePlusIcon, RefreshCwIcon, CopyIcon, CheckIcon, MapPinIcon, FileTextIcon, UploadIcon, Loader2Icon, WalletIcon } from "lucide-react";
+import { PackagePlusIcon, RefreshCwIcon, CopyIcon, CheckIcon, MapPinIcon, FileTextIcon, UploadIcon, Loader2Icon, WalletIcon, MessageCircleIcon } from "lucide-react";
 import DeliverySchedule from "./DeliverySchedule";
 
 const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
@@ -21,6 +22,7 @@ const DELIVERY_BADGE = {
 
 export default function ExternalDashboard() {
     const { getToken } = useAuth();
+    const router = useRouter();
     const authHeaders = useCallback(async () => ({ Authorization: `Bearer ${await getToken()}` }), [getToken]);
 
     const [deliveries, setDeliveries] = useState([]);
@@ -29,6 +31,7 @@ export default function ExternalDashboard() {
     const [loading, setLoading] = useState(true);
     const [copiedId, setCopiedId] = useState(null);
     const [uploadingId, setUploadingId] = useState(null);
+    const [openingChatId, setOpeningChatId] = useState(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -69,6 +72,25 @@ export default function ExternalDashboard() {
             toast.error(err?.response?.data?.error || err.message);
         } finally {
             setUploadingId(null);
+        }
+    };
+
+    // Open (or reuse) an admin support chat scoped to this delivery, so the seller
+    // can raise a concern or report package damage to our staff about that order.
+    const contactStaff = async (orderId) => {
+        setOpeningChatId(orderId);
+        try {
+            const { data } = await axios.post(
+                `/api/chat/conversations`,
+                { targetType: "ADMIN", orderId },
+                { headers: await authHeaders() }
+            );
+            const conversationId = data?.conversation?.id;
+            if (!conversationId) throw new Error("Could not open the chat");
+            router.push(`/chat/${conversationId}`);
+        } catch (err) {
+            toast.error(err?.response?.data?.error || err.message);
+            setOpeningChatId(null);
         }
     };
 
@@ -158,7 +180,11 @@ export default function ExternalDashboard() {
                                                 {copiedId === d.orderId ? <CheckIcon size={12} className="text-green-600" /> : <CopyIcon size={12} />} Client link
                                             </button>
                                             <Link href={`/track/${d.orderId}?t=${d.trackingToken}`} target="_blank" className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400"><MapPinIcon size={12} /> Track</Link>
+                                            <button onClick={() => contactStaff(d.orderId)} disabled={openingChatId === d.orderId} className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium hover:border-green-400 disabled:opacity-60">
+                                                {openingChatId === d.orderId ? <Loader2Icon size={12} className="animate-spin" /> : <MessageCircleIcon size={12} />} Chat staff
+                                            </button>
                                         </div>
+                                        <p className="text-[11px] text-slate-400 text-right">Have a concern or a damaged package? <b>Chat staff</b> about this delivery.</p>
                                         <p className="flex items-center gap-1 text-[11px] text-slate-400 text-right">
                                             <FileTextIcon size={12} className="shrink-0" /> Invoice, label &amp; receipts are issued by our staff at intake and delivery.
                                         </p>

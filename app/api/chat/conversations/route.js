@@ -233,8 +233,20 @@ export async function POST(request) {
             }
 
             targetUserId = adminUsers[0].id;
-            const adminIds = adminUsers.map((admin) => admin.id);
-            const adminParticipants = [...new Set(adminIds)];
+
+            // Staff who receive this conversation. Admins are always included; when the
+            // chat is tied to a specific delivery (orderId present) — e.g. an external
+            // seller raising a concern or reporting package damage — logistics managers
+            // are looped in too so it reaches the dispatch team as well as admins.
+            const staffIds = adminUsers.map((admin) => admin.id);
+            if (orderId) {
+                const logisticsUsers = await prisma.user.findMany({
+                    where: { role: "LOGISTICS_MANAGER" },
+                    select: { id: true }
+                });
+                staffIds.push(...logisticsUsers.map((u) => u.id));
+            }
+            const staffParticipants = [...new Set(staffIds)];
 
             const existingConversation = await prisma.conversation.findFirst({
                 where: {
@@ -252,7 +264,7 @@ export async function POST(request) {
                         {
                             participants: {
                                 some: {
-                                    userId: { in: adminParticipants }
+                                    userId: { in: staffParticipants }
                                 }
                             }
                         }
@@ -263,14 +275,16 @@ export async function POST(request) {
             if (existingConversation) {
                 let conversation = await hydrateConversation(existingConversation.id);
                 if (conversation) {
+                    // Backfill any staff (newly-added logistics managers included) who
+                    // aren't yet on an existing thread.
                     const existingIds = new Set(conversation.participants.map((p) => p.userId));
-                    const missingAdminIds = adminParticipants.filter((adminId) => !existingIds.has(adminId));
-                    for (const adminId of missingAdminIds) {
+                    const missingStaffIds = staffParticipants.filter((staffId) => !existingIds.has(staffId));
+                    for (const staffId of missingStaffIds) {
                         await prisma.conversationParticipant.create({
-                            data: { conversationId: existingConversation.id, userId: adminId }
+                            data: { conversationId: existingConversation.id, userId: staffId }
                         });
                     }
-                    if (missingAdminIds.length) {
+                    if (missingStaffIds.length) {
                         conversation = await hydrateConversation(existingConversation.id);
                     }
                 }
@@ -290,10 +304,10 @@ export async function POST(request) {
                 data: { conversationId: newConversation.id, userId }
             });
 
-            for (const adminId of adminParticipants) {
-                if (adminId === userId) continue;
+            for (const staffId of staffParticipants) {
+                if (staffId === userId) continue;
                 await prisma.conversationParticipant.create({
-                    data: { conversationId: newConversation.id, userId: adminId }
+                    data: { conversationId: newConversation.id, userId: staffId }
                 });
             }
 
