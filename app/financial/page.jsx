@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
+import ReportsView from '@/components/reports/ReportsView'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,10 +19,11 @@ export default async function FinancialDashboardPage() {
     )
   }
 
+  // Financial operations see the money-facing reports platform-wide. The
+  // reports API re-checks scope, so this page only needs the role gate.
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold">Financial Operations Dashboard</h1>
-      <p className="mt-2 text-slate-600">Placeholder dashboard for `FINANCIAL_OPERATIONAL` role.</p>
+      <ReportsView />
     </div>
   )
 }

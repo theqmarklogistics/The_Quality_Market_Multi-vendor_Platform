@@ -8,7 +8,8 @@ import ScheduleRouteModal from "@/components/logistics/ScheduleRouteModal";
 import ExternalDeliveryModal from "@/components/logistics/ExternalDeliveryModal";
 import { initializeSocket } from "@/lib/socketClient";
 import { haversineKm, KIGALI_HUB } from "@/lib/deliveryEta";
-import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon, FileTextIcon } from "lucide-react";
+import Link from "next/link";
+import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon, FileTextIcon, BarChart3Icon } from "lucide-react";
 
 const CORRIDOR_BADGE = {
     OPEN: "bg-slate-100 text-slate-600",
@@ -168,6 +169,7 @@ export default function DispatchBoard() {
                     <button onClick={() => setScheduleOpen(true)} disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-green-600 text-white px-3 py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50"><CalendarPlusIcon size={14} /> Schedule route</button>
                     <button onClick={() => setExternalOpen(true)} disabled={busy} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium hover:border-green-400"><PackagePlusIcon size={14} /> External delivery</button>
                     <button onClick={runBatching} disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-slate-800 text-white px-3 py-2 text-sm font-medium hover:bg-slate-900 disabled:opacity-50"><LayersIcon size={14} /> Batch now</button>
+                    <Link href="/logistics/reports" className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:border-green-400"><BarChart3Icon size={14} /> Reports</Link>
                     <button onClick={() => load()} className="flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm hover:border-green-400"><RefreshCwIcon size={14} /> Refresh</button>
                 </div>
             </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from "next/navigation"
-import { BikeIcon, ClipboardListIcon, CircleDollarSignIcon, CreditCardIcon, FileTextIcon, HomeIcon, LayoutPanelTopIcon, MailIcon, MegaphoneIcon, MessageCircleIcon, PackageCheckIcon, PercentIcon, RotateCcwIcon, RouteIcon, ShieldCheckIcon, StoreIcon, TagIcon, TagsIcon, TicketPercentIcon, TruckIcon, UsersIcon, WarehouseIcon } from "lucide-react"
+import { BarChart3Icon, BikeIcon, ClipboardListIcon, CircleDollarSignIcon, CreditCardIcon, FileTextIcon, HomeIcon, LayoutPanelTopIcon, MailIcon, MegaphoneIcon, MessageCircleIcon, PackageCheckIcon, PercentIcon, RotateCcwIcon, RouteIcon, ShieldCheckIcon, StoreIcon, TagIcon, TagsIcon, TicketPercentIcon, TruckIcon, UsersIcon, WarehouseIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useUser } from "@clerk/nextjs"
@@ -23,6 +23,7 @@ const AdminSidebar = () => {
 
     const sidebarLinks = [
         { name: 'Dashboard', href: '/admin', icon: HomeIcon },
+        { name: 'Reports', href: '/admin/reports', icon: BarChart3Icon },
         { name: 'Stores', href: '/admin/stores', icon: StoreIcon },
         { name: 'Approve Store', href: '/admin/approve', icon: ShieldCheckIcon, badge: counts.pendingStores },
         { name: 'Approve Products', href: '/admin/products', icon: PackageCheckIcon, badge: counts.pendingProducts },

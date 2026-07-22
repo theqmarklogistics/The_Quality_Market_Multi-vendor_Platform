@@ -1,6 +1,6 @@
 'use client'
 import { usePathname } from "next/navigation"
-import { CircleDollarSignIcon, HomeIcon, LayoutListIcon, MessageCircleIcon, SquarePenIcon, SquarePlusIcon } from "lucide-react"
+import { BarChart3Icon, CircleDollarSignIcon, HomeIcon, LayoutListIcon, MessageCircleIcon, SquarePenIcon, SquarePlusIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useAuth } from "@clerk/nextjs"
@@ -35,6 +35,7 @@ const StoreSidebar = ({storeInfo}) => {
         { name: 'Orders', href: '/store/orders', icon: LayoutListIcon, badge: pendingOrders },
         { name: 'Chats', href: '/store/chat', icon: MessageCircleIcon },
         { name: 'Payouts', href: '/store/payouts', icon: CircleDollarSignIcon },
+        { name: 'Reports', href: '/store/reports', icon: BarChart3Icon },
     ]
 
     return (
