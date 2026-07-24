@@ -50,6 +50,11 @@ export default function ReportsView() {
     const [report, setReport] = useState(null)
     const [loading, setLoading] = useState(false)
     const [downloading, setDownloading] = useState(null)
+    // Active per-report filter values (e.g. { riderId }), cleared when the
+    // selected report changes. The report response describes which filter
+    // controls to render (report.filters) and carries their options.
+    const [filters, setFilters] = useState({})
+    const filtersKey = JSON.stringify(filters)
 
     // 1) Load the catalogue for this user.
     useEffect(() => {
@@ -74,7 +79,7 @@ export default function ReportsView() {
             try {
                 const token = await getToken()
                 const { data } = await axios.get('/api/reports', {
-                    params: { type: activeType, from: range.from, to: range.to },
+                    params: { type: activeType, from: range.from, to: range.to, ...filters },
                     headers: { Authorization: `Bearer ${token}` },
                 })
                 if (!cancelled) setReport(data)
@@ -85,14 +90,15 @@ export default function ReportsView() {
             }
         })()
         return () => { cancelled = true }
-    }, [activeType, range.from, range.to, getToken])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeType, range.from, range.to, filtersKey, getToken])
 
     const download = async (format) => {
         try {
             setDownloading(format)
             const token = await getToken()
             const res = await axios.get('/api/reports', {
-                params: { type: activeType, from: range.from, to: range.to, format },
+                params: { type: activeType, from: range.from, to: range.to, format, ...filters },
                 headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob',
             })
@@ -185,7 +191,7 @@ export default function ReportsView() {
                                 return (
                                     <button
                                         key={r.type}
-                                        onClick={() => setActiveType(r.type)}
+                                        onClick={() => { setActiveType(r.type); setFilters({}) }}
                                         title={r.description}
                                         className={`flex items-center gap-2 text-sm px-3.5 py-2 rounded-lg border transition ${
                                             active
@@ -224,6 +230,31 @@ export default function ReportsView() {
                 </div>
             </div>
 
+            {/* Per-report filters (e.g. focus on a single rider) */}
+            {report?.filters?.length > 0 && (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {report.filters.map((f) => (
+                        <div key={f.key} className="flex items-center gap-2 text-sm">
+                            <label className="text-slate-400">{f.label}</label>
+                            <select
+                                value={filters[f.key] || ''}
+                                onChange={(e) => setFilters((prev) => {
+                                    const next = { ...prev }
+                                    if (e.target.value) next[f.key] = e.target.value
+                                    else delete next[f.key]
+                                    return next
+                                })}
+                                className="border border-slate-200 rounded-md px-2 py-1.5 bg-white min-w-[180px]"
+                            >
+                                {f.options.map((o) => (
+                                    <option key={o.value} value={o.value}>{o.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {/* Body */}
             {loading || !report ? (
                 <div className="py-20"><Loading /></div>
@@ -239,7 +270,10 @@ function ReportBody({ report }) {
     return (
         <div className="mt-6">
             <div className="flex items-baseline justify-between flex-wrap gap-2">
-                <h2 className="text-lg font-medium text-slate-800">{report.title}</h2>
+                <div>
+                    <h2 className="text-lg font-medium text-slate-800">{report.title}</h2>
+                    {report.subtitle && <p className="text-sm text-green-700 mt-0.5">{report.subtitle}</p>}
+                </div>
                 <span className="text-xs text-slate-400">{report.range?.label}</span>
             </div>
 

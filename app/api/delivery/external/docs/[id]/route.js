@@ -56,7 +56,9 @@ const styles = StyleSheet.create({
     statement: { fontSize: 10, color: "#0f172a", lineHeight: 1.6, marginBottom: 6 },
     sigBlock: { marginTop: 26, flexDirection: "row", gap: 30 },
     sigBox: { flex: 1 },
-    sigLine: { borderBottomWidth: 1, borderBottomColor: "#94a3b8", height: 34, marginBottom: 4 },
+    sigLine: { borderBottomWidth: 1, borderBottomColor: "#94a3b8", height: 34, marginBottom: 4, justifyContent: "flex-end", paddingHorizontal: 2, paddingBottom: 3 },
+    // Pre-printed value sitting on a signature line (e.g. the recorded receiver).
+    sigFill: { fontFamily: "Helvetica-Bold", fontSize: 10, color: "#0f172a" },
     sigLabel: { fontSize: 8, color: "#64748b" },
     footer: { position: "absolute", bottom: 28, left: 40, right: 40, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#e2e8f0", textAlign: "center", fontSize: 8, color: "#94a3b8" },
     qrWrapper: { alignItems: "center", marginTop: 8 },
@@ -256,7 +258,9 @@ function SenderReceipt({ order, partnerName }) {
                         <Text style={styles.sigLabel}>Sender name &amp; signature · date</Text>
                     </View>
                     <View style={styles.sigBox}>
-                        <View style={styles.sigLine} />
+                        <View style={styles.sigLine}>
+                            {order.receivedByName ? <Text style={styles.sigFill}>{order.receivedByName}</Text> : null}
+                        </View>
                         <Text style={styles.sigLabel}>Received by (staff / rider) · date</Text>
                     </View>
                 </View>

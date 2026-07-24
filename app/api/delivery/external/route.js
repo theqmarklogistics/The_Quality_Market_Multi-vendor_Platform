@@ -12,6 +12,7 @@ import { geocodeRwAddress } from "@/lib/geocode";
 import { getSocketServer } from "@/lib/socketServer";
 import { sendDeliveryReviewAlertEmail, sendDeliveryTrackingEmail } from "@/lib/email";
 import { dispatchExpressOrder } from "@/lib/expressDispatch";
+import { resolveReceivedBy } from "@/lib/receivedBy";
 
 const ALLOWED_PAYMENT = [paymentMethod.BANK_TRANSFER, paymentMethod.MTN_MOMO, paymentMethod.EKASH];
 const ALLOWED_INTAKE = ["HUB_DROP_OFF", "DRIVER_SWEEP"];
@@ -194,6 +195,10 @@ export async function POST(request) {
             dropHubId = hub.id;
         }
 
+        // Optional: which staff member received the package (id + name snapshot).
+        // Blank clears it; a non-empty id must be an active internal staff member.
+        const received = await resolveReceivedBy(body?.receivedById);
+
         // Second option after a shared/pinned location: geocode the recorded
         // address (cell/village) so the fee is still distance-based. The
         // approximate point is stored on the booking address (for batching and
@@ -312,6 +317,7 @@ export async function POST(request) {
                 "pickupContactName", "pickupPhone", "pickupLandmark",
                 "pickupLat", "pickupLng", "packageDescription", "declaredValue",
                 "packageWeightKg", "packageLengthCm", "packageWidthCm", "packageHeightCm", "creditApplied",
+                "receivedById", "receivedByName",
                 "trackingToken",
                 "recipientLat", "recipientLng",
                 "createdAt", "updatedAt"
@@ -329,6 +335,7 @@ export async function POST(request) {
                 ${pickupContactName}, ${pickupPhone}, ${pickupLandmark},
                 ${pickupLat}, ${pickupLng}, ${packageDescription}, ${declaredValue},
                 ${packageWeightKg}, ${packageLengthCm}, ${packageWidthCm}, ${packageHeightCm}, ${creditApplied},
+                ${received.receivedById}, ${received.receivedByName},
                 ${trackingToken},
                 ${recipientLat}, ${recipientLng},
                 ${now}, ${now}

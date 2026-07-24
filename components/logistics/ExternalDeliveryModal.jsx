@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { XIcon, PackagePlusIcon, Loader2Icon, CopyIcon, CheckIcon, CrosshairIcon, MapPinIcon, CheckCircleIcon } from "lucide-react";
 import LocationPicker from "@/components/delivery/LocationPicker";
 import RwLocationSelect from "@/components/delivery/RwLocationSelect";
+import { humanizeRole } from "@/lib/roleLabels";
 
 const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "RWF";
@@ -17,6 +18,7 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
 
     const [partners, setPartners] = useState([]);
     const [hubs, setHubs] = useState([]);
+    const [staff, setStaff] = useState([]);
     const [partnerId, setPartnerId] = useState("");
     const [newPartnerName, setNewPartnerName] = useState("");
     const [creatingPartner, setCreatingPartner] = useState(false);
@@ -39,6 +41,7 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
             packageDescription: "", declaredValue: "", paymentMethod: "MTN_MOMO",
             packageWeightKg: "", packageLengthCm: "", packageWidthCm: "", packageHeightCm: "",
             recipientLat: null, recipientLng: null,
+            receivedById: "",
         };
     }
     const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -51,12 +54,20 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
         } catch (err) { toast.error(err?.response?.data?.error || err.message); }
     }, [authHeaders]);
 
+    const loadStaff = useCallback(async () => {
+        try {
+            const { data } = await axios.get(`/api/logistics/staff`, { headers: await authHeaders() });
+            setStaff(data.staff || []);
+        } catch (_) { /* optional field — leave the dropdown empty on failure */ }
+    }, [authHeaders]);
+
     useEffect(() => {
         if (!open) return;
         setForm(blankForm()); setPartnerId(""); setNewPartnerName(""); setMarkPaid(true); setResult(null); setCopied(false); setQuote(null);
         loadPartners();
+        loadStaff();
         axios.get(`/api/delivery/network`).then(({ data }) => setHubs(data?.hubs || [])).catch(() => null);
-    }, [open, loadPartners]);
+    }, [open, loadPartners, loadStaff]);
 
     // Live quote whenever a pricing input changes (sector, weight, dims, or pin).
     useEffect(() => {
@@ -321,6 +332,15 @@ export default function ExternalDeliveryModal({ open, onClose, onCreated }) {
                             <option value="BANK_TRANSFER">Bank transfer</option>
                             <option value="EKASH">eKash</option>
                         </select>
+
+                        {/* Optional: which staff member received the package at intake. */}
+                        <div>
+                            <label className="mb-1 block text-xs font-semibold text-slate-500">Received by <span className="font-normal text-slate-400">(optional)</span></label>
+                            <select value={form.receivedById} onChange={(e) => set("receivedById", e.target.value)} className={`w-full ${inp}`}>
+                                <option value="">Not recorded</option>
+                                {staff.map((s) => <option key={s.id} value={s.id}>{s.name}{s.role ? ` — ${humanizeRole(s.role)}` : ""}</option>)}
+                            </select>
+                        </div>
 
                         <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
                             <div className="flex items-center justify-between">

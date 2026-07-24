@@ -65,6 +65,8 @@ export async function GET(request) {
                 lat: o.recipientLat ?? o.address?.latitude ?? null,
                 lng: o.recipientLng ?? o.address?.longitude ?? null,
                 deliveryFeeShare: o.deliveryFeeShare,
+                receivedById: o.receivedById ?? null,
+                receivedByName: o.receivedByName ?? null,
             })),
         }));
 

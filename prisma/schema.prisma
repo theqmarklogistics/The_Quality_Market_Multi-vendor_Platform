@@ -276,6 +276,11 @@ model Order {
     packageLengthCm    Float?
     packageWidthCm     Float?
     packageHeightCm    Float?
+    // Staff member who received the package (optional). Stored as an id + name
+    // snapshot so delivery documents stay stable even if the staff record is later
+    // renamed or removed. No FK relation (mirrors `paymentReviewedBy`).
+    receivedById       String?
+    receivedByName     String?
     // Pooling credit: `poolingSavings` (total − deliveryFeeShare) is returned to the
     // partner as account credit on delivery; `creditApplied` is credit redeemed at
     // booking to reduce the cash due.

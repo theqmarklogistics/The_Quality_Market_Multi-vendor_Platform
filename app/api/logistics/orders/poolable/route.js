@@ -45,6 +45,8 @@ export async function GET(request) {
                 landmarkAddress: o.landmarkAddress ?? null,
                 isExternalDelivery: o.isExternalDelivery,
                 packageDescription: o.packageDescription ?? null,
+                receivedById: o.receivedById ?? null,
+                receivedByName: o.receivedByName ?? null,
                 // Unpaid external bookings can be intaken but not routed yet.
                 paymentPending: o.isExternalDelivery && !o.isPaid,
             })),

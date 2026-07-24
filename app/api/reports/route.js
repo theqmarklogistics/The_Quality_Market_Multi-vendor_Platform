@@ -51,7 +51,9 @@ export async function GET(request) {
         }
 
         const { from, to } = parseRange(searchParams);
-        const report = await computeReport({ type, scope, from, to });
+        // Optional per-report filters (ignored by reports that don't use them).
+        const riderId = searchParams.get('riderId') || undefined;
+        const report = await computeReport({ type, scope, from, to, riderId });
 
         if (format === 'csv') {
             const csv = reportToCsv(report);

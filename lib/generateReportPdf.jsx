@@ -97,6 +97,7 @@ function ReportDocument({ report, logoSrc }) {
                     </View>
                     <View>
                         <Text style={styles.reportLabel}>{report.title}</Text>
+                        {report.subtitle ? <Text style={styles.metaLine}>{report.subtitle}</Text> : null}
                         <Text style={styles.metaLine}>{report.scopeLabel}</Text>
                         <Text style={styles.metaLine}>Period: {report.range?.label}</Text>
                         <Text style={styles.metaLine}>Generated: {new Date(report.generatedAt).toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>

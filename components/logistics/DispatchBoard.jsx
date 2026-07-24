@@ -9,7 +9,8 @@ import ExternalDeliveryModal from "@/components/logistics/ExternalDeliveryModal"
 import { initializeSocket } from "@/lib/socketClient";
 import { haversineKm, KIGALI_HUB } from "@/lib/deliveryEta";
 import Link from "next/link";
-import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon, FileTextIcon, BarChart3Icon } from "lucide-react";
+import { TruckIcon, CheckCircleIcon, PackageIcon, RefreshCwIcon, LayersIcon, RotateCcwIcon, BanknoteIcon, CalendarPlusIcon, PackagePlusIcon, FileTextIcon, BarChart3Icon, UserCheckIcon } from "lucide-react";
+import { humanizeRole } from "@/lib/roleLabels";
 
 const CORRIDOR_BADGE = {
     OPEN: "bg-slate-100 text-slate-600",
@@ -42,12 +43,33 @@ function ExternalDocLinks({ orderId }) {
     );
 }
 
+// Optional "received by" staff picker for an external delivery — records who
+// took the package in. Persists to the order and is printed on the Sender receipt.
+function ReceivedBySelect({ orderId, value, staff, disabled, onChange }) {
+    return (
+        <label className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
+            <UserCheckIcon size={11} className="shrink-0 text-slate-400" />
+            <span className="shrink-0">Received by</span>
+            <select
+                value={value || ""}
+                disabled={disabled}
+                onChange={(e) => onChange(orderId, e.target.value)}
+                className="max-w-[190px] rounded-lg border border-slate-200 px-1.5 py-0.5 text-[11px] disabled:opacity-50"
+            >
+                <option value="">Not recorded</option>
+                {staff.map((s) => <option key={s.id} value={s.id}>{s.name}{s.role ? ` — ${humanizeRole(s.role)}` : ""}</option>)}
+            </select>
+        </label>
+    );
+}
+
 export default function DispatchBoard() {
     const { getToken } = useAuth();
     const [date, setDate] = useState(todayStr());
     const [corridors, setCorridors] = useState([]);
     const [poolable, setPoolable] = useState([]);
     const [riders, setRiders] = useState([]);
+    const [staff, setStaff] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -59,14 +81,16 @@ export default function DispatchBoard() {
         if (!silent) setLoading(true);
         try {
             const headers = await authHeaders();
-            const [c, r, p] = await Promise.all([
+            const [c, r, p, s] = await Promise.all([
                 axios.get(`/api/logistics/corridors?date=${date}`, { headers }),
                 axios.get(`/api/logistics/riders`, { headers }),
                 axios.get(`/api/logistics/orders/poolable`, { headers }),
+                axios.get(`/api/logistics/staff`, { headers }),
             ]);
             setCorridors(c.data.corridors || []);
             setRiders(r.data.riders || []);
             setPoolable(p.data.orders || []);
+            setStaff(s.data.staff || []);
         } catch (err) {
             if (!silent) toast.error(err?.response?.data?.error || err.message);
         } finally {
@@ -124,6 +148,21 @@ export default function DispatchBoard() {
             await axios.post(`/api/logistics/orders/${orderId}/intake`, {}, { headers: await authHeaders() });
             load({ silent: true });
         } catch (err) { toast.error(err?.response?.data?.error || err.message); } finally { setBusy(false); }
+    };
+
+    // Record (or clear) which staff member received an external delivery's package.
+    // Optimistic — reflect the choice locally, then persist; reload on failure.
+    const setReceivedBy = async (orderId, receivedById) => {
+        const name = staff.find((s) => s.id === receivedById)?.name ?? null;
+        const patch = (o) => (o.orderId === orderId ? { ...o, receivedById: receivedById || null, receivedByName: name } : o);
+        setPoolable((prev) => prev.map(patch));
+        setCorridors((prev) => prev.map((c) => ({ ...c, stops: c.stops.map(patch) })));
+        try {
+            await axios.post(`/api/logistics/orders/${orderId}/received-by`, { receivedById }, { headers: await authHeaders() });
+        } catch (err) {
+            toast.error(err?.response?.data?.error || err.message);
+            load({ silent: true });
+        }
     };
 
     const resolveFailed = async (orderId, action) => {
@@ -219,6 +258,7 @@ export default function DispatchBoard() {
                                         <p className="mt-0.5 text-xs text-slate-400 truncate">{o.packageDescription || o.landmarkAddress}</p>
                                     )}
                                     {o.isExternalDelivery && <ExternalDocLinks orderId={o.orderId} />}
+                                    {o.isExternalDelivery && <ReceivedBySelect orderId={o.orderId} value={o.receivedById} staff={staff} disabled={busy} onChange={setReceivedBy} />}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <span className="text-[10px] font-semibold text-slate-500">{o.deliveryStatus}</span>
@@ -287,6 +327,7 @@ export default function DispatchBoard() {
                                                     </p>
                                                     {s.landmarkAddress && <p className="text-xs text-slate-400 truncate">{s.landmarkAddress}</p>}
                                                     {s.isExternalDelivery && <ExternalDocLinks orderId={s.orderId} />}
+                                                    {s.isExternalDelivery && <ReceivedBySelect orderId={s.orderId} value={s.receivedById} staff={staff} disabled={busy} onChange={setReceivedBy} />}
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
