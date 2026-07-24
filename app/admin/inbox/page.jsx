@@ -85,6 +85,17 @@ export default function AdminInbox() {
 
     const fmtTime = (d) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
+    // Resend delivery status shown on outbound messages (dark bubble → light chips).
+    const DELIVERY = {
+        sent: { label: 'Sent', cls: 'bg-white/15 text-white/70' },
+        delivered: { label: 'Delivered', cls: 'bg-emerald-400/25 text-emerald-100' },
+        delayed: { label: 'Delayed', cls: 'bg-amber-400/25 text-amber-100' },
+        opened: { label: 'Opened', cls: 'bg-white/15 text-white/70' },
+        clicked: { label: 'Clicked', cls: 'bg-white/15 text-white/70' },
+        bounced: { label: 'Bounced', cls: 'bg-red-500/30 text-red-100' },
+        complained: { label: 'Spam report', cls: 'bg-red-500/30 text-red-100' },
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-40">
@@ -183,6 +194,11 @@ export default function AdminInbox() {
                                         <p className={`flex items-center gap-1 text-[11px] mb-1 ${m.direction === 'OUTBOUND' ? 'text-white/60' : 'text-slate-400'}`}>
                                             {m.direction === 'OUTBOUND' ? <ArrowUpRightIcon size={11} /> : <ArrowDownLeftIcon size={11} />}
                                             {m.direction === 'OUTBOUND' ? 'You' : m.fromEmail} · {fmtTime(m.createdAt)}
+                                            {m.direction === 'OUTBOUND' && DELIVERY[m.deliveryStatus] && (
+                                                <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] font-medium ${DELIVERY[m.deliveryStatus].cls}`}>
+                                                    {DELIVERY[m.deliveryStatus].label}
+                                                </span>
+                                            )}
                                         </p>
                                         {m.bodyText
                                             ? <p className="whitespace-pre-wrap">{m.bodyText}</p>

@@ -865,6 +865,11 @@ model EmailMessage {
     providerMessageId String?
     sentById          String? // admin user id, outbound only
     isRead            Boolean        @default(false)
+    // Latest Resend delivery-lifecycle state for OUTBOUND mail, set by the
+    // /api/email/inbound webhook: sent | delivered | delayed | opened | clicked
+    // | bounced | complained. Null until the first lifecycle event arrives.
+    deliveryStatus    String?
+    statusAt          DateTime?
     createdAt         DateTime       @default(now())
 
     thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
