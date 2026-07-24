@@ -4,7 +4,7 @@ import axios from "axios"
 import toast from "react-hot-toast"
 import { useAuth } from "@clerk/nextjs"
 import {
-    Banknote, BarChart3, CircleDollarSign, CreditCard, Download, FileText,
+    Banknote, BarChart3, Bike, CircleDollarSign, CreditCard, Download, FileText,
     Package, RotateCcw, Store, Truck,
 } from "lucide-react"
 import Loading from "@/components/Loading"
@@ -12,7 +12,7 @@ import ReportChart from "./ReportChart"
 import { formatValue } from "@/lib/reports/format"
 
 // Resolve the catalog's icon *name* to a lucide component.
-const ICONS = { CircleDollarSign, CreditCard, Banknote, Truck, Package, RotateCcw, Store }
+const ICONS = { CircleDollarSign, CreditCard, Banknote, Truck, Bike, Package, RotateCcw, Store }
 
 // yyyy-mm-dd for <input type=date>, in local time.
 function toInput(date) {
