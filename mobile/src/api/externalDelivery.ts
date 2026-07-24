@@ -104,6 +104,19 @@ export function getDeliveryHubs(): Promise<DeliveryHub[]> {
   return apiGet<{ hubs: DeliveryHub[] }>('/api/delivery/network').then((d) => d.hubs || []);
 }
 
+// ── Receiver staff ───────────────────────────────────────────────────────────
+// Internal staff who can be recorded as having received the package (optional
+// "Received by" picker on the booking form). Readable by any booking role.
+export interface ReceiverStaff {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export function getReceiverStaff(): Promise<ReceiverStaff[]> {
+  return apiGet<{ staff: ReceiverStaff[] }>('/api/delivery/staff').then((d) => d.staff || []);
+}
+
 export function quoteExternalDelivery(params: QuoteParams): Promise<DeliveryQuote> {
   const q: Record<string, string> = {};
   for (const [k, v] of Object.entries(params)) {
@@ -151,6 +164,8 @@ export interface ExternalBookingPayload {
   applyCredit: boolean;
   // EXPRESS: instant dispatch once paid, priced with the express base rate.
   express?: boolean;
+  // Optional: id of the internal staff member who received the package.
+  receivedById?: string;
 }
 
 export interface BookingResult {

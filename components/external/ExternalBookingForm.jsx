@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { ArrowLeftIcon, PackagePlusIcon, Loader2Icon, MapPinIcon, CrosshairIcon, CheckCircleIcon, CopyIcon, CheckIcon, LinkIcon, AlertTriangleIcon, ZapIcon } from "lucide-react";
 import LocationPicker from "@/components/delivery/LocationPicker";
 import RwLocationSelect from "@/components/delivery/RwLocationSelect";
+import { humanizeRole } from "@/lib/roleLabels";
 
 const currency = process.env.NEXT_PUBLIC_CURRENCY_SYMBOL || "RWF";
 const APP_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
@@ -27,10 +28,13 @@ export default function ExternalBookingForm() {
         packageWeightKg: "", packageLengthCm: "", packageWidthCm: "", packageHeightCm: "",
         recipientLat: null, recipientLng: null,
         pickupLat: null, pickupLng: null,
+        receivedById: "",
     });
     const [quote, setQuote] = useState(null);
     // Active drop-off hubs the sender can choose from (HUB_DROP_OFF intake).
     const [hubs, setHubs] = useState([]);
+    // Internal staff who can be recorded as having received the package (optional).
+    const [staff, setStaff] = useState([]);
     // Express: instant dispatch (no schedule wait) at the premium express rate.
     const [express, setExpress] = useState(false);
     // Admin can switch Express off (rider capacity) — hide the toggle when so.
@@ -67,6 +71,18 @@ export default function ExternalBookingForm() {
             .catch(() => null);
         return () => { active = false; };
     }, []);
+
+    // Internal staff for the optional "received by" picker.
+    useEffect(() => {
+        let active = true;
+        (async () => {
+            try {
+                const { data } = await axios.get('/api/delivery/staff', { headers: await authHeaders() });
+                if (active) setStaff(data.staff || []);
+            } catch (_) { /* optional field — leave empty on failure */ }
+        })();
+        return () => { active = false; };
+    }, [authHeaders]);
 
     // Whether Express is currently offered (admin toggle).
     useEffect(() => {
@@ -424,6 +440,17 @@ export default function ExternalBookingForm() {
                     <option value="BANK_TRANSFER">Bank transfer</option>
                     <option value="EKASH">eKash</option>
                 </select>
+
+                {/* Optional: the staff member who took the package in — works for
+                    both intake methods (hub drop-off or a sweep pickup). */}
+                <div className="rounded-2xl border border-slate-100 p-4 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Received by <span className="lowercase font-normal text-slate-400">(optional)</span></p>
+                    <p className="text-[11px] text-slate-400">The staff member who took the package in — at the hub or during a sweep pickup. Leave blank if it hasn&apos;t been received yet.</p>
+                    <select className={input} value={form.receivedById} onChange={(e) => set("receivedById", e.target.value)}>
+                        <option value="">Not recorded</option>
+                        {staff.map((s) => <option key={s.id} value={s.id}>{s.name}{s.role ? ` — ${humanizeRole(s.role)}` : ""}</option>)}
+                    </select>
+                </div>
 
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
                     <div className="flex items-center justify-between">

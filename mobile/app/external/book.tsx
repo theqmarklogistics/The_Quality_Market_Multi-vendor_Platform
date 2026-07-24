@@ -24,10 +24,12 @@ import {
   getDeliveryConfig,
   getDeliveryHubs,
   getExternalDeliveries,
+  getReceiverStaff,
   quoteExternalDelivery,
   trackingLink,
   type DeliveryHub,
   type DeliveryQuote,
+  type ReceiverStaff,
 } from '@/api/externalDelivery';
 import { Button, Field } from '@/components/ui';
 import { EMPTY_RW_LOCATION, RwLocationSelect, type RwLocation } from '@/components/RwLocationSelect';
@@ -39,6 +41,17 @@ const num = (v: string): number | undefined => {
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 };
+
+// Human-friendly labels for the UserRole enum shown in the "received by" picker.
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Admin',
+  LOGISTICS_MANAGER: 'Logistics manager',
+  WAREHOUSE_KEEPER: 'Warehouse keeper',
+  FINANCIAL_OPERATIONAL: 'Finance / ops',
+  RIDER: 'Rider',
+  AGENT: 'Agent',
+};
+const humanizeRole = (role: string) => ROLE_LABELS[role] ?? role.replace(/_/g, ' ').toLowerCase();
 
 export default function ExternalBookScreen() {
   const router = useRouter();
@@ -75,6 +88,10 @@ export default function ExternalBookScreen() {
   const [paymentMethod, setPaymentMethod] = useState<
     typeof PaymentMethod.MTN_MOMO | typeof PaymentMethod.BANK_TRANSFER | typeof PaymentMethod.EKASH
   >(PaymentMethod.MTN_MOMO);
+
+  // Optional: which internal staff member received the package (either intake method).
+  const [staff, setStaff] = useState<ReceiverStaff[]>([]);
+  const [receivedById, setReceivedById] = useState('');
 
   const [quote, setQuote] = useState<DeliveryQuote | null>(null);
   const [creditBalance, setCreditBalance] = useState(0);
@@ -118,6 +135,17 @@ export default function ExternalBookScreen() {
     let active = true;
     getDeliveryHubs()
       .then((h) => active && setHubs(h))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Load internal staff for the optional "received by" picker.
+  useEffect(() => {
+    let active = true;
+    getReceiverStaff()
+      .then((s) => active && setStaff(s))
       .catch(() => {});
     return () => {
       active = false;
@@ -274,6 +302,7 @@ export default function ExternalBookScreen() {
         paymentMethod,
         applyCredit,
         express,
+        receivedById: receivedById || undefined,
       });
       const msg = res.needsReview
         ? "This package's weight is outside our standard ranges — our team will confirm the delivery fee and contact you. No payment is due yet."
@@ -311,7 +340,7 @@ export default function ExternalBookScreen() {
     recipientName, recipientPhone, recipientEmail, location, landmark, hasPin, coords,
     intakeMethod, hubs, dropHubId, pickupContactName, pickupPhone, pickupLandmark, pickupCoords,
     packageDescription, declaredValue, weightKg, lengthCm, widthCm, heightCm,
-    paymentMethod, applyCredit, router,
+    paymentMethod, applyCredit, express, receivedById, router,
   ]);
 
   return (
@@ -493,6 +522,53 @@ export default function ExternalBookScreen() {
           );
         })}
       </View>
+
+      {/* Received by (optional) — the staff member who took the package in,
+          for either intake method (hub drop-off or a sweep pickup). */}
+      {staff.length > 0 ? (
+        <>
+          <Text style={styles.section}>Received by (optional)</Text>
+          <Text style={styles.hint}>
+            The staff member who took the package in — at the hub or during a sweep pickup. Leave
+            blank if it hasn&apos;t been received yet.
+          </Text>
+          <View style={{ gap: spacing.sm }}>
+            <TouchableOpacity
+              style={[styles.hubRow, !receivedById && styles.hubRowActive]}
+              onPress={() => setReceivedById('')}
+            >
+              <Ionicons
+                name={!receivedById ? 'radio-button-on' : 'radio-button-off'}
+                size={18}
+                color={!receivedById ? colors.success : colors.muted}
+              />
+              <View style={styles.flex}>
+                <Text style={styles.hubName}>Not recorded</Text>
+              </View>
+            </TouchableOpacity>
+            {staff.map((s) => {
+              const active = receivedById === s.id;
+              return (
+                <TouchableOpacity
+                  key={s.id}
+                  style={[styles.hubRow, active && styles.hubRowActive]}
+                  onPress={() => setReceivedById(s.id)}
+                >
+                  <Ionicons
+                    name={active ? 'radio-button-on' : 'radio-button-off'}
+                    size={18}
+                    color={active ? colors.success : colors.muted}
+                  />
+                  <View style={styles.flex}>
+                    <Text style={styles.hubName}>{s.name}</Text>
+                    <Text style={styles.hubLandmark}>{humanizeRole(s.role)}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
 
       {/* Express toggle: instant dispatch at the premium express rate */}
       {expressEnabled ? (
