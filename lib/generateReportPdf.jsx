@@ -31,6 +31,8 @@ const styles = StyleSheet.create({
     tableHeaderText: { fontFamily: 'Helvetica-Bold', fontSize: 8, color: BRAND_BLUE },
     tableRow: { flexDirection: 'row', padding: '3 6', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
     cell: { fontSize: 8 },
+    totalsRow: { flexDirection: 'row', padding: '4 6', marginTop: 2, borderTopWidth: 1.5, borderTopColor: BRAND_BLUE, backgroundColor: '#f8fafc' },
+    totalsCell: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#0f172a' },
     note: { fontSize: 8, color: '#94a3b8', fontFamily: 'Helvetica-Oblique', paddingVertical: 4 },
     footer: { position: 'absolute', bottom: 20, left: 36, right: 36, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0', fontSize: 7.5, color: '#94a3b8', textAlign: 'center' },
 });
@@ -42,27 +44,38 @@ function colStyle(col) {
     return { flex, textAlign: col.align === 'right' ? 'right' : 'left' };
 }
 
+// A cell of the totals footer: the column's total when it has one, otherwise the
+// "Total" label in the first column and blanks everywhere else.
+function totalCell(section, column, index, currency) {
+    const value = section.totals[column.key];
+    if (value !== undefined && value !== null) return formatValue(value, column.format, currency);
+    return index === 0 ? (section.totalsLabel || 'Total') : '';
+}
+
 function TableSection({ section, currency }) {
     const isTime = section.kind === 'timeseries';
     const columns = isTime
         ? [{ key: 'x', label: 'Date', format: 'text' }, { key: 'y', label: 'Value', format: section.valueFormat || 'number', align: 'right' }]
         : (section.columns || []);
     const rows = isTime ? (section.data || []) : (section.rows || []);
+    // Wide sections own their landscape page, so they may flow across pages and
+    // carry many more rows than a section squeezed in beside the others.
+    const limit = section.wide ? 400 : 60;
 
     return (
-        <View style={styles.section} wrap={false}>
+        <View style={styles.section} wrap={section.wide === true}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             {rows.length === 0 ? (
                 <Text style={styles.note}>{section.note || 'No data for this period.'}</Text>
             ) : (
                 <>
-                    <View style={styles.tableHeader}>
+                    <View style={styles.tableHeader} fixed={section.wide === true}>
                         {columns.map((c, i) => (
                             <Text key={i} style={[styles.tableHeaderText, colStyle(c)]}>{c.label}</Text>
                         ))}
                     </View>
-                    {rows.slice(0, 60).map((row, ri) => (
-                        <View key={ri} style={styles.tableRow}>
+                    {rows.slice(0, limit).map((row, ri) => (
+                        <View key={ri} style={styles.tableRow} wrap={false}>
                             {columns.map((c, ci) => (
                                 <Text key={ci} style={[styles.cell, colStyle(c)]}>
                                     {formatValue(row[c.key], c.format, currency)}
@@ -70,8 +83,20 @@ function TableSection({ section, currency }) {
                             ))}
                         </View>
                     ))}
-                    {rows.length > 60 && (
-                        <Text style={styles.note}>Showing first 60 of {rows.length} rows — download the CSV for the full list.</Text>
+                    {rows.length > limit && (
+                        <Text style={styles.note}>Showing first {limit} of {rows.length} rows — download the CSV for the full list.</Text>
+                    )}
+                    {section.totals && (
+                        <View style={styles.totalsRow} wrap={false}>
+                            {columns.map((c, ci) => (
+                                <Text key={ci} style={[styles.totalsCell, colStyle(c)]}>
+                                    {totalCell(section, c, ci, currency)}
+                                </Text>
+                            ))}
+                        </View>
+                    )}
+                    {section.totals && rows.length > limit && (
+                        <Text style={styles.note}>The total above covers all {rows.length} rows, not just those listed.</Text>
                     )}
                 </>
             )}
@@ -79,30 +104,48 @@ function TableSection({ section, currency }) {
     );
 }
 
+function ReportHeader({ report, logoSrc }) {
+    return (
+        <View style={styles.header} fixed>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {logoSrc && (
+                    <PDFImage src={logoSrc} style={{ width: 78, height: 44, marginRight: 10, objectFit: 'contain' }} />
+                )}
+                <View>
+                    <Text style={styles.brand}>The Quality Market</Text>
+                    <Text style={styles.brandTagline}>Quality is our Culture</Text>
+                    <Text style={styles.brandSub}>Kigali, KN 82 St, Tropical plaza, C26</Text>
+                </View>
+            </View>
+            <View>
+                <Text style={styles.reportLabel}>{report.title}</Text>
+                {report.subtitle ? <Text style={styles.metaLine}>{report.subtitle}</Text> : null}
+                <Text style={styles.metaLine}>{report.scopeLabel}</Text>
+                <Text style={styles.metaLine}>Period: {report.range?.label}</Text>
+                <Text style={styles.metaLine}>Generated: {new Date(report.generatedAt).toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+            </View>
+        </View>
+    );
+}
+
+const Footer = () => (
+    <Text style={styles.footer} fixed>
+        The Quality Market · Confidential business report · support@thequalitymarket.com
+    </Text>
+);
+
 function ReportDocument({ report, logoSrc }) {
     const currency = report.currency || 'RWF';
+    const sections = report.sections || [];
+    // A many-columned table (e.g. the shipment ledger) is unreadable squeezed
+    // into portrait, so it gets its own landscape page after the summary.
+    const inline = sections.filter((s) => !s.wide);
+    const wide = sections.filter((s) => s.wide);
+
     return (
         <Document>
             <Page size="A4" style={styles.page}>
-                <View style={styles.header} fixed>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {logoSrc && (
-                            <PDFImage src={logoSrc} style={{ width: 78, height: 44, marginRight: 10, objectFit: 'contain' }} />
-                        )}
-                        <View>
-                            <Text style={styles.brand}>The Quality Market</Text>
-                            <Text style={styles.brandTagline}>Quality is our Culture</Text>
-                            <Text style={styles.brandSub}>Kigali, KN 82 St, Tropical plaza, C26</Text>
-                        </View>
-                    </View>
-                    <View>
-                        <Text style={styles.reportLabel}>{report.title}</Text>
-                        {report.subtitle ? <Text style={styles.metaLine}>{report.subtitle}</Text> : null}
-                        <Text style={styles.metaLine}>{report.scopeLabel}</Text>
-                        <Text style={styles.metaLine}>Period: {report.range?.label}</Text>
-                        <Text style={styles.metaLine}>Generated: {new Date(report.generatedAt).toLocaleDateString('en-RW', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
-                    </View>
-                </View>
+                <ReportHeader report={report} logoSrc={logoSrc} />
 
                 {/* KPI grid */}
                 <View style={styles.kpiWrap}>
@@ -117,14 +160,20 @@ function ReportDocument({ report, logoSrc }) {
                 </View>
 
                 {/* Sections */}
-                {(report.sections || []).map((section) => (
+                {inline.map((section) => (
                     <TableSection key={section.id} section={section} currency={currency} />
                 ))}
 
-                <Text style={styles.footer} fixed>
-                    The Quality Market · Confidential business report · support@thequalitymarket.com
-                </Text>
+                <Footer />
             </Page>
+
+            {wide.map((section) => (
+                <Page key={section.id} size="A4" orientation="landscape" style={styles.page}>
+                    <ReportHeader report={report} logoSrc={logoSrc} />
+                    <TableSection section={section} currency={currency} />
+                    <Footer />
+                </Page>
+            ))}
         </Document>
     );
 }

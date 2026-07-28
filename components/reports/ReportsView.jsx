@@ -334,7 +334,26 @@ function ReportTable({ section, currency }) {
                         </tr>
                     ))}
                 </tbody>
+                {section.totals && (
+                    <tfoot>
+                        <tr className="border-t-2 border-slate-200 font-semibold text-slate-800">
+                            {section.columns.map((c, ci) => (
+                                <td key={c.key} className={`py-2 px-2 ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}>
+                                    {totalCell(section, c, ci, currency)}
+                                </td>
+                            ))}
+                        </tr>
+                    </tfoot>
+                )}
             </table>
         </div>
     )
+}
+
+// A cell of the totals footer: the column's total when it has one, otherwise the
+// "Total" label in the first column and blanks everywhere else.
+function totalCell(section, column, index, currency) {
+    const value = section.totals[column.key]
+    if (value !== undefined && value !== null) return formatValue(value, column.format, currency)
+    return index === 0 ? (section.totalsLabel || 'Total') : ''
 }
