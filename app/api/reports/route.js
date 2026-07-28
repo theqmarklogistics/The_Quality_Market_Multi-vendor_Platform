@@ -19,7 +19,9 @@ const DEFAULT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 // query string is discarded. They can only ever NARROW a report within the scope
 // resolveReportScope already granted, never widen it: each report validates the
 // value against the entities its own (scoped) data contains.
-const FILTER_KEYS = ['storeId', 'productId', 'packageId', 'riderId', 'corridorId', 'hubId'];
+// `category` carries a category NAME (names are globally unique — a product
+// references its category by name); every other key carries an id.
+const FILTER_KEYS = ['storeId', 'category', 'productId', 'packageId', 'riderId', 'corridorId', 'hubId'];
 
 function parseFilters(searchParams) {
     const filters = {};
