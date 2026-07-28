@@ -37,11 +37,18 @@ const styles = StyleSheet.create({
     footer: { position: 'absolute', bottom: 20, left: 36, right: 36, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0', fontSize: 7.5, color: '#94a3b8', textAlign: 'center' },
 });
 
-function colStyle(col) {
+// A many-columned table needs a bigger sheet and smaller type than the portrait
+// summary. Beyond ~14 columns even A4 landscape squeezes every cell into a
+// two-line wrap, so those tables print on A3 instead.
+const DENSE_FROM_COLUMNS = 14;
+const pageSizeFor = (section) => ((section.columns || []).length > DENSE_FROM_COLUMNS ? 'A3' : 'A4');
+const fontSizeFor = (columnCount) => (columnCount > DENSE_FROM_COLUMNS ? 6 : columnCount > 8 ? 7 : 8);
+
+function colStyle(col, fontSize) {
     // First column is the wide label column; numeric/right-aligned columns are
     // narrower. Everything is flex so it scales to the number of columns.
     const flex = col.align === 'right' ? 1 : 1.6;
-    return { flex, textAlign: col.align === 'right' ? 'right' : 'left' };
+    return { flex, fontSize, textAlign: col.align === 'right' ? 'right' : 'left' };
 }
 
 // A cell of the totals footer: the column's total when it has one, otherwise the
@@ -61,6 +68,7 @@ function TableSection({ section, currency }) {
     // Wide sections own their landscape page, so they may flow across pages and
     // carry many more rows than a section squeezed in beside the others.
     const limit = section.wide ? 400 : 60;
+    const fontSize = fontSizeFor(columns.length);
 
     return (
         <View style={styles.section} wrap={section.wide === true}>
@@ -71,13 +79,13 @@ function TableSection({ section, currency }) {
                 <>
                     <View style={styles.tableHeader} fixed={section.wide === true}>
                         {columns.map((c, i) => (
-                            <Text key={i} style={[styles.tableHeaderText, colStyle(c)]}>{c.label}</Text>
+                            <Text key={i} style={[styles.tableHeaderText, colStyle(c, fontSize)]}>{c.label}</Text>
                         ))}
                     </View>
                     {rows.slice(0, limit).map((row, ri) => (
                         <View key={ri} style={styles.tableRow} wrap={false}>
                             {columns.map((c, ci) => (
-                                <Text key={ci} style={[styles.cell, colStyle(c)]}>
+                                <Text key={ci} style={[styles.cell, colStyle(c, fontSize)]}>
                                     {formatValue(row[c.key], c.format, currency)}
                                 </Text>
                             ))}
@@ -89,7 +97,7 @@ function TableSection({ section, currency }) {
                     {section.totals && (
                         <View style={styles.totalsRow} wrap={false}>
                             {columns.map((c, ci) => (
-                                <Text key={ci} style={[styles.totalsCell, colStyle(c)]}>
+                                <Text key={ci} style={[styles.totalsCell, colStyle(c, fontSize)]}>
                                     {totalCell(section, c, ci, currency)}
                                 </Text>
                             ))}
@@ -168,7 +176,7 @@ function ReportDocument({ report, logoSrc }) {
             </Page>
 
             {wide.map((section) => (
-                <Page key={section.id} size="A4" orientation="landscape" style={styles.page}>
+                <Page key={section.id} size={pageSizeFor(section)} orientation="landscape" style={styles.page}>
                     <ReportHeader report={report} logoSrc={logoSrc} />
                     <TableSection section={section} currency={currency} />
                     <Footer />
