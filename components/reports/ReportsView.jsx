@@ -230,28 +230,31 @@ export default function ReportsView() {
                 </div>
             </div>
 
-            {/* Per-report filters (e.g. focus on a single rider) */}
+            {/* Per-report filters — focus the report on one store, product,
+                package, rider, corridor or hub. */}
             {report?.filters?.length > 0 && (
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                     {report.filters.map((f) => (
-                        <div key={f.key} className="flex items-center gap-2 text-sm">
-                            <label className="text-slate-400">{f.label}</label>
-                            <select
-                                value={filters[f.key] || ''}
-                                onChange={(e) => setFilters((prev) => {
-                                    const next = { ...prev }
-                                    if (e.target.value) next[f.key] = e.target.value
-                                    else delete next[f.key]
-                                    return next
-                                })}
-                                className="border border-slate-200 rounded-md px-2 py-1.5 bg-white min-w-[180px]"
-                            >
-                                {f.options.map((o) => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <ReportFilter
+                            key={f.key}
+                            filter={f}
+                            value={filters[f.key] || ''}
+                            onChange={(value) => setFilters((prev) => {
+                                const next = { ...prev }
+                                if (value) next[f.key] = value
+                                else delete next[f.key]
+                                return next
+                            })}
+                        />
                     ))}
+                    {Object.keys(filters).length > 0 && (
+                        <button
+                            onClick={() => setFilters({})}
+                            className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 transition"
+                        >
+                            Clear filters
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -261,6 +264,51 @@ export default function ReportsView() {
             ) : (
                 <ReportBody report={report} />
             )}
+        </div>
+    )
+}
+
+// One filter control, described entirely by the report payload. A picker commits
+// on change; a text filter commits on Enter or blur so the report isn't re-fetched
+// on every keystroke.
+function ReportFilter({ filter, value, onChange }) {
+    const [draft, setDraft] = useState(value)
+
+    // Adopt the committed value when it changes elsewhere (e.g. "Clear filters").
+    useEffect(() => { setDraft(value) }, [value])
+
+    if (filter.kind === 'text') {
+        return (
+            <div className="flex items-center gap-2 text-sm">
+                <label className="text-slate-400">{filter.label}</label>
+                <input
+                    type="search"
+                    value={draft}
+                    placeholder={filter.placeholder || ''}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={() => onChange(draft.trim())}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') onChange(draft.trim())
+                        if (e.key === 'Escape') { setDraft(''); onChange('') }
+                    }}
+                    className="border border-slate-200 rounded-md px-2 py-1.5 bg-white min-w-[180px]"
+                />
+            </div>
+        )
+    }
+
+    return (
+        <div className="flex items-center gap-2 text-sm">
+            <label className="text-slate-400">{filter.label}</label>
+            <select
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="border border-slate-200 rounded-md px-2 py-1.5 bg-white min-w-[180px]"
+            >
+                {filter.options.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+            </select>
         </div>
     )
 }

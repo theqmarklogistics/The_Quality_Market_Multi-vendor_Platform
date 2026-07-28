@@ -15,6 +15,21 @@ import { generateReportPdf } from "@/lib/generateReportPdf";
 const MAX_WINDOW_MS = 366 * 24 * 60 * 60 * 1000; // one year cap on a single report
 const DEFAULT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
+// Per-report focus filters. Only these keys are forwarded — anything else in the
+// query string is discarded. They can only ever NARROW a report within the scope
+// resolveReportScope already granted, never widen it: each report validates the
+// value against the entities its own (scoped) data contains.
+const FILTER_KEYS = ['storeId', 'productId', 'packageId', 'riderId', 'corridorId', 'hubId'];
+
+function parseFilters(searchParams) {
+    const filters = {};
+    for (const key of FILTER_KEYS) {
+        const value = (searchParams.get(key) || '').trim();
+        if (value) filters[key] = value.slice(0, 100);
+    }
+    return filters;
+}
+
 // Parse from/to into a [from, to] window with sane defaults and clamping.
 function parseRange(searchParams) {
     const now = new Date();
@@ -52,8 +67,7 @@ export async function GET(request) {
 
         const { from, to } = parseRange(searchParams);
         // Optional per-report filters (ignored by reports that don't use them).
-        const riderId = searchParams.get('riderId') || undefined;
-        const report = await computeReport({ type, scope, from, to, riderId });
+        const report = await computeReport({ type, scope, from, to, ...parseFilters(searchParams) });
 
         if (format === 'csv') {
             const csv = reportToCsv(report);

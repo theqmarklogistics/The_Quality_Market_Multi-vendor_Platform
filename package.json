@@ -14,6 +14,7 @@
     "test:delivery-pricing": "node scripts/check-delivery-pricing.mjs",
     "test:order-totals": "node scripts/check-order-totals.mjs",
     "test:chargeable-weight": "node scripts/check-chargeable-weight.mjs",
+    "test:report-filters": "node scripts/check-report-filters.mjs",
     "test:batch-ordering": "node scripts/check-batch-ordering.mjs",
     "postinstall": "prisma generate"
   },
